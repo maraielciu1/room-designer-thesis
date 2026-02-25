@@ -1,0 +1,634 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  THEORETICAL FOUNDATION — AR-Based Interior Design Application
+%  Author:  Mara Ielciu
+%  Date:    February 2026
+% ═══════════════════════════════════════════════════════════════════════════
+
+\chapter{Theoretical Foundation}
+\label{ch:theoretical}
+
+\section{Introduction}
+\label{sec:intro}
+
+The proliferation of LiDAR-equipped mobile devices has unlocked new possibilities in the domain of augmented reality (AR) for consumer applications. This chapter presents the theoretical foundation underpinning the development of an iOS application that enables users to scan physical rooms, reconstruct them as interactive 3D models, and replace detected furniture with virtual alternatives — effectively functioning as an AR-powered interior design tool.
+
+The application integrates several Apple-native frameworks — \textbf{RoomPlan}, \textbf{ARKit}, \textbf{RealityKit}, and \textbf{Object Capture} — and is architected following the \textbf{Model–View–ViewModel (MVVM)} design pattern. The user interface is built entirely with \textbf{SwiftUI}, while the 3D rendering pipeline relies on \textbf{RealityKit} and its underlying \textbf{Metal} graphics engine.
+
+This chapter discusses each technology in depth, examining the computational models they employ, their role within the application, and the design decisions that guided their integration.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Augmented Reality and Spatial Computing}
+\label{sec:ar_spatial}
+
+\subsection{Augmented Reality: Definition and Paradigm}
+
+Augmented reality is defined as the real-time overlay of computer-generated content onto the user's perception of the physical world \cite{azuma1997}. Unlike virtual reality (VR), which replaces the user's environment entirely, AR \emph{supplements} it, maintaining the user's awareness of and connection with their physical surroundings.
+
+Milgram and Kishino's \emph{reality–virtuality continuum} \cite{milgram1994} positions AR between the fully real and the fully virtual. The application presented in this thesis operates across this continuum: the room-scanning phase lies close to the ``real'' end (a live camera feed augmented with detection overlays), while the 3D room editor operates in a fully virtual scene reconstructed from physical measurements.
+
+\subsection{Spatial Computing on Mobile Devices}
+
+Modern iOS devices equipped with LiDAR (Light Detection and Ranging) sensors can perform real-time depth sensing at up to 5 metres with millimetre-level accuracy \cite{apple_lidar}. The LiDAR scanner emits infrared laser pulses and measures the time of flight (ToF) for each reflected pulse, constructing a depth map of the scene.
+
+This depth information is fused with data from the device's cameras, inertial measurement unit (IMU), and accelerometer through a process known as \textbf{visual-inertial odometry (VIO)}. Apple's implementation of VIO within ARKit combines:
+
+\begin{itemize}
+    \item \textbf{Feature point tracking}: Using computer vision algorithms (variants of ORB and FAST feature detectors) to identify and track visual landmarks across consecutive camera frames.
+    \item \textbf{Inertial data integration}: Gyroscope and accelerometer readings are fused using an Extended Kalman Filter (EKF) or its unscented variant (UKF) to estimate device pose between visual updates.
+    \item \textbf{Depth-enhanced pose estimation}: LiDAR depth maps provide absolute scale information, resolving the scale ambiguity inherent in monocular visual odometry.
+\end{itemize}
+
+The result is a six-degrees-of-freedom (6DoF) pose estimate for the device — three translational and three rotational — updated at 60\,Hz, enabling precise placement of virtual content in the physical world.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Apple Frameworks and Technologies}
+\label{sec:frameworks}
+
+The application leverages four primary Apple frameworks, each addressing a distinct aspect of the AR pipeline. Figure~\ref{fig:framework_stack} illustrates their relationship.
+
+\subsection{ARKit — World Tracking and Scene Understanding}
+\label{subsec:arkit}
+
+\textbf{ARKit} (Apple, 2017) is Apple's foundational AR framework. It provides:
+
+\begin{enumerate}
+    \item \textbf{World Tracking} (\texttt{ARWorldTrackingConfiguration}): Combines visual-inertial odometry with LiDAR depth sensing to establish a persistent coordinate system anchored to the physical world. The world origin is defined at the device's position when the AR session begins.
+
+    \item \textbf{Plane Detection}: Identifies horizontal and vertical surfaces using a RANSAC-based (Random Sample Consensus) plane fitting algorithm applied to the LiDAR point cloud. Detected planes are represented as \texttt{ARPlaneAnchor} objects with estimated extents and classification (floor, wall, ceiling, table, seat).
+
+    \item \textbf{Scene Reconstruction} (\texttt{ARMeshAnchor}): On LiDAR-equipped devices, ARKit generates a real-time triangle mesh of the environment. This mesh is constructed using a volumetric fusion approach, where incoming depth frames are integrated into a truncated signed distance function (TSDF) volume, similar to the KinectFusion algorithm \cite{newcombe2011kinectfusion}. The TSDF is periodically meshed using the Marching Cubes algorithm to produce a triangle mesh, which ARKit provides as \texttt{ARMeshAnchor} objects.
+
+    \item \textbf{Scene Understanding}: ARKit classifies mesh faces into semantic categories (floor, wall, ceiling, door, window, seat, table) using a neural network that operates on a combination of geometric features (surface normals, curvature) and visual features (texture, colour). This classification is exposed through the \texttt{ARMeshClassification} enum.
+
+    \item \textbf{Raycasting}: The framework provides raycasting functions that intersect a ray (e.g., from a screen touch point) with detected planes or the reconstructed mesh, enabling precise placement of virtual objects on physical surfaces.
+\end{enumerate}
+
+In the application, ARKit underpins the room scanning process indirectly through RoomPlan (Section~\ref{subsec:roomplan}), which builds upon ARKit's world tracking and scene reconstruction capabilities.
+
+
+\subsection{RoomPlan — Parametric Room Scanning}
+\label{subsec:roomplan}
+
+\textbf{RoomPlan} (Apple, 2022, iOS 16+) is a high-level framework specifically designed for scanning and reconstructing indoor environments. It builds upon ARKit's scene understanding and adds room-specific intelligence.
+
+\subsubsection{Architecture and Processing Pipeline}
+
+RoomPlan operates through the \texttt{RoomCaptureSession} class, which orchestrates the following pipeline:
+
+\begin{enumerate}
+    \item \textbf{Real-time Scanning}: The user moves through a room while the device captures depth data via LiDAR and visual data via the wide-angle camera. The \texttt{RoomCaptureView} provides a pre-built UIKit view with a live camera feed overlaid with real-time detection feedback (highlighted walls, detected objects).
+
+    \item \textbf{Structural Element Detection}: RoomPlan's machine learning models, trained on Apple's proprietary dataset of indoor environments, identify and parametrise:
+    \begin{itemize}
+        \item \textbf{Walls}: Detected as planar surfaces with estimated position, orientation, and dimensions. Each wall is represented as a \texttt{CapturedRoom.Wall} with a \texttt{transform} (4$\times$4 matrix) and \texttt{dimensions} (width, height).
+        \item \textbf{Floors and Ceilings}: Horizontal surfaces classified by their vertical position relative to detected walls.
+        \item \textbf{Doors and Windows}: Openings in walls, detected by analysing depth discontinuities and wall geometry. Each is parametrised with position, size, and type (standard, French, sliding, etc.).
+    \end{itemize}
+
+    \item \textbf{Object Detection and Classification}: Furniture and fixtures within the room are detected and classified into semantic categories defined by the \texttt{CapturedRoom.Object.Category} enum, which includes:
+    \begin{itemize}
+        \item Seating: \texttt{chair}, \texttt{sofa}
+        \item Surfaces: \texttt{table}
+        \item Storage: \texttt{storage}
+        \item Sleeping: \texttt{bed}
+        \item Fixtures: \texttt{fireplace}, \texttt{television}, \texttt{stove}, \texttt{bathtub}, \texttt{toilet}, \texttt{sink}, \texttt{washerDryer}, \texttt{dishwasher}, \texttt{refrigerator}
+        \item Other: \texttt{stairs}
+    \end{itemize}
+
+    Each detected object provides:
+    \begin{itemize}
+        \item A \textbf{transform} (\texttt{simd\_float4x4}): A 4$\times$4 homogeneous transformation matrix encoding the object's position, orientation, and scale in world coordinates.
+        \item \textbf{Dimensions} (\texttt{SIMD3<Float>}): The axis-aligned bounding box extents (width, height, depth) in metres.
+        \item A \textbf{category} label from the above classification.
+    \end{itemize}
+
+    \item \textbf{Post-Processing}: When the session ends (\texttt{captureSession.stop()}), RoomPlan performs global optimisation on the accumulated data, refining wall alignments, merging duplicate detections, and producing the final \texttt{CapturedRoom} data structure. This step uses bundle adjustment techniques to minimise reprojection errors across all captured frames.
+\end{enumerate}
+
+\subsubsection{Machine Learning Models in RoomPlan}
+
+RoomPlan employs several on-device neural networks, all running on the Apple Neural Engine (ANE):
+
+\begin{itemize}
+    \item \textbf{Semantic Segmentation Network}: A convolutional neural network (CNN) that classifies each region of the depth/RGB input into room element categories. This network architecture is similar to DeepLab \cite{chen2017deeplab} but optimised for Apple Silicon's Neural Engine.
+    \item \textbf{Object Detection Network}: Operates on the 3D point cloud and associated RGB imagery to detect and classify furniture objects. This uses a 3D variant of anchor-based detection, similar to VoteNet \cite{qi2019votenet}, where point cloud features vote for object centres.
+    \item \textbf{Plane Estimation Network}: Refines RANSAC-detected planes using learned priors about typical room geometry (e.g., walls are typically perpendicular to floors, doorways occur at specific heights).
+\end{itemize}
+
+All models are pre-trained by Apple, ship with the iOS operating system, and execute entirely on-device — no cloud processing or network connectivity is required, ensuring user privacy.
+
+\subsubsection{Data Representation: The CapturedRoom Structure}
+
+The output of a RoomPlan scan is a \texttt{CapturedRoom} object, which contains:
+
+\begin{verbatim}
+CapturedRoom:
+  ├── walls:     [Wall]      — position, dimensions, transform
+  ├── floors:    [Floor]     — position, dimensions, transform
+  ├── doors:     [Door]      — position, dimensions, type, transform
+  ├── windows:   [Window]    — position, dimensions, type, transform
+  ├── objects:   [Object]    — position, dimensions, category, transform
+  └── openings:  [Opening]   — wall openings
+\end{verbatim}
+
+This parametric representation differs fundamentally from a raw point cloud or mesh: it is a \emph{structured, semantically annotated, dimensionally accurate} model of the room that can be directly manipulated programmatically — precisely the property exploited by this application for furniture replacement.
+
+The \texttt{CapturedRoom} structure conforms to \texttt{Codable} (Swift's serialisation protocol), enabling persistence. In this application, scanned rooms are serialised to JSON and stored in the device's Documents directory, allowing users to revisit and edit previously scanned rooms across app sessions.
+
+
+\subsection{RealityKit — 3D Rendering Engine}
+\label{subsec:realitykit}
+
+\textbf{RealityKit} (Apple, 2019) is Apple's modern 3D rendering framework, built on top of the \textbf{Metal} graphics API. It provides an entity-component-system (ECS) architecture optimised for AR and VR content.
+
+\subsubsection{Entity-Component-System Architecture}
+
+RealityKit follows the ECS pattern, where:
+
+\begin{itemize}
+    \item \textbf{Entities} are lightweight identifiers that act as containers for components. The application uses \texttt{AnchorEntity} (positioned at a fixed world-space coordinate), \texttt{ModelEntity} (renderable geometry), and plain \texttt{Entity} (grouping/container node).
+    \item \textbf{Components} define behaviour and appearance: \texttt{ModelComponent} (mesh + materials), \texttt{CollisionComponent} (physics-based hit testing), \texttt{Transform} (position, rotation, scale).
+    \item \textbf{Systems} process entities with specific component combinations each frame.
+\end{itemize}
+
+\subsubsection{Rendering Pipeline}
+
+RealityKit uses Metal 3 for GPU-accelerated rendering with:
+
+\begin{itemize}
+    \item \textbf{Physically Based Rendering (PBR)}: All materials use PBR shading, computing light interaction based on roughness, metalness, and base colour parameters. This is implemented via a Cook-Torrance bidirectional reflectance distribution function (BRDF) \cite{cook1982reflectance}.
+    \item \textbf{Multi-pass Lighting}: The application configures a three-point lighting setup (key, fill, back) using \texttt{PointLight} entities. Each light computes attenuation based on the inverse-square law, with a configurable attenuation radius.
+    \item \textbf{Shadow Mapping}: Lights cast shadows using cascaded shadow maps, providing depth cues essential for spatial understanding.
+\end{itemize}
+
+\subsubsection{Scene Graph and Coordinate Spaces}
+
+RealityKit's scene graph is a tree of entities. Each entity's \texttt{Transform} component defines a local coordinate space relative to its parent. The application exploits this hierarchy in several ways:
+
+\begin{itemize}
+    \item \textbf{Room structure entities} (walls, floors, doors, windows) are anchored at the world-space positions provided by RoomPlan's \texttt{CapturedRoom} data.
+    \item \textbf{Furniture entities} are placed at the exact \texttt{transform} from the scanned object, then wrapped in container entities to handle centering and ground alignment independently.
+    \item \textbf{Camera entity} (\texttt{PerspectiveCamera}) is placed on a dedicated \texttt{AnchorEntity} and manipulated via orbit controls computed from user gestures.
+\end{itemize}
+
+\subsubsection{Non-AR Mode: Virtual 3D Scene}
+
+A key architectural decision in this application was to render the room editor in \textbf{non-AR mode} (\texttt{ARView(cameraMode: .nonAR)}). This means the \texttt{ARView} does not display a live camera feed; instead, it renders a fully virtual 3D scene with a dark background and programmatic lighting. This choice was driven by several factors:
+
+\begin{enumerate}
+    \item \textbf{Decoupled from physical environment}: Users can edit their room design without needing to be physically present in the scanned room.
+    \item \textbf{Orbit camera}: A virtual camera enables orbit, pan, and zoom controls (implemented via UIKit gesture recognisers), providing a more intuitive editing experience than fixed AR perspectives.
+    \item \textbf{Performance}: Disabling AR session processing frees GPU and CPU resources for scene rendering and model loading.
+    \item \textbf{Reproducibility}: The virtual scene is fully deterministic, ensuring consistent rendering across sessions.
+\end{enumerate}
+
+
+\subsection{Object Capture and Photogrammetry}
+\label{subsec:object_capture}
+
+\textbf{Object Capture} (Apple, iOS 17+) enables users to scan individual real-world objects and generate textured 3D models in the USDZ format. This feature leverages the \texttt{ObjectCaptureSession} and \texttt{PhotogrammetrySession} APIs.
+
+\subsubsection{The Photogrammetry Pipeline}
+
+Photogrammetry is the science of extracting 3D measurements and models from photographic images \cite{luhmann2014photogrammetry}. Apple's Object Capture implements a multi-stage pipeline:
+
+\begin{enumerate}
+    \item \textbf{Image Acquisition}: The \texttt{ObjectCaptureSession} guides the user to capture overlapping photographs of an object from multiple viewpoints. The session uses ARKit's tracking to compute camera poses and provides real-time feedback on coverage completeness. Images are saved in HEIC format to the device's temporary directory.
+
+    \item \textbf{Feature Detection and Matching}: For each image pair, the system extracts local features using algorithms similar to SIFT (Scale-Invariant Feature Transform) \cite{lowe2004sift} or its accelerated variants. These features are matched across image pairs to establish point correspondences. The matching process uses approximate nearest-neighbour search (FLANN) and applies Lowe's ratio test to filter ambiguous matches.
+
+    \item \textbf{Structure from Motion (SfM)}: Given the matched feature points and their estimated camera poses (from ARKit), the system performs:
+    \begin{itemize}
+        \item \textbf{Triangulation}: Each matched pair of features is triangulated to produce a 3D point, forming a sparse point cloud.
+        \item \textbf{Bundle Adjustment}: A non-linear least squares optimisation (typically Levenberg-Marquardt) jointly refines camera poses and 3D point positions to minimise reprojection error:
+        \[
+            \min_{\mathbf{P}_j, \mathbf{X}_i} \sum_{i,j} \| \mathbf{x}_{ij} - \pi(\mathbf{P}_j, \mathbf{X}_i) \|^2
+        \]
+        where $\mathbf{x}_{ij}$ is the observed 2D position of point $i$ in image $j$, $\mathbf{P}_j$ is the camera projection matrix for image $j$, $\mathbf{X}_i$ is the 3D position of point $i$, and $\pi$ is the projection function.
+    \end{itemize}
+
+    \item \textbf{Multi-View Stereo (MVS)}: The sparse point cloud is densified using patch-based multi-view stereo \cite{furukawa2010pmvs}. For each pixel in each image, the system estimates depth by searching for photometric consistency across neighbouring views, producing a dense depth map. These depth maps are fused into a dense point cloud.
+
+    \item \textbf{Surface Reconstruction}: The dense point cloud is converted to a triangle mesh using Poisson Surface Reconstruction \cite{kazhdan2006poisson} or a screened Poisson variant. This algorithm solves for an implicit function whose zero-set approximates the surface, then extracts the mesh using Marching Cubes.
+
+    \item \textbf{Texture Mapping}: The reconstructed mesh is parameterised (UV unwrapped), and textures are projected from the source images onto the mesh surface. Multi-band blending is applied to handle colour inconsistencies across views.
+
+    \item \textbf{USDZ Export}: The final textured mesh is encoded in the Universal Scene Description (USDZ) format — Apple's standard for 3D content. USDZ is a zero-compression, unencrypted package containing the mesh geometry (vertices, normals, UV coordinates), PBR materials, and texture images.
+\end{enumerate}
+
+\subsubsection{Session States and Lifecycle}
+
+The \texttt{ObjectCaptureSession} progresses through a defined state machine:
+
+\begin{verbatim}
+  initializing → ready → detecting → capturing → finishing → completed
+                                                           ↘ failed
+\end{verbatim}
+
+\begin{itemize}
+    \item \textbf{Initializing}: Hardware calibration and sensor warm-up.
+    \item \textbf{Ready}: The session is prepared; the user should position the object.
+    \item \textbf{Detecting}: The system is localising the object's bounding volume using depth and visual cues.
+    \item \textbf{Capturing}: Active image acquisition. The system tracks coverage and provides feedback through \texttt{feedbackUpdates} (e.g., ``move slower'', ``move to uncovered area'').
+    \item \textbf{Finishing}: Final processing of captured images.
+    \item \textbf{Completed}: The image set is ready for photogrammetric reconstruction.
+\end{itemize}
+
+\subsubsection{Quality and Configuration Parameters}
+
+The application configures the \texttt{PhotogrammetrySession} with:
+
+\begin{itemize}
+    \item \texttt{sampleOrdering: .sequential} — processes images in capture order, preserving spatial locality for more efficient feature matching.
+    \item \texttt{featureSensitivity: .normal} — standard feature detection threshold; higher sensitivity detects more features but increases processing time.
+    \item \texttt{isObjectMaskingEnabled: true} — the system segments the target object from the background, improving reconstruction quality by excluding background geometry.
+    \item \texttt{checkpointDirectory} — enables incremental reconstruction; if the process is interrupted, it can resume from the last checkpoint.
+    \item \texttt{detail: .reduced} — generates a lower-polygon mesh suitable for real-time rendering on mobile devices, typically $<$50K triangles.
+\end{itemize}
+
+\subsubsection{Image Count Validation}
+
+Photogrammetric reconstruction requires sufficient overlap between views. The application enforces a minimum of 20 images before attempting reconstruction. This threshold is derived from the requirement that each surface point must be visible in at least 3 images with sufficient parallax for reliable triangulation. At 20 images covering a full 360° orbit, the average inter-image angular separation is 18°, providing approximately 5--8$\times$ redundancy for most surface points.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{3D Model Representation: USDZ Format}
+\label{sec:usdz}
+
+The application uses the \textbf{Universal Scene Description (USD)} format \cite{pixar_usd}, specifically its compressed variant \textbf{USDZ}, as the interchange format for all 3D furniture models.
+
+\subsection{Structure and Components}
+
+A USDZ file is an uncompressed ZIP archive containing:
+
+\begin{itemize}
+    \item \textbf{USD Layer} (primary): Defines the scene hierarchy, geometry, materials, and transforms.
+    \item \textbf{Textures}: PNG, JPEG, or EXR image files referenced by materials.
+    \item \textbf{Mesh Data}: Vertices, face indices, normals, and UV coordinates stored in an efficient binary encoding.
+\end{itemize}
+
+\subsection{Coordinate System and Units}
+
+USD uses a right-handed coordinate system with the Y-axis pointing up. All dimensions are specified in metres, which aligns directly with ARKit and RoomPlan's coordinate conventions. This consistency eliminates unit conversion errors during model placement.
+
+\subsection{Model Scaling and Alignment}
+
+A significant technical challenge addressed in this application is the correct scaling and positioning of replacement furniture models. The \texttt{loadAndScaleModel(named:targetDimensions:)} function implements the following algorithm:
+
+\begin{enumerate}
+    \item \textbf{Compute local-space bounds}: The model's bounding box is computed in its own local coordinate space using \texttt{visualBounds(relativeTo: model)}, which yields the untransformed extents.
+    \item \textbf{Calculate uniform scale}: The scale factor is computed as the minimum ratio across all three axes:
+    \[
+        s = \min\left(\frac{t_x}{e_x}, \frac{t_y}{e_y}, \frac{t_z}{e_z}\right) \times 0.90
+    \]
+    where $t_{x,y,z}$ are the target dimensions (from RoomPlan) and $e_{x,y,z}$ are the model's local extents. The 0.90 factor provides a 10\% safety margin to prevent overshoot.
+
+    \item \textbf{Centre the model}: The scaled model is placed in a container entity, and its position is adjusted to centre the visual bounds at the container's origin.
+
+    \item \textbf{Ground alignment}: The model's bottom is aligned with the bottom of the target volume ($-t_y/2$), ensuring furniture sits on the floor rather than floating or clipping through it.
+\end{enumerate}
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Application Architecture}
+\label{sec:architecture}
+
+\subsection{MVVM Design Pattern}
+
+The application follows the \textbf{Model--View--ViewModel (MVVM)} architectural pattern \cite{microsoft_mvvm}, adapted for SwiftUI's declarative paradigm:
+
+\begin{itemize}
+    \item \textbf{Model Layer}: Pure data structures conforming to \texttt{Codable} for serialisation:
+    \begin{itemize}
+        \item \texttt{User} — user identity and metadata.
+        \item \texttt{Room} — room metadata, scan data reference, and furniture replacements.
+        \item \texttt{FurnitureReplacement} — records a replaced object with its original category, replacement model, transform, and manipulation offsets.
+        \item \texttt{ReplacementHistory} — timestamped audit trail of user actions.
+        \item \texttt{ScannedFurniture} — metadata for user-scanned 3D objects.
+    \end{itemize}
+
+    \item \textbf{ViewModel Layer} (Services): Classes conforming to \texttt{ObservableObject}, injected as \texttt{@EnvironmentObject} through SwiftUI's dependency injection:
+    \begin{itemize}
+        \item \texttt{UserManager} — user CRUD operations and session management.
+        \item \texttt{RoomManager} — room persistence, duplicate detection, and CRUD.
+        \item \texttt{HistoryManager} — replacement action logging and retrieval.
+        \item \texttt{FurnitureCatalogManager} — model loading, scaling, and category mapping.
+        \item \texttt{ScannedFurnitureManager} — object capture file management and metadata.
+    \end{itemize}
+
+    \item \textbf{View Layer}: SwiftUI views that observe ViewModels and render accordingly:
+    \begin{itemize}
+        \item \texttt{LandingView} — entry point with navigation to rooms and furniture library.
+        \item \texttt{RoomListView} — displays saved rooms with scan status indicators.
+        \item \texttt{RoomScanView} — manages the RoomPlan scanning lifecycle.
+        \item \texttt{RoomDesignerView} — the 3D room editor (primary interaction surface).
+        \item \texttt{ObjectScanView} — Object Capture scanning workflow.
+        \item \texttt{FurnitureLibraryView} — furniture catalog browser.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Reactive Data Flow}
+
+SwiftUI's reactive paradigm ensures automatic UI updates when data changes:
+
+\begin{enumerate}
+    \item \textbf{State Management}: View-local state is managed with \texttt{@State}. Cross-view state is managed with \texttt{@Binding} (child views) and \texttt{@EnvironmentObject} (dependency injection).
+    \item \textbf{Observation}: ViewModels use \texttt{@Published} properties, which emit change notifications through the Combine framework's \texttt{ObservableObject} protocol. When a \texttt{@Published} property changes, all views observing that ViewModel are automatically re-rendered.
+    \item \textbf{Unidirectional Data Flow}: User actions trigger ViewModel methods, which update \texttt{@Published} properties, which trigger view re-renders — creating a clean unidirectional data flow cycle.
+\end{enumerate}
+
+
+\subsection{UIKit Integration via UIViewRepresentable}
+
+Certain components require UIKit for functionality unavailable in SwiftUI:
+
+\begin{itemize}
+    \item \texttt{RoomCaptureViewWrapper}: Wraps RoomPlan's \texttt{RoomCaptureView} (a UIKit view) in a \texttt{UIViewRepresentable} adapter, enabling its use within SwiftUI's declarative hierarchy.
+    \item \texttt{RoomModelSceneView}: Wraps RealityKit's \texttt{ARView} in a \texttt{UIViewRepresentable}, managing the 3D scene lifecycle through SwiftUI's \texttt{makeUIView}, \texttt{updateUIView}, and \texttt{Coordinator} pattern.
+\end{itemize}
+
+The \texttt{Coordinator} class serves as the delegate and gesture handler, bridging UIKit's imperative event model with SwiftUI's declarative state model.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{3D Scene Reconstruction from RoomPlan Data}
+\label{sec:scene_reconstruction}
+
+The application reconstructs a fully navigable 3D scene from the parametric \texttt{CapturedRoom} data. This process involves several steps:
+
+\subsection{Room Bounds Computation}
+
+The bounding box of the room is computed by iterating over all structural elements (walls, floors) and objects, extracting the translation vector from each element's \texttt{transform} matrix, and computing the axis-aligned minimum and maximum:
+
+\[
+    \mathbf{p}_{\min} = \min_i \begin{pmatrix} t_{i,x} \\ t_{i,y} \\ t_{i,z} \end{pmatrix}, \quad
+    \mathbf{p}_{\max} = \max_i \begin{pmatrix} t_{i,x} \\ t_{i,y} \\ t_{i,z} \end{pmatrix}
+\]
+
+The orbit centre is computed as $\mathbf{c} = (\mathbf{p}_{\min} + \mathbf{p}_{\max}) / 2$.
+
+\subsection{Structural Element Rendering}
+
+Each room element (wall, floor, door, window) is rendered as a semi-transparent panel with wireframe edges:
+
+\begin{itemize}
+    \item A \texttt{MeshResource.generateBox()} primitive is created with the element's \texttt{dimensions}.
+    \item A \texttt{SimpleMaterial} with a category-specific colour and low opacity (10--15\%) is applied for the panel.
+    \item Wireframe edges are rendered as thin box primitives along each edge, providing visual structure without occluding the furniture.
+    \item The entity is positioned using the element's \texttt{transform} matrix (a 4$\times$4 homogeneous transformation).
+\end{itemize}
+
+\subsection{Furniture Object Rendering}
+
+Detected furniture objects are rendered in one of two modes:
+
+\begin{enumerate}
+    \item \textbf{Wireframe bounding box} (unreplaced objects): A wireframe outline matching the object's \texttt{dimensions} at its \texttt{transform} position. The wireframe is interactive — tapping selects the object, long-pressing opens the furniture catalog.
+    \item \textbf{Replacement model} (replaced objects): A USDZ model loaded, scaled, and positioned at the object's original location. The model can be further manipulated (dragged, rotated) by the user.
+\end{enumerate}
+
+
+\subsection{Orbit Camera System}
+
+The virtual camera is implemented as a \texttt{PerspectiveCamera} entity placed on a dedicated anchor. Its position is computed using spherical coordinates:
+
+\[
+    \begin{cases}
+        x = c_x + d \cdot \cos(\theta) \cdot \sin(\phi) \\
+        y = c_y + d \cdot \sin(\theta) \\
+        z = c_z + d \cdot \cos(\theta) \cdot \cos(\phi)
+    \end{cases}
+\]
+
+where $d$ is the orbit distance, $\theta$ is the elevation angle, and $\phi$ is the azimuth angle. User gestures update these parameters:
+
+\begin{itemize}
+    \item \textbf{Two-finger pan}: Updates $\phi$ (azimuth) and $\theta$ (elevation).
+    \item \textbf{Pinch}: Scales $d$ (distance), with clamping to prevent the camera from entering or leaving the scene.
+\end{itemize}
+
+The camera's orientation is computed using a \texttt{look-at} matrix, ensuring it always points towards the orbit centre.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Gesture-Based Object Manipulation}
+\label{sec:gestures}
+
+The application implements a multi-gesture interaction system for selecting and manipulating furniture in the 3D scene:
+
+\subsection{Hit Testing and Object Selection}
+
+When the user taps or long-presses the screen, the system performs a \textbf{ray cast} from the touch point into the 3D scene. The closest intersected entity with a \texttt{CollisionComponent} is identified, and its corresponding \texttt{ScannedObject} is looked up in the object map.
+
+Hit testing uses RealityKit's built-in \texttt{ARView.entity(at:)} method, which projects a ray from screen coordinates through the camera's projection matrix and tests intersection with collision shapes in the scene.
+
+\subsection{Object Movement}
+
+One-finger pan gestures translate the selected object on the horizontal (XZ) plane. The translation is computed in world space by projecting the 2D screen-space gesture delta along the camera's right and forward vectors (projected onto the floor plane):
+
+\[
+    \Delta\mathbf{p}_{\text{world}} = \mathbf{r}_{\text{floor}} \cdot \Delta x_{\text{screen}} \cdot k + \mathbf{f}_{\text{floor}} \cdot (-\Delta y_{\text{screen}}) \cdot k
+\]
+
+where $\mathbf{r}_{\text{floor}}$ and $\mathbf{f}_{\text{floor}}$ are the camera's right and forward vectors projected onto the Y=0 plane, $\Delta x, \Delta y$ are screen-space pixel deltas, and $k = d \cdot 0.001$ is a sensitivity factor proportional to orbit distance.
+
+\subsection{Object Rotation}
+
+Two-finger twist gestures rotate the selected object around the Y-axis. The rotation is applied as a quaternion multiplication:
+
+\[
+    \mathbf{q}_{\text{new}} = \mathbf{q}_{\text{start}} \cdot \mathbf{q}(\alpha, \hat{\mathbf{y}})
+\]
+
+where $\mathbf{q}_{\text{start}}$ is the orientation at gesture begin, $\alpha$ is the cumulative rotation angle from the gesture, and $\hat{\mathbf{y}} = (0, 1, 0)$ is the world up vector.
+
+\subsection{Manipulation Persistence}
+
+All manipulations (position offset, Y-axis rotation, custom scale) are persisted in the \texttt{FurnitureReplacement} data model, ensuring that user edits survive app restarts. The persistence uses a combination of:
+
+\begin{itemize}
+    \item \texttt{positionOffset: [Double]?} — world-space displacement from the original scanned position.
+    \item \texttt{yRotation: Double?} — rotation angle in radians, extracted from the quaternion using $\text{atan2}(2(qw \cdot qy + qz \cdot qx), 1 - 2(qx^2 + qy^2))$.
+    \item \texttt{customScale: Double?} — relative scale factor compared to the auto-computed fit scale.
+\end{itemize}
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Data Persistence Strategy}
+\label{sec:persistence}
+
+The application employs a local-first data persistence architecture, prioritising offline functionality and privacy:
+
+\subsection{UserDefaults}
+
+Lightweight metadata is stored in \texttt{UserDefaults}, Apple's key-value storage system:
+
+\begin{itemize}
+    \item User profiles (\texttt{[User]})
+    \item Room metadata (\texttt{[Room]}) — names, IDs, replacement records
+    \item Replacement history (\texttt{[ReplacementHistory]})
+    \item Scanned furniture metadata (\texttt{[ScannedFurniture]})
+\end{itemize}
+
+All data structures conform to \texttt{Codable} and are serialised to JSON via \texttt{JSONEncoder}/\texttt{JSONDecoder}.
+
+\subsection{File System}
+
+Larger binary data is stored in the app's Documents directory:
+
+\begin{itemize}
+    \item \texttt{Documents/RoomScans/\{uuid\}.json} — serialised \texttt{CapturedRoom} data from RoomPlan.
+    \item \texttt{Documents/ScannedFurniture/\{uuid\}.usdz} — user-scanned 3D models.
+    \item \texttt{Documents/ObjectCaptureTemp/} — temporary directory for Object Capture session images and checkpoints, cleaned up after reconstruction.
+\end{itemize}
+
+\subsection{In-Memory Cache}
+
+A static dictionary (\texttt{Room.inMemoryRooms: [UUID: CapturedRoom]}) serves as a fast-access cache for \texttt{CapturedRoom} data. The cache follows a write-through pattern: writes update both cache and disk, reads check cache first and fall back to disk.
+
+\subsection{Architecture Rationale}
+
+The application does not use a traditional backend server or database. This decision is motivated by:
+
+\begin{enumerate}
+    \item \textbf{Privacy}: All data (room scans, 3D models, user profiles) remains on the device. No personal spatial data leaves the device.
+    \item \textbf{Offline-first}: The app functions fully without network connectivity.
+    \item \textbf{Simplicity}: Eliminating server infrastructure reduces complexity, latency, and potential failure points.
+    \item \textbf{Performance}: Local data access avoids network round-trips for real-time 3D editing operations.
+\end{enumerate}
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Concurrency and Thread Safety}
+\label{sec:concurrency}
+
+The application manages several concurrent subsystems (AR session, capture session, gesture processing, 3D rendering) that must coordinate safely.
+
+\subsection{Swift Concurrency Model}
+
+The application uses Swift's structured concurrency (\texttt{async/await}, \texttt{Task}) for managing asynchronous operations:
+
+\begin{itemize}
+    \item \texttt{ObjectCaptureSession.stateUpdates} and \texttt{feedbackUpdates} are \texttt{AsyncSequence} values consumed in \texttt{.task \{\}} modifiers.
+    \item State updates from background sequences are dispatched to the main actor via \texttt{await MainActor.run \{\}} to ensure UI updates occur on the main thread.
+    \item The \texttt{PhotogrammetrySession.outputs} sequence delivers progress and completion events asynchronously.
+\end{itemize}
+
+\subsection{Main Actor Isolation}
+
+SwiftUI views and their \texttt{@State} properties are implicitly \texttt{@MainActor}-isolated. The \texttt{RoomCaptureCoordinator} uses \texttt{nonisolated} methods and \texttt{nonisolated(unsafe)} properties to safely bridge between RoomPlan's background callbacks and SwiftUI's main-thread requirements. Delegate method bodies dispatch to the main thread via \texttt{DispatchQueue.main.async}.
+
+\subsection{Gesture Coordinator}
+
+The \texttt{RoomModelSceneView.Coordinator} manages all UIKit gesture recognisers and must mediate between simultaneous gesture sources. It implements \texttt{UIGestureRecognizerDelegate} to:
+
+\begin{itemize}
+    \item Enable simultaneous recognition of pinch + rotation gestures.
+    \item Distinguish between camera-controlling gestures (two-finger pan) and object-manipulating gestures (one-finger pan on selected object).
+    \item Ensure that gesture state (e.g., \texttt{isManipulating}) is communicated back to SwiftUI via \texttt{@Binding} properties.
+\end{itemize}
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Comparison with Alternative Approaches}
+\label{sec:comparison}
+
+\subsection{RoomPlan vs. General-Purpose 3D Segmentation Models}
+
+Several research models were evaluated as alternatives to RoomPlan for furniture detection:
+
+\begin{itemize}
+    \item \textbf{SAM 3D (Segment Anything Model 3D)}: A general-purpose 3D segmentation model. While more flexible than RoomPlan, it is not optimised for furniture detection, requires Core ML or external API integration, and adds significant complexity without material benefit for this use case.
+
+    \item \textbf{VoteNet} \cite{qi2019votenet}: A deep learning model for 3D object detection from point clouds. While effective for general object detection, it lacks the semantic room understanding (walls, doors, windows) that RoomPlan provides natively.
+
+    \item \textbf{Reason-3D}: A research model combining large language models with 3D scene understanding. While promising for intelligent object placement, it is not production-ready.
+\end{itemize}
+
+RoomPlan was selected because it provides \textbf{native integration}, \textbf{furniture-specific training}, \textbf{real-time performance}, \textbf{on-device privacy}, and \textbf{a structured output format} (\texttt{CapturedRoom}) that is directly consumable by the application's scene reconstruction pipeline.
+
+\subsection{Non-AR Scene Editor vs. Live AR Overlay}
+
+The application initially rendered furniture replacements as AR overlays on a live camera feed. This approach was abandoned in favour of a non-AR 3D scene editor for several reasons:
+
+\begin{itemize}
+    \item \textbf{Persistence}: AR overlays require the user to be in the same physical location and rely on continuous world tracking, which is fragile across sessions.
+    \item \textbf{Editing Freedom}: A virtual scene allows orbit, zoom, and pan — views impossible in fixed-perspective AR.
+    \item \textbf{Reproducibility}: The virtual scene renders identically every time, unaffected by lighting changes in the physical environment.
+\end{itemize}
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Summary of Technologies}
+\label{sec:tech_summary}
+
+Table~\ref{tab:technologies} summarises the technologies used in the application.
+
+\begin{table}[h]
+\centering
+\caption{Summary of technologies and frameworks used in the application.}
+\label{tab:technologies}
+\begin{tabular}{|l|l|p{7cm}|}
+\hline
+\textbf{Technology} & \textbf{Version} & \textbf{Role in Application} \\
+\hline
+Swift & 5.9+ & Primary programming language \\
+SwiftUI & iOS 17+ & Declarative UI framework \\
+ARKit & iOS 11+ & World tracking, VIO, depth sensing \\
+RoomPlan & iOS 16+ & Room scanning, structural detection, furniture classification \\
+RealityKit & iOS 13+ & 3D rendering, PBR materials, scene graph management \\
+Object Capture API & iOS 17+ & Individual object scanning, session management \\
+PhotogrammetrySession & iOS 17+ & SfM, MVS, mesh reconstruction, USDZ export \\
+Metal & iOS 8+ & GPU-accelerated rendering backend \\
+Combine & iOS 13+ & Reactive data binding (\texttt{ObservableObject}, \texttt{@Published}) \\
+LiDAR Scanner & Hardware & Time-of-flight depth sensing (5m range) \\
+Apple Neural Engine & Hardware & On-device ML inference for scene understanding \\
+USD/USDZ & Pixar/Apple & 3D model interchange format \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{thebibliography}{99}
+
+\bibitem{azuma1997}
+R.~T.~Azuma, ``A survey of augmented reality,'' \textit{Presence: Teleoperators and Virtual Environments}, vol.~6, no.~4, pp.~355--385, 1997.
+
+\bibitem{milgram1994}
+P.~Milgram and F.~Kishino, ``A taxonomy of mixed reality visual displays,'' \textit{IEICE Transactions on Information and Systems}, vol.~E77-D, no.~12, pp.~1321--1329, 1994.
+
+\bibitem{apple_lidar}
+Apple Inc., ``LiDAR Scanner on iPad Pro and iPhone,'' \textit{Apple Developer Documentation}, 2020--2025.
+
+\bibitem{newcombe2011kinectfusion}
+R.~A.~Newcombe et al., ``KinectFusion: Real-time dense surface mapping and tracking,'' in \textit{Proc.~IEEE ISMAR}, 2011.
+
+\bibitem{chen2017deeplab}
+L.-C.~Chen et al., ``Rethinking atrous convolution for semantic image segmentation,'' \textit{arXiv:1706.05587}, 2017.
+
+\bibitem{qi2019votenet}
+C.~R.~Qi et al., ``Deep Hough voting for 3D object detection in point clouds,'' in \textit{Proc.~IEEE ICCV}, 2019.
+
+\bibitem{cook1982reflectance}
+R.~L.~Cook and K.~E.~Torrance, ``A reflectance model for computer graphics,'' \textit{ACM Transactions on Graphics}, vol.~1, no.~1, pp.~7--24, 1982.
+
+\bibitem{luhmann2014photogrammetry}
+T.~Luhmann et al., \textit{Close-Range Photogrammetry and 3D Imaging}, 2nd~ed. Berlin: De Gruyter, 2014.
+
+\bibitem{lowe2004sift}
+D.~G.~Lowe, ``Distinctive image features from scale-invariant keypoints,'' \textit{International Journal of Computer Vision}, vol.~60, no.~2, pp.~91--110, 2004.
+
+\bibitem{furukawa2010pmvs}
+Y.~Furukawa and J.~Ponce, ``Accurate, dense, and robust multiview stereopsis,'' \textit{IEEE Trans.~PAMI}, vol.~32, no.~8, pp.~1362--1376, 2010.
+
+\bibitem{kazhdan2006poisson}
+M.~Kazhdan, M.~Bolitho, and H.~Hoppe, ``Poisson surface reconstruction,'' in \textit{Proc.~Eurographics SGP}, 2006.
+
+\bibitem{pixar_usd}
+Pixar Animation Studios, ``Universal Scene Description,'' \url{https://openusd.org}, 2016--2025.
+
+\bibitem{microsoft_mvvm}
+Microsoft, ``The MVVM Pattern,'' \textit{.NET Application Architecture Guidance}, 2012.
+
+\end{thebibliography}

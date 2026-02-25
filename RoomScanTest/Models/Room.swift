@@ -1,0 +1,140 @@
+//
+//  Room.swift
+//  RoomScanTest
+//
+//  Created by Mara Ielciu on 16.02.2026.
+//
+
+import Foundation
+import RoomPlan
+
+struct Room: Identifiable, Codable {
+    let id: UUID
+    var name: String
+    var userId: UUID
+    var createdAt: Date
+    var updatedAt: Date
+    var capturedRoomExportURL: String? // Legacy — kept for backward compat
+    var furnitureReplacements: [FurnitureReplacement]
+    
+    init(id: UUID = UUID(), name: String, userId: UUID, createdAt: Date = Date(),
+         updatedAt: Date = Date(), capturedRoomExportURL: String? = nil,
+         furnitureReplacements: [FurnitureReplacement] = []) {
+        self.id = id
+        self.name = name
+        self.userId = userId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.capturedRoomExportURL = capturedRoomExportURL
+        self.furnitureReplacements = furnitureReplacements
+    }
+}
+
+// MARK: - CapturedRoom Persistence
+
+extension Room {
+
+    // ── In-memory cache (fast access while app is running) ──────
+    static var inMemoryRooms: [UUID: CapturedRoom] = [:]
+
+    // ── Disk storage directory ──────────────────────────────────
+
+    /// Folder in Documents where room scan JSON files are stored
+    private static var roomDataDirectory: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let dir = docs.appendingPathComponent("RoomScans", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir
+    }
+
+    /// Path to this room's scan data JSON file
+    private var scanDataURL: URL {
+        Room.roomDataDirectory.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    // ── Public API ──────────────────────────────────────────────
+
+    /// Whether a saved scan file exists on disk for this room
+    var hasScanData: Bool {
+        Room.inMemoryRooms[self.id] != nil
+            || FileManager.default.fileExists(atPath: scanDataURL.path)
+    }
+
+    /// Get the CapturedRoom — checks memory cache first, then loads from disk
+    func getCapturedRoom() -> CapturedRoom? {
+        // 1. Check in-memory cache
+        if let cached = Room.inMemoryRooms[self.id] {
+            return cached
+        }
+
+        // 2. Try loading from disk
+        if let loaded = loadFromDisk() {
+            Room.inMemoryRooms[self.id] = loaded
+            return loaded
+        }
+
+        return nil
+    }
+
+    /// Store a CapturedRoom — writes to both memory cache and disk
+    mutating func setCapturedRoom(_ room: CapturedRoom) {
+        Room.inMemoryRooms[self.id] = room
+        self.updatedAt = Date()
+        saveToDisk(room)
+    }
+
+    /// Remove the scan data from memory and disk (used when deleting a room)
+    func deleteScanData() {
+        Room.inMemoryRooms.removeValue(forKey: self.id)
+        if FileManager.default.fileExists(atPath: scanDataURL.path) {
+            try? FileManager.default.removeItem(at: scanDataURL)
+            print("[Room] Deleted scan data for: \(name)")
+        }
+    }
+
+    // ── Private disk I/O ────────────────────────────────────────
+
+    /// Serialize CapturedRoom to JSON and write to Documents/RoomScans/
+    private func saveToDisk(_ capturedRoom: CapturedRoom) {
+        do {
+            let data = try JSONEncoder().encode(capturedRoom)
+            try data.write(to: scanDataURL, options: [.atomic])
+            print("[Room] Saved scan (\(data.count / 1024) KB) → \(scanDataURL.lastPathComponent)")
+        } catch {
+            print("[Room] ⚠️ Failed to save scan: \(error.localizedDescription)")
+        }
+    }
+
+    /// Load CapturedRoom from its JSON file on disk
+    private func loadFromDisk() -> CapturedRoom? {
+        guard FileManager.default.fileExists(atPath: scanDataURL.path) else { return nil }
+        do {
+            let data = try Data(contentsOf: scanDataURL)
+            let room = try JSONDecoder().decode(CapturedRoom.self, from: data)
+            print("[Room] Loaded scan (\(data.count / 1024) KB) ← \(scanDataURL.lastPathComponent)")
+            return room
+        } catch {
+            print("[Room] ⚠️ Failed to load scan: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    // ── Maintenance ─────────────────────────────────────────────
+
+    /// Remove orphaned scan files that no longer have a matching Room
+    static func cleanOrphanedScanFiles(existingRoomIds: Set<UUID>) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: roomDataDirectory, includingPropertiesForKeys: nil
+        ) else { return }
+
+        for file in files where file.pathExtension == "json" {
+            let stem = file.deletingPathExtension().lastPathComponent
+            if let fileId = UUID(uuidString: stem), !existingRoomIds.contains(fileId) {
+                try? FileManager.default.removeItem(at: file)
+                print("[Room] Cleaned orphaned scan: \(file.lastPathComponent)")
+            }
+        }
+    }
+}
