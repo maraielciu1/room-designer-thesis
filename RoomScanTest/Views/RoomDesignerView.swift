@@ -633,6 +633,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         let coord = context.coordinator
         coord.allObjectMap.removeAll()
         coord.anchorMap.removeAll()
+        coord.moverMap.removeAll()
         coord.replacedContentMap.removeAll()
         coord.wireframeContentMap.removeAll()
         coord.initialScaleMap.removeAll()
@@ -654,6 +655,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         }
         coord.allObjectMap.removeAll()
         coord.anchorMap.removeAll()
+        coord.moverMap.removeAll()
         coord.replacedContentMap.removeAll()
         coord.wireframeContentMap.removeAll()
         coord.initialScaleMap.removeAll()
@@ -848,15 +850,23 @@ struct RoomModelSceneView: UIViewRepresentable {
 
             if let replacement = replacement {
                 // ═══ REPLACED OBJECT ═══
-                var xform = object.transform
-                if let off = replacement.positionOffset, off.count >= 3 {
-                    xform.columns.3.x += Float(off[0])
-                    xform.columns.3.y += Float(off[1])
-                    xform.columns.3.z += Float(off[2])
-                }
+                // Anchor stays at the ORIGINAL scan position (never moves).
+                let anchor = AnchorEntity(world: object.transform)
+                anchor.name = key + "_anchor"
 
-                let anchor = AnchorEntity(world: xform)
-                anchor.name = key
+                // Mover entity: this is what handleObjectPan moves.
+                let mover = Entity()
+                mover.name = key
+                anchor.addChild(mover)
+
+                // Apply any saved position offset to the mover
+                if let off = replacement.positionOffset, off.count >= 3 {
+                    let origPos = SIMD3<Float>(object.transform.columns.3.x,
+                                               object.transform.columns.3.y,
+                                               object.transform.columns.3.z)
+                    let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                    mover.setPosition(targetPos, relativeTo: nil)
+                }
 
                 let dims = object.dimensions
                 let target = SIMD3<Float>(
@@ -864,10 +874,6 @@ struct RoomModelSceneView: UIViewRepresentable {
                 )
 
                 // ── Choose loading strategy ──
-                // Scanned models (from Object Capture) are already in
-                // real-world metres — load at 1:1 scale.
-                // Built-in catalogue models are scaled to fit the
-                // detected object's bounding box.
                 let modelName = replacement.replacedWithUSDZ
                 let model: Entity? = catMgr.isScannedModel(modelName)
                     ? catMgr.loadAtRealWorldScale(named: modelName, targetDimensions: target)
@@ -882,15 +888,14 @@ struct RoomModelSceneView: UIViewRepresentable {
                         model.scale *= Float(cs)
                     }
 
-                    // Add a light near the model for better visibility in 3D scene
                     let modelLight = PointLight()
                     modelLight.light.intensity = 2000
                     modelLight.light.color = .white
                     modelLight.light.attenuationRadius = 8
                     modelLight.position = [0, max(dims.y, 0.5), 0]
-                    anchor.addChild(modelLight)
+                    mover.addChild(modelLight)
 
-                    anchor.addChild(model)
+                    mover.addChild(model)
                     coord.replacedContentMap[key] = model
                     coord.initialScaleMap[key] = baseScale
                 }
@@ -904,15 +909,20 @@ struct RoomModelSceneView: UIViewRepresentable {
                 hitBox.components.set(OpacityComponent(opacity: 0.001))
                 hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: bs)]))
                 hitBox.name = key
-                anchor.addChild(hitBox)
+                mover.addChild(hitBox)
 
                 view.scene.addAnchor(anchor)
                 coord.anchorMap[key] = anchor
+                coord.moverMap[key] = mover
 
             } else {
                 // ═══ UNREPLACED: category-coloured wireframe ═══
                 let anchor = AnchorEntity(world: object.transform)
-                anchor.name = key
+                anchor.name = key + "_anchor"
+
+                let mover = Entity()
+                mover.name = key
+                anchor.addChild(mover)
 
                 let dims = object.dimensions
                 let bs = SIMD3<Float>(max(dims.x, 0.1), max(dims.y, 0.1), max(dims.z, 0.1))
@@ -920,7 +930,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                 let color = Self.wireframeColor(for: cat)
                 let wireframe = Self.createWireframeBox(size: bs, color: color, thickness: 0.008)
                 wireframe.name = key
-                anchor.addChild(wireframe)
+                mover.addChild(wireframe)
                 coord.wireframeContentMap[key] = wireframe
 
                 // Subtle fill for depth perception
@@ -929,7 +939,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                     materials: [SimpleMaterial(color: color.withAlphaComponent(1.0), isMetallic: false)]
                 )
                 fill.components.set(OpacityComponent(opacity: 0.06))
-                anchor.addChild(fill)
+                mover.addChild(fill)
 
                 // Collision box for hit testing
                 let hitBox = ModelEntity(
@@ -939,10 +949,11 @@ struct RoomModelSceneView: UIViewRepresentable {
                 hitBox.components.set(OpacityComponent(opacity: 0.001))
                 hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: bs)]))
                 hitBox.name = key
-                anchor.addChild(hitBox)
+                mover.addChild(hitBox)
 
                 view.scene.addAnchor(anchor)
                 coord.anchorMap[key] = anchor
+                coord.moverMap[key] = mover
             }
         }
 
@@ -958,15 +969,23 @@ struct RoomModelSceneView: UIViewRepresentable {
             // Skip if already rendered (rebuild handles removal first)
             guard coord.anchorMap[key] == nil else { continue }
 
-            var placementXform = xform
-            if let off = rep.positionOffset, off.count >= 3 {
-                placementXform.columns.3.x += Float(off[0])
-                placementXform.columns.3.y += Float(off[1])
-                placementXform.columns.3.z += Float(off[2])
-            }
+            // Anchor stays at the BASE transform (never moves)
+            let anchor = AnchorEntity(world: xform)
+            anchor.name = key + "_anchor"
 
-            let anchor = AnchorEntity(world: placementXform)
-            anchor.name = key
+            // Mover entity: this is what gets repositioned
+            let mover = Entity()
+            mover.name = key
+            anchor.addChild(mover)
+
+            // Apply saved offset to the mover
+            if let off = rep.positionOffset, off.count >= 3 {
+                let origPos = SIMD3<Float>(xform.columns.3.x,
+                                           xform.columns.3.y,
+                                           xform.columns.3.z)
+                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                mover.setPosition(targetPos, relativeTo: nil)
+            }
 
             // Create a ScannedObject entry for selection & manipulation
             let addedObj = ScannedObject(
@@ -1002,9 +1021,9 @@ struct RoomModelSceneView: UIViewRepresentable {
                 modelLight.light.color = .white
                 modelLight.light.attenuationRadius = 8
                 modelLight.position = [0, 0.5, 0]
-                anchor.addChild(modelLight)
+                mover.addChild(modelLight)
 
-                anchor.addChild(model)
+                mover.addChild(model)
                 coord.replacedContentMap[key] = model
                 coord.initialScaleMap[key] = baseScale
             }
@@ -1012,7 +1031,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             // Collision box for hit testing / selection
             let hitDims: SIMD3<Float>
             if let model = model {
-                let b = model.visualBounds(relativeTo: anchor)
+                let b = model.visualBounds(relativeTo: mover)
                 let ext = b.extents
                 hitDims = SIMD3<Float>(max(ext.x, 0.1), max(ext.y, 0.1), max(ext.z, 0.1))
             } else {
@@ -1025,10 +1044,11 @@ struct RoomModelSceneView: UIViewRepresentable {
             hitBox.components.set(OpacityComponent(opacity: 0.001))
             hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
             hitBox.name = key
-            anchor.addChild(hitBox)
+            mover.addChild(hitBox)
 
             view.scene.addAnchor(anchor)
             coord.anchorMap[key] = anchor
+            coord.moverMap[key] = mover
         }
     }
 
@@ -1188,7 +1208,8 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         // ── Object maps ──
         var allObjectMap:        [String: ScannedObject] = [:]
-        var anchorMap:           [String: AnchorEntity]  = [:]
+        var anchorMap:           [String: AnchorEntity]  = [:]   // scene-level anchors (fixed)
+        var moverMap:            [String: Entity]        = [:]   // movable containers (moved by drag)
         var replacedContentMap:  [String: Entity]        = [:]
         var wireframeContentMap: [String: Entity]        = [:]
         var initialScaleMap:     [String: Float]         = [:]
@@ -1250,9 +1271,9 @@ struct RoomModelSceneView: UIViewRepresentable {
             var bestKey: String?
             var bestDist: Float = 200
 
-            for (key, anchor) in anchorMap {
+            for (key, mover) in moverMap {
                 guard allObjectMap[key] != nil else { continue }
-                let worldPos = anchor.position(relativeTo: nil)
+                let worldPos = mover.position(relativeTo: nil)
                 guard let screenPt = view.project(worldPos) else { continue }
                 let dx = Float(screenPt.x - point.x)
                 let dy = Float(screenPt.y - point.y)
@@ -1318,7 +1339,7 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         @objc func handleObjectPan(_ gesture: UIPanGestureRecognizer) {
             guard let key = selectedKey,
-                  let anchor = anchorMap[key] else { return }
+                  let mover = moverMap[key] else { return }
 
             // ── Chase speed ──
             // How fast the object catches the target each frame.
@@ -1332,7 +1353,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                 guard activeDragMode != nil else { return }
                 isManipulating = true
 
-                let curPos = anchor.position(relativeTo: nil)
+                let curPos = mover.position(relativeTo: nil)
                 dragStartPos  = curPos
                 targetDragPos = curPos          // target starts where object is
 
@@ -1363,7 +1384,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                         default:     return .zero
                         }
                     }()
-                    let pos = anchor.position(relativeTo: nil)
+                    let pos = mover.position(relativeTo: nil)
                     if let p1 = arView.project(pos),
                        let p2 = arView.project(pos + worldDir * 0.1) {
                         let sAxis = SIMD2<Float>(Float(p2.x - p1.x),
@@ -1430,17 +1451,17 @@ struct RoomModelSceneView: UIViewRepresentable {
                 }
 
                 // ── 5. Smoothly chase the target (lerp — can NEVER overshoot) ──
-                let curPos = anchor.position(relativeTo: nil)
+                let curPos = mover.position(relativeTo: nil)
                 let newPos = simd_mix(curPos, targetDragPos,
                                       SIMD3<Float>(repeating: chase))
 
-                anchor.setPosition(newPos, relativeTo: nil)
+                mover.setPosition(newPos, relativeTo: nil)
                 gizmoAnchor?.setPosition(newPos, relativeTo: nil)
 
             case .ended, .cancelled:
                 // Snap to the final target so the object rests exactly
                 // where the finger intended, not partway through a lerp.
-                anchor.setPosition(targetDragPos, relativeTo: nil)
+                mover.setPosition(targetDragPos, relativeTo: nil)
                 gizmoAnchor?.setPosition(targetDragPos, relativeTo: nil)
 
                 activeDragMode = nil
@@ -1484,7 +1505,7 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         func saveManipulation(for key: String) {
             guard let obj = allObjectMap[key],
-                  let anchor = anchorMap[key] else { return }
+                  let mover = moverMap[key] else { return }
 
             let origPos = obj.transform.columns.3
             guard let idx = roomBinding.wrappedValue.furnitureReplacements.firstIndex(where: { rep in
@@ -1494,7 +1515,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }) else { return }
 
             // Position offset from original
-            let curPos = anchor.position(relativeTo: nil)
+            let curPos = mover.position(relativeTo: nil)
             let offset = curPos - SIMD3<Float>(origPos.x, origPos.y, origPos.z)
             roomBinding.wrappedValue.furnitureReplacements[idx].positionOffset =
                 [Double(offset.x), Double(offset.y), Double(offset.z)]
@@ -1520,7 +1541,7 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         func resetSelectedEntity() {
             guard let key = selectedKey,
-                  let anchor = anchorMap[key],
+                  let mover = moverMap[key],
                   let obj = allObjectMap[key] else { return }
 
             let origPos = SIMD3<Float>(
@@ -1528,7 +1549,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                 obj.transform.columns.3.y,
                 obj.transform.columns.3.z
             )
-            anchor.setPosition(origPos, relativeTo: nil)
+            mover.setPosition(origPos, relativeTo: nil)
             gizmoAnchor?.setPosition(origPos, relativeTo: nil)
 
             if let content = replacedContentMap[key] {
@@ -1545,14 +1566,14 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         func adjustHeight(by delta: Float) {
             guard let key = selectedKey,
-                  let anchor = anchorMap[key] else { return }
+                  let mover = moverMap[key] else { return }
 
-            var pos = anchor.position(relativeTo: nil)
+            var pos = mover.position(relativeTo: nil)
             pos.y += delta
             // floorY is now the TOP of the floor surface (where objects rest).
             pos.y = max(floorY, pos.y)
             pos.y = min(roomBoundsMax.y, pos.y)
-            anchor.setPosition(pos, relativeTo: nil)
+            mover.setPosition(pos, relativeTo: nil)
             gizmoAnchor?.setPosition(pos, relativeTo: nil)
 
             if replacedContentMap[key] != nil {
@@ -1638,10 +1659,10 @@ struct RoomModelSceneView: UIViewRepresentable {
         /// Determines which gizmo arrow (or the center) the screen point is near.
         func detectDragMode(at point: CGPoint) -> DragMode? {
             guard let key = selectedKey,
-                  let anchor = anchorMap[key],
+                  let mover = moverMap[key],
                   let view = view else { return nil }
 
-            let center = anchor.position(relativeTo: nil)
+            let center = mover.position(relativeTo: nil)
             let arrowLen: Float = 0.33   // slightly past tip
 
             // Sample points along each arrow for hit detection
@@ -1690,7 +1711,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             removeGizmo()
 
             guard let key = selectedKey,
-                  let anchor = anchorMap[key],
+                  let mover = moverMap[key],
                   let obj = allObjectMap[key] else { return }
 
             let dims = obj.dimensions
@@ -1705,11 +1726,11 @@ struct RoomModelSceneView: UIViewRepresentable {
                 size: boxSize, color: color, thickness: 0.012
             )
             highlight.name = "__highlight__"
-            anchor.addChild(highlight)
+            mover.addChild(highlight)
             selectionHighlight = highlight
 
-            // Show axis arrows at the object's world position
-            let worldPos = anchor.position(relativeTo: nil)
+            // Show axis arrows at the mover's world position
+            let worldPos = mover.position(relativeTo: nil)
             showGizmo(at: worldPos)
         }
 
