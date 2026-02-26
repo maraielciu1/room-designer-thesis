@@ -26,35 +26,50 @@ struct FurnitureLibraryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab picker
-            Picker("Library", selection: $selectedTab) {
-                ForEach(LibraryTab.allCases, id: \.self) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding()
+        ZStack {
+            Color(hex: 0x0B0D17).ignoresSafeArea()
 
-            switch selectedTab {
-            case .scanned:
-                scannedSection
-            case .builtIn:
-                builtInSection
+            VStack(spacing: 0) {
+                // ── Custom segmented picker ──
+                HStack(spacing: 6) {
+                    ForEach(LibraryTab.allCases, id: \.self) { tab in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
+                        } label: {
+                            Text(tab.rawValue)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(selectedTab == tab ? .white : AppTheme.secondaryText)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(
+                                    selectedTab == tab
+                                    ? AnyShapeStyle(AppTheme.accentGradientInline)
+                                    : AnyShapeStyle(Color.white.opacity(0.06))
+                                )
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                switch selectedTab {
+                case .scanned: scannedSection
+                case .builtIn: builtInSection
+                }
             }
         }
         .navigationTitle("My Furniture")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showObjectScan = true }) {
-                    Label("Scan Object", systemImage: "cube.transparent")
+                    Image(systemName: "cube.transparent")
+                        .tintedIcon()
                 }
             }
         }
         .fullScreenCover(isPresented: $showObjectScan) {
-            // No NavigationView wrapper here — ObjectScanView manages its own
-            // navigation per phase. During capture, ObjectCaptureView MUST be
-            // the root view with zero overlays to show its built-in UI controls.
             ObjectScanView(onDismiss: { showObjectScan = false })
         }
     }
@@ -66,11 +81,17 @@ struct FurnitureLibraryView: View {
             if userScans.isEmpty {
                 scannedEmptyState
             } else {
-                List {
-                    ForEach(userScans) { item in
-                        ScannedFurnitureRow(item: item)
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(userScans) { item in
+                            ScannedFurnitureRow(item: item, onDelete: {
+                                scannedFurnitureManager.deleteFurniture(item)
+                            })
+                            .padding(.horizontal, 16)
+                        }
                     }
-                    .onDelete(perform: deleteScanned)
+                    .padding(.top, 4)
+                    .padding(.bottom, 24)
                 }
             }
         }
@@ -80,39 +101,33 @@ struct FurnitureLibraryView: View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image(systemName: "cube.transparent")
-                .font(.system(size: 60))
-                .foregroundColor(.gray)
+            ZStack {
+                Circle()
+                    .fill(AppTheme.glowCyan.opacity(0.10))
+                    .frame(width: 110, height: 110)
+                    .blur(radius: 28)
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 48))
+                    .foregroundStyle(AppTheme.accentGradientInline)
+            }
 
             Text("No Scanned Objects")
-                .font(.title2).fontWeight(.semibold)
+                .font(.title3.weight(.bold))
+                .foregroundColor(.white)
 
-            Text("Scan real-world furniture to create 3D models you can place in any room.")
+            Text("Scan real-world furniture to create\n3D models you can place in any room.")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             Button(action: { showObjectScan = true }) {
-                HStack {
-                    Image(systemName: "camera.fill")
-                    Text("Scan Your First Object")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding()
-                .background(Color.blue)
-                .cornerRadius(12)
+                Label("Scan Your First Object", systemImage: "camera.fill")
             }
+            .buttonStyle(GradientButtonStyle())
             .padding(.top, 8)
 
             Spacer()
-        }
-    }
-
-    private func deleteScanned(at offsets: IndexSet) {
-        for index in offsets {
-            scannedFurnitureManager.deleteFurniture(userScans[index])
         }
     }
 
@@ -120,12 +135,14 @@ struct FurnitureLibraryView: View {
 
     private var builtInSection: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
                 ForEach(catalogManager.getAllAvailableModels(), id: \.self) { name in
                     BuiltInModelCard(name: name)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 24)
         }
     }
 }
@@ -134,45 +151,60 @@ struct FurnitureLibraryView: View {
 
 struct ScannedFurnitureRow: View {
     let item: ScannedFurniture
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 14) {
-            // 3D thumbnail of the scanned model
+            // 3D thumbnail
             USDZThumbnailView(
                 url: item.usdzURL,
                 size: CGSize(width: 56, height: 56)
             )
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.blue.opacity(0.08))
+                    .fill(AppTheme.glowCyan.opacity(0.08))
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
 
                 HStack(spacing: 6) {
                     Text(item.category.capitalized)
-                        .font(.caption)
+                        .font(.caption2.weight(.medium))
+                        .foregroundColor(AppTheme.glowCyan)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.12))
-                        .cornerRadius(6)
+                        .padding(.vertical, 3)
+                        .background(AppTheme.glowCyan.opacity(0.12))
+                        .clipShape(Capsule())
 
                     Text(item.formattedSize)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.caption2)
+                        .foregroundColor(AppTheme.tertiaryText)
                 }
 
                 Text(item.createdAt, style: .date)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.tertiaryText)
             }
 
             Spacer()
+
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.glowRed.opacity(0.7))
+                        .padding(8)
+                        .background(AppTheme.glowRed.opacity(0.10))
+                        .clipShape(Circle())
+                }
+            }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .glassCard(cornerRadius: AppTheme.cardCornerRadius)
     }
 }
 
@@ -184,19 +216,19 @@ struct BuiltInModelCard: View {
         VStack(spacing: 8) {
             USDZThumbnailView(
                 url: catalogManager.modelFileURL(for: name),
-                size: CGSize(width: 80, height: 80)
+                size: CGSize(width: 72, height: 72)
             )
 
             Text(name.replacingOccurrences(of: "_", with: " ").capitalized)
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .multilineTextAlignment(.center)
-                .foregroundColor(.primary)
+                .foregroundColor(.white.opacity(0.85))
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
+        .glassCard(cornerRadius: AppTheme.cardCornerRadius)
     }
 }
 
@@ -206,4 +238,5 @@ struct BuiltInModelCard: View {
             .environmentObject(FurnitureCatalogManager())
             .environmentObject(ScannedFurnitureManager(userManager: UserManager()))
     }
+    .preferredColorScheme(.dark)
 }

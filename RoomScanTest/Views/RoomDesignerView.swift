@@ -187,32 +187,36 @@ struct RoomDesignerView: View {
     // MARK: Top Bar
 
     private var topBar: some View {
-        HStack {
+        HStack(spacing: 10) {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
-                    .foregroundColor(.white).padding()
-                    .background(Color.black.opacity(0.6)).clipShape(Circle())
+                    .tintedIcon()
             }
 
             Spacer()
 
-            Text(room.name)
-                .font(.headline).foregroundColor(.white)
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Color.black.opacity(0.6)).cornerRadius(10)
+            HStack(spacing: 8) {
+                Image(systemName: "view.3d")
+                    .foregroundStyle(AppTheme.accentGradientInline)
+                    .font(.system(size: 14))
+                Text(room.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .glassCard(cornerRadius: 12)
 
             Spacer()
 
             Button(action: takeScreenshot) {
                 Image(systemName: "camera.fill")
-                    .foregroundColor(.white).padding()
-                    .background(Color.black.opacity(0.6)).clipShape(Circle())
+                    .tintedIcon()
             }
 
             Button(action: { showDebugView.toggle() }) {
                 Image(systemName: "info.circle")
-                    .foregroundColor(.white).padding()
-                    .background(Color.black.opacity(0.6)).clipShape(Circle())
+                    .tintedIcon(AppTheme.glowViolet)
             }
         }
     }
@@ -234,68 +238,66 @@ struct RoomDesignerView: View {
                     onBrowseAll: { showFullCatalog = true }
                 )
             }
-            .background(Color.black.opacity(0.85))
-            .cornerRadius(15)
-            .padding(.horizontal)
+            .glassCard(cornerRadius: AppTheme.cornerRadius)
+            .padding(.horizontal, 12)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.easeInOut(duration: 0.25), value: selectedObject?.stableId)
         } else {
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "cube.transparent")
-                        .foregroundColor(.blue)
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "cube.transparent.fill")
+                        .foregroundStyle(AppTheme.accentGradientInline)
                     Text("3D Room Editor")
-                        .font(.headline).foregroundColor(.white)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.white)
                 }
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Label("Two-finger drag to orbit", systemImage: "arrow.triangle.2.circlepath")
-                    Label("Pinch to zoom", systemImage: "arrow.up.left.and.arrow.down.right")
-                    Label("Tap furniture to select", systemImage: "hand.tap")
-                    Label("Drag axis arrows to move", systemImage: "arrow.up.and.down.and.arrow.left.and.right")
-                    Label("Twist to rotate selected", systemImage: "rotate.right")
+                VStack(alignment: .leading, spacing: 6) {
+                    hintRow(icon: "arrow.triangle.2.circlepath", text: "Two-finger drag to orbit")
+                    hintRow(icon: "arrow.up.left.and.arrow.down.right", text: "Pinch to zoom")
+                    hintRow(icon: "hand.tap", text: "Tap furniture to select")
+                    hintRow(icon: "arrow.up.and.down.and.arrow.left.and.right", text: "Drag axis arrows to move")
+                    hintRow(icon: "rotate.right", text: "Twist to rotate selected")
                 }
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
 
                 Button(action: { showAddFurnitureCatalog = true }) {
                     Label("Add New Furniture", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.blue)
-                        .cornerRadius(12)
                 }
-                .padding(.top, 4)
+                .buttonStyle(GradientButtonStyle())
+                .padding(.top, 2)
             }
-            .padding()
-            .background(Color.black.opacity(0.6))
-            .cornerRadius(15)
-            .padding(.horizontal)
+            .padding(16)
+            .glassCard(cornerRadius: AppTheme.cornerRadius)
+            .padding(.horizontal, 12)
         }
+    }
+
+    private func hintRow(icon: String, text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption)
+            .foregroundColor(AppTheme.secondaryText)
     }
 
     // MARK: Object Info Bar (unreplaced)
 
     private func objectInfoBar(for object: ScannedObject) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(object.categoryDescription)
-                    .font(.headline).foregroundColor(.white)
+                    .font(.subheadline.weight(.bold)).foregroundColor(.white)
                 Text("Select a replacement below or drag to reposition")
-                    .font(.caption).foregroundColor(.white.opacity(0.7))
+                    .font(.caption2).foregroundColor(AppTheme.secondaryText)
             }
             Spacer()
             if isManipulating {
                 Text("Moving…")
-                    .font(.caption).foregroundColor(.cyan)
+                    .font(.caption2.weight(.semibold)).foregroundColor(AppTheme.glowCyan)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Color.cyan.opacity(0.2)).cornerRadius(8)
+                    .background(AppTheme.glowCyan.opacity(0.15)).cornerRadius(8)
             }
             Button { selectedObject = nil } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.white.opacity(0.7)).font(.title2)
+                    .foregroundColor(AppTheme.tertiaryText).font(.title3)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -306,28 +308,28 @@ struct RoomDesignerView: View {
     private func manipulationBar(for object: ScannedObject) -> some View {
         VStack(spacing: 10) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(selectedReplacement?.replacedWithUSDZ
                         .replacingOccurrences(of: "_", with: " ").capitalized ?? "Furniture")
-                        .font(.headline).foregroundColor(.white)
+                        .font(.subheadline.weight(.bold)).foregroundColor(.white)
                     Text("Drag an axis arrow to move / Twist to rotate")
-                        .font(.caption).foregroundColor(.white.opacity(0.7))
+                        .font(.caption2).foregroundColor(AppTheme.secondaryText)
                 }
                 Spacer()
                 if isManipulating {
                     Text("Adjusting…")
-                        .font(.caption).foregroundColor(.green)
+                        .font(.caption2.weight(.semibold)).foregroundColor(AppTheme.glowGreen)
                         .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.green.opacity(0.2)).cornerRadius(8)
+                        .background(AppTheme.glowGreen.opacity(0.15)).cornerRadius(8)
                 }
                 Button { selectedObject = nil } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.7)).font(.title2)
+                        .foregroundColor(AppTheme.tertiaryText).font(.title3)
                 }
             }
 
             // ── Axis legend + actions ──
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 // Axis colour key
                 HStack(spacing: 8) {
                     axisLabel(color: .red,   text: "X")
@@ -339,15 +341,17 @@ struct RoomDesignerView: View {
 
                 Button(action: resetPosition) {
                     Label("Reset", systemImage: "arrow.counterclockwise")
-                        .font(.subheadline).foregroundColor(.white)
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(Color.orange).cornerRadius(10)
+                        .font(.caption.weight(.semibold)).foregroundColor(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(AppTheme.glowOrange.opacity(0.85))
+                        .clipShape(Capsule())
                 }
                 Button(action: removeReplacement) {
                     Label("Remove", systemImage: "trash")
-                        .font(.subheadline).foregroundColor(.white)
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(Color.red).cornerRadius(10)
+                        .font(.caption.weight(.semibold)).foregroundColor(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(AppTheme.glowRed.opacity(0.85))
+                        .clipShape(Capsule())
                 }
             }
         }
@@ -1794,11 +1798,11 @@ struct FurnitureCatalogTray: View {
     var body: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Color.white.opacity(0.15))
+                .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     // Built-in models
                     ForEach(builtInModels, id: \.self) { model in
                         Button { onSelectModel(model) } label: {
@@ -1808,14 +1812,18 @@ struct FurnitureCatalogTray: View {
                                     size: CGSize(width: 48, height: 48)
                                 )
                                 Text(model.replacingOccurrences(of: "_", with: " ").capitalized)
-                                    .font(.caption2)
-                                    .foregroundColor(.white)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundColor(.white.opacity(0.85))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
                             }
                             .frame(width: 76, height: 76)
-                            .background(Color.white.opacity(0.12))
-                            .cornerRadius(12)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            )
                         }
                     }
 
@@ -1828,32 +1836,40 @@ struct FurnitureCatalogTray: View {
                                     size: CGSize(width: 48, height: 48)
                                 )
                                 Text(scan.name)
-                                    .font(.caption2)
-                                    .foregroundColor(.white)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundColor(.white.opacity(0.85))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
                             }
                             .frame(width: 76, height: 76)
-                            .background(Color.green.opacity(0.15))
-                            .cornerRadius(12)
+                            .background(AppTheme.glowGreen.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppTheme.glowGreen.opacity(0.15), lineWidth: 1)
+                            )
                         }
                     }
 
                     Button(action: onBrowseAll) {
                         VStack(spacing: 6) {
                             Image(systemName: "square.grid.2x2")
-                                .font(.system(size: 24))
-                                .foregroundColor(.orange)
+                                .font(.system(size: 22))
+                                .foregroundStyle(AppTheme.accentGradientInline)
                             Text("All")
-                                .font(.caption2)
-                                .foregroundColor(.white)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(AppTheme.secondaryText)
                         }
                         .frame(width: 76, height: 76)
-                        .background(Color.white.opacity(0.12))
-                        .cornerRadius(12)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 10)
             }
         }
@@ -1890,47 +1906,51 @@ struct FurniturePickerView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                // Built-in models
-                if !availableModels.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("Built-in Models")
-                            .font(.headline)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                            ForEach(availableModels, id: \.self) { name in
-                                FurnitureCard(modelName: name) { replaceObject(with: name) }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                }
+            ZStack {
+                Color(hex: 0x0B0D17).ignoresSafeArea()
 
-                // User-scanned models
-                if !userScans.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("My Scanned Furniture")
-                            .font(.headline)
-                            .padding(.horizontal)
-                            .padding(.top, 16)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                            ForEach(userScans) { scan in
-                                ScannedFurnitureCard(item: scan) {
-                                    replaceObject(with: scan.catalogKey)
+                ScrollView {
+                    // Built-in models
+                    if !availableModels.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "Built-in Models", icon: "cube.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(availableModels, id: \.self) { name in
+                                    FurnitureCard(modelName: name) { replaceObject(with: name) }
                                 }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal)
+                    }
+
+                    // User-scanned models
+                    if !userScans.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "My Scanned Furniture", icon: "person.crop.rectangle.stack.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(userScans) { scan in
+                                    ScannedFurnitureCard(item: scan) {
+                                        replaceObject(with: scan.catalogKey)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
                     }
                 }
+                .padding(.bottom, 10)
             }
-            .padding(.bottom, 10)
             .navigationTitle("Select Furniture")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(AppTheme.glowCyan)
                 }
             }
         }
@@ -1984,51 +2004,53 @@ struct AddFurniturePickerView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                // Built-in models
-                if !builtInModels.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("Built-in Models")
-                            .font(.headline)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                            ForEach(builtInModels, id: \.self) { name in
-                                FurnitureCard(modelName: name) {
-                                    onSelect(name)
-                                    dismiss()
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                }
+            ZStack {
+                Color(hex: 0x0B0D17).ignoresSafeArea()
 
-                // User-scanned models
-                if !userScans.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("My Scanned Furniture")
-                            .font(.headline)
-                            .padding(.horizontal)
-                            .padding(.top, 16)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                            ForEach(userScans) { scan in
-                                ScannedFurnitureCard(item: scan) {
-                                    onSelect(scan.catalogKey)
-                                    dismiss()
+                ScrollView {
+                    if !builtInModels.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "Built-in Models", icon: "cube.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(builtInModels, id: \.self) { name in
+                                    FurnitureCard(modelName: name) {
+                                        onSelect(name)
+                                        dismiss()
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal)
+                    }
+
+                    if !userScans.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "My Scanned Furniture", icon: "person.crop.rectangle.stack.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(userScans) { scan in
+                                    ScannedFurnitureCard(item: scan) {
+                                        onSelect(scan.catalogKey)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
                     }
                 }
+                .padding(.bottom, 10)
             }
-            .padding(.bottom, 10)
             .navigationTitle("Add Furniture to Room")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(AppTheme.glowCyan)
                 }
             }
         }
@@ -2180,15 +2202,14 @@ struct FurnitureCard: View {
                     size: CGSize(width: 80, height: 80)
                 )
                 Text(modelName.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .font(.caption)
+                    .font(.caption.weight(.medium))
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.primary)
+                    .foregroundColor(AppTheme.primaryText)
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .glassCard()
         }
     }
 }
@@ -2209,18 +2230,17 @@ struct ScannedFurnitureCard: View {
                     size: CGSize(width: 80, height: 80)
                 )
                 Text(item.name)
-                    .font(.caption)
+                    .font(.caption.weight(.medium))
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.primary)
+                    .foregroundColor(AppTheme.primaryText)
                     .lineLimit(2)
                 Text(item.category.capitalized)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.secondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.green.opacity(0.08))
-            .cornerRadius(12)
+            .glassCard()
         }
     }
 }

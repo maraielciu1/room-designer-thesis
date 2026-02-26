@@ -18,8 +18,6 @@ struct RoomScanView: View {
     let roomName: String
 
     /// Called after a successful scan and room creation.
-    /// The parent chain (CreateRoomView → RoomListView) uses this to dismiss the
-    /// sheet and navigate to the designer.
     var onComplete: ((Room) -> Void)? = nil
 
     @State private var isScanning = false
@@ -32,25 +30,38 @@ struct RoomScanView: View {
 
     var body: some View {
         ZStack {
+            Color(hex: 0x0B0D17).ignoresSafeArea()
+
             if createdRoom != nil {
                 // ── Scan complete — brief success state ──
-                VStack(spacing: 20) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.green)
+                VStack(spacing: 22) {
+                    ZStack {
+                        Circle()
+                            .fill(AppTheme.glowGreen.opacity(0.12))
+                            .frame(width: 100, height: 100)
+                            .blur(radius: 25)
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 52))
+                            .foregroundStyle(AppTheme.glowGreen)
+                    }
                     Text("Room Scanned!")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.white)
                     Text(roomName)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    ProgressView("Opening designer…")
-                        .padding(.top, 10)
+                        .foregroundColor(AppTheme.secondaryText)
+
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(AppTheme.glowCyan)
+                        Text("Opening designer…")
+                            .font(.footnote)
+                            .foregroundColor(AppTheme.secondaryText)
+                    }
+                    .padding(.top, 6)
                 }
                 .navigationBarBackButtonHidden(true)
                 .onAppear {
-                    // Give the user a moment to see the success state, then
-                    // signal the parent to dismiss the sheet & navigate.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                         if let room = createdRoom {
                             onComplete?(room)
@@ -92,78 +103,99 @@ struct RoomScanView: View {
                     )
                     .edgesIgnoringSafeArea(.all)
                 } else {
-                    ProgressView("Initializing camera...")
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .foregroundColor(.white)
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .tint(AppTheme.glowCyan)
+                        Text("Initializing camera…")
+                            .font(.footnote)
+                            .foregroundColor(AppTheme.secondaryText)
+                    }
                 }
 
+                // Overlay: bottom controls
                 VStack {
                     Spacer()
 
                     if isProcessing {
-                        ProgressView("Building 3D Model...")
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(10)
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("Building 3D Model…")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .glassCard(cornerRadius: 16)
+                        .padding(.bottom, 50)
                     } else {
                         Button(action: {
                             isProcessing = true
                             roomCaptureView?.captureSession.stop()
                         }) {
-                            HStack {
+                            HStack(spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill")
                                 Text("Done Scanning")
                             }
-                            .font(.headline)
+                            .font(.headline.weight(.semibold))
                             .foregroundColor(.white)
-                            .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.green)
-                            .cornerRadius(15)
+                            .padding(.vertical, 16)
+                            .background(AppTheme.glowGreen)
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius))
+                            .shadow(color: AppTheme.glowGreen.opacity(0.35), radius: 10, y: 4)
                         }
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, 32)
                         .padding(.bottom, 50)
                     }
                 }
 
             } else {
                 // ── Instructions ──
-                VStack(spacing: 30) {
-                    Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 60))
-                        .foregroundColor(.blue)
+                VStack(spacing: 28) {
+                    Spacer()
+
+                    ZStack {
+                        Circle()
+                            .fill(AppTheme.glowCyan.opacity(0.10))
+                            .frame(width: 110, height: 110)
+                            .blur(radius: 28)
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 44, weight: .light))
+                            .foregroundStyle(AppTheme.accentGradientInline)
+                            .frame(width: 80, height: 80)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    }
 
                     Text("Ready to Scan")
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.white)
 
-                    VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: 14) {
                         InstructionRow(icon: "1.circle.fill", text: "Move slowly around the room")
                         InstructionRow(icon: "2.circle.fill", text: "Point camera at furniture")
                         InstructionRow(icon: "3.circle.fill", text: "Ensure good lighting")
                         InstructionRow(icon: "4.circle.fill", text: "Tap 'Start Scan' when ready")
                     }
-                    .padding()
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 18)
+                    .glassCard(cornerRadius: AppTheme.cornerRadius)
+                    .padding(.horizontal, 24)
 
                     Button(action: {
                         finalizePreScan()
                     }) {
-                        HStack {
+                        HStack(spacing: 10) {
                             Image(systemName: "camera.fill")
                             Text("Start Scan")
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(15)
                     }
-                    .padding(.horizontal, 40)
+                    .buttonStyle(GradientButtonStyle())
+
+                    Spacer()
                 }
-                .padding()
             }
         }
         .alert("Error", isPresented: $showError) {
@@ -212,10 +244,11 @@ struct InstructionRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(.blue)
+                .foregroundStyle(AppTheme.accentGradientInline)
                 .font(.title3)
             Text(text)
-                .font(.body)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
         }
     }
 }
@@ -224,4 +257,5 @@ struct InstructionRow: View {
     RoomScanView(roomName: "Living Room")
         .environmentObject(RoomManager(userManager: UserManager()))
         .environmentObject(UserManager())
+        .preferredColorScheme(.dark)
 }

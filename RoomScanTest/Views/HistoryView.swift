@@ -12,11 +12,11 @@ struct HistoryView: View {
     @EnvironmentObject var roomManager: RoomManager
     @State private var selectedFilter: HistoryFilter = .all
 
-    enum HistoryFilter {
-        case all
-        case today
-        case week
-        case month
+    enum HistoryFilter: String, CaseIterable {
+        case all   = "All"
+        case today = "Today"
+        case week  = "Week"
+        case month = "Month"
     }
 
     var filteredHistory: [ReplacementHistory] {
@@ -35,53 +35,83 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        // No NavigationView here — already inside the root one from AppRootView
-        VStack {
-            // Filter Picker
-            Picker("Filter", selection: $selectedFilter) {
-                Text("All").tag(HistoryFilter.all)
-                Text("Today").tag(HistoryFilter.today)
-                Text("This Week").tag(HistoryFilter.week)
-                Text("This Month").tag(HistoryFilter.month)
-            }
-            .pickerStyle(.segmented)
-            .padding()
+        ZStack {
+            Color(hex: 0x0B0D17).ignoresSafeArea()
 
-            if filteredHistory.isEmpty {
-                Spacer()
-                VStack(spacing: 20) {
-                    Image(systemName: "clock.badge.questionmark")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray)
-                    Text("No History")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Your furniture replacements will appear here")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+            VStack(spacing: 0) {
+                // ── Custom segmented picker ──
+                HStack(spacing: 6) {
+                    ForEach(HistoryFilter.allCases, id: \.self) { filter in
+                        Button(action: { withAnimation(.easeInOut(duration: 0.2)) { selectedFilter = filter } }) {
+                            Text(filter.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(selectedFilter == filter ? .white : AppTheme.secondaryText)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    selectedFilter == filter
+                                    ? AnyShapeStyle(AppTheme.accentGradientInline)
+                                    : AnyShapeStyle(Color.white.opacity(0.06))
+                                )
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
-                .padding()
-                Spacer()
-            } else {
-                List {
-                    ForEach(groupedHistory.keys.sorted(by: >), id: \.self) { date in
-                        Section(header: Text(formatDate(date))) {
-                            ForEach(groupedHistory[date] ?? []) { entry in
-                                HistoryRowView(entry: entry)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                if filteredHistory.isEmpty {
+                    Spacer()
+                    VStack(spacing: 18) {
+                        ZStack {
+                            Circle()
+                                .fill(AppTheme.glowViolet.opacity(0.10))
+                                .frame(width: 100, height: 100)
+                                .blur(radius: 25)
+                            Image(systemName: "clock.badge.questionmark")
+                                .font(.system(size: 48))
+                                .foregroundStyle(AppTheme.accentGradientInline)
+                        }
+                        Text("No History")
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.white)
+                        Text("Your furniture replacements will appear here")
+                            .font(.subheadline)
+                            .foregroundColor(AppTheme.secondaryText)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(groupedHistory.keys.sorted(by: >), id: \.self) { date in
+                                // ── Date section header ──
+                                ThemeSectionHeader(title: formatDate(date), icon: "calendar")
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 4)
+
+                                ForEach(groupedHistory[date] ?? []) { entry in
+                                    HistoryRowView(entry: entry)
+                                        .padding(.horizontal, 16)
+                                }
                             }
                         }
+                        .padding(.bottom, 24)
                     }
                 }
             }
         }
         .navigationTitle("History")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !filteredHistory.isEmpty {
                     Button("Clear") {
                         historyManager.clearHistory()
                     }
+                    .foregroundColor(AppTheme.glowRed)
                 }
             }
         }
@@ -110,49 +140,50 @@ struct HistoryRowView: View {
     let entry: ReplacementHistory
 
     var body: some View {
-        HStack {
-            Image(systemName: iconForAction(entry.action))
-                .foregroundColor(colorForAction(entry.action))
-                .font(.title3)
-                .frame(width: 30)
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(colorForAction(entry.action).opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: iconForAction(entry.action))
+                    .foregroundColor(colorForAction(entry.action))
+                    .font(.system(size: 16, weight: .semibold))
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.action.rawValue.capitalized)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
                 if !entry.details.isEmpty {
                     Text(entry.details)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppTheme.secondaryText)
+                        .lineLimit(2)
                 }
                 Text(entry.timestamp, style: .time)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.tertiaryText)
             }
 
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .glassCard(cornerRadius: AppTheme.cardCornerRadius)
     }
 
     private func iconForAction(_ action: ReplacementHistory.HistoryAction) -> String {
         switch action {
-        case .replaced:
-            return "arrow.triangle.2.circlepath"
-        case .removed:
-            return "trash"
-        case .updated:
-            return "pencil"
+        case .replaced: return "arrow.triangle.2.circlepath"
+        case .removed:  return "trash"
+        case .updated:  return "pencil"
         }
     }
 
     private func colorForAction(_ action: ReplacementHistory.HistoryAction) -> Color {
         switch action {
-        case .replaced:
-            return .blue
-        case .removed:
-            return .red
-        case .updated:
-            return .orange
+        case .replaced: return AppTheme.glowCyan
+        case .removed:  return AppTheme.glowRed
+        case .updated:  return AppTheme.glowOrange
         }
     }
 }
@@ -163,4 +194,5 @@ struct HistoryRowView: View {
             .environmentObject(HistoryManager(userManager: UserManager()))
             .environmentObject(RoomManager(userManager: UserManager()))
     }
+    .preferredColorScheme(.dark)
 }
