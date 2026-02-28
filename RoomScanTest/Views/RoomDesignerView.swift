@@ -82,6 +82,7 @@ struct RoomDesignerView: View {
     @EnvironmentObject var roomManager: RoomManager
     @EnvironmentObject var historyManager: HistoryManager
     @EnvironmentObject var catalogManager: FurnitureCatalogManager
+    @EnvironmentObject var scannedFurnitureManager: ScannedFurnitureManager
     @Environment(\.dismiss) var dismiss
 
     @State private var selectedObject: ScannedObject? = nil
@@ -95,6 +96,7 @@ struct RoomDesignerView: View {
     @State private var heightSignal: Int = 0
     @State private var heightDeltaValue: Float = 0
     @State private var showAddFurnitureCatalog = false
+    @State private var editorHintsExpanded = true
 
     @State var room: Room
 
@@ -109,6 +111,20 @@ struct RoomDesignerView: View {
     }
 
     private var isSelectedObjectReplaced: Bool { selectedReplacement != nil }
+
+    /// Resolves a display-friendly name for a model key.
+    /// For scanned objects (`scanned_<uuid>`) it returns the user-given name
+    /// from ScannedFurnitureManager; for built-in models it humanises the filename.
+    private func friendlyModelName(_ key: String) -> String {
+        if catalogManager.isScannedModel(key) {
+            let uuidString = String(key.dropFirst("scanned_".count))
+            if let uuid = UUID(uuidString: uuidString),
+               let item = scannedFurnitureManager.items.first(where: { $0.id == uuid }) {
+                return item.name
+            }
+        }
+        return key.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 
     var body: some View {
         ZStack {
@@ -152,15 +168,34 @@ struct RoomDesignerView: View {
                 }
             } else {
                 // No captured room data
-                VStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 50))
-                        .foregroundColor(.orange)
-                    Text("Room data not available")
-                        .font(.headline)
-                    Text("Please scan the room again")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                ZStack {
+                    Color(hex: 0x0B0D17).ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(AppTheme.glowOrange.opacity(0.12))
+                                .frame(width: 110, height: 110)
+                                .blur(radius: 25)
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(AppTheme.glowOrange)
+                        }
+                        Text("Room Data Not Available")
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.white)
+                        Text("This room hasn't been scanned yet.\nGo back and scan it to get started.")
+                            .font(.subheadline)
+                            .foregroundColor(AppTheme.secondaryText)
+                            .multilineTextAlignment(.center)
+
+                        Button(action: { dismiss() }) {
+                            Label("Go Back", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(GradientButtonStyle())
+                        .padding(.top, 6)
+                    }
+                    .padding(32)
                 }
             }
         }
@@ -243,32 +278,73 @@ struct RoomDesignerView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.easeInOut(duration: 0.25), value: selectedObject?.stableId)
         } else {
-            VStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "cube.transparent.fill")
-                        .foregroundStyle(AppTheme.accentGradientInline)
-                    Text("3D Room Editor")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(.white)
-                }
+            VStack(spacing: 0) {
+                // ── Collapsible header ──
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        editorHintsExpanded.toggle()
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 36, height: 4)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    hintRow(icon: "arrow.triangle.2.circlepath", text: "Two-finger drag to orbit")
-                    hintRow(icon: "arrow.up.left.and.arrow.down.right", text: "Pinch to zoom")
-                    hintRow(icon: "hand.tap", text: "Tap furniture to select")
-                    hintRow(icon: "arrow.up.and.down.and.arrow.left.and.right", text: "Drag axis arrows to move")
-                    hintRow(icon: "rotate.right", text: "Twist to rotate selected")
+                        HStack(spacing: 8) {
+                            Image(systemName: "cube.transparent.fill")
+                                .foregroundStyle(AppTheme.accentGradientInline)
+                            Text("3D Room Editor")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(AppTheme.secondaryText)
+                                .rotationEffect(.degrees(editorHintsExpanded ? 0 : -180))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, editorHintsExpanded ? 4 : 14)
                 }
+                .buttonStyle(.plain)
 
-                Button(action: { showAddFurnitureCatalog = true }) {
-                    Label("Add New Furniture", systemImage: "plus.circle.fill")
+                // ── Expandable content ──
+                if editorHintsExpanded {
+                    VStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            hintRow(icon: "arrow.triangle.2.circlepath", text: "Two-finger drag to orbit")
+                            hintRow(icon: "arrow.up.left.and.arrow.down.right", text: "Pinch to zoom")
+                            hintRow(icon: "hand.tap", text: "Tap furniture to select")
+                            hintRow(icon: "arrow.up.and.down.and.arrow.left.and.right", text: "Drag axis arrows to move")
+                            hintRow(icon: "rotate.right", text: "Twist to rotate selected")
+                        }
+
+                        Button(action: { showAddFurnitureCatalog = true }) {
+                            Label("Add New Furniture", systemImage: "plus.circle.fill")
+                        }
+                        .buttonStyle(GradientButtonStyle())
+                        .padding(.top, 2)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                .buttonStyle(GradientButtonStyle())
-                .padding(.top, 2)
             }
-            .padding(16)
             .glassCard(cornerRadius: AppTheme.cornerRadius)
             .padding(.horizontal, 12)
+            .gesture(
+                DragGesture(minimumDistance: 20)
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if value.translation.height > 30 {
+                                editorHintsExpanded = false
+                            } else if value.translation.height < -30 {
+                                editorHintsExpanded = true
+                            }
+                        }
+                    }
+            )
         }
     }
 
@@ -309,8 +385,7 @@ struct RoomDesignerView: View {
         VStack(spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(selectedReplacement?.replacedWithUSDZ
-                        .replacingOccurrences(of: "_", with: " ").capitalized ?? "Furniture")
+                    Text(friendlyModelName(selectedReplacement?.replacedWithUSDZ ?? "Furniture"))
                         .font(.subheadline.weight(.bold)).foregroundColor(.white)
                     Text("Drag an axis arrow to move / Twist to rotate")
                         .font(.caption2).foregroundColor(AppTheme.secondaryText)
@@ -386,7 +461,7 @@ struct RoomDesignerView: View {
         roomManager.updateRoom(room)
         historyManager.addHistoryEntry(
             roomId: room.id, replacementId: replacement.id, action: .replaced,
-            details: "Replaced \(catDesc) with \(usdzFileName.replacingOccurrences(of: "_", with: " "))"
+            details: "Replaced \(catDesc) with \(friendlyModelName(usdzFileName))"
         )
     }
 
@@ -465,7 +540,7 @@ struct RoomDesignerView: View {
             roomId: room.id,
             replacementId: replacement.id,
             action: .replaced,
-            details: "Added \(modelName.replacingOccurrences(of: "_", with: " ").capitalized) to room"
+            details: "Added \(friendlyModelName(modelName)) to room"
         )
     }
 
@@ -863,15 +938,6 @@ struct RoomModelSceneView: UIViewRepresentable {
                 mover.name = key
                 anchor.addChild(mover)
 
-                // Apply any saved position offset to the mover
-                if let off = replacement.positionOffset, off.count >= 3 {
-                    let origPos = SIMD3<Float>(object.transform.columns.3.x,
-                                               object.transform.columns.3.y,
-                                               object.transform.columns.3.z)
-                    let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
-                    mover.setPosition(targetPos, relativeTo: nil)
-                }
-
                 let dims = object.dimensions
                 let target = SIMD3<Float>(
                     max(dims.x, 0.1), max(dims.y, 0.1), max(dims.z, 0.1)
@@ -915,9 +981,21 @@ struct RoomModelSceneView: UIViewRepresentable {
                 hitBox.name = key
                 mover.addChild(hitBox)
 
+                // ★ Add anchor to scene FIRST — setPosition(relativeTo: nil)
+                //   requires the entity to be in the scene hierarchy so
+                //   RealityKit can resolve world-space coordinates.
                 view.scene.addAnchor(anchor)
                 coord.anchorMap[key] = anchor
                 coord.moverMap[key] = mover
+
+                // Apply any saved position offset AFTER the entity is in-scene
+                if let off = replacement.positionOffset, off.count >= 3 {
+                    let origPos = SIMD3<Float>(object.transform.columns.3.x,
+                                               object.transform.columns.3.y,
+                                               object.transform.columns.3.z)
+                    let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                    mover.setPosition(targetPos, relativeTo: nil)
+                }
 
             } else {
                 // ═══ UNREPLACED: category-coloured wireframe ═══
@@ -982,15 +1060,6 @@ struct RoomModelSceneView: UIViewRepresentable {
             mover.name = key
             anchor.addChild(mover)
 
-            // Apply saved offset to the mover
-            if let off = rep.positionOffset, off.count >= 3 {
-                let origPos = SIMD3<Float>(xform.columns.3.x,
-                                           xform.columns.3.y,
-                                           xform.columns.3.z)
-                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
-                mover.setPosition(targetPos, relativeTo: nil)
-            }
-
             // Create a ScannedObject entry for selection & manipulation
             let addedObj = ScannedObject(
                 stableId: key,
@@ -1050,9 +1119,19 @@ struct RoomModelSceneView: UIViewRepresentable {
             hitBox.name = key
             mover.addChild(hitBox)
 
+            // ★ Add anchor to scene FIRST so setPosition(relativeTo: nil) works
             view.scene.addAnchor(anchor)
             coord.anchorMap[key] = anchor
             coord.moverMap[key] = mover
+
+            // Apply saved offset AFTER entity is in-scene
+            if let off = rep.positionOffset, off.count >= 3 {
+                let origPos = SIMD3<Float>(xform.columns.3.x,
+                                           xform.columns.3.y,
+                                           xform.columns.3.z)
+                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                mover.setPosition(targetPos, relativeTo: nil)
+            }
         }
     }
 
@@ -1463,6 +1542,12 @@ struct RoomModelSceneView: UIViewRepresentable {
                 gizmoAnchor?.setPosition(newPos, relativeTo: nil)
 
             case .ended, .cancelled:
+                // If .began returned early (no valid drag mode detected),
+                // skip snap & save to avoid using a stale targetDragPos.
+                guard activeDragMode != nil else {
+                    return
+                }
+
                 // Snap to the final target so the object rests exactly
                 // where the finger intended, not partway through a lerp.
                 mover.setPosition(targetDragPos, relativeTo: nil)
@@ -1956,6 +2041,18 @@ struct FurniturePickerView: View {
         }
     }
 
+    /// Resolves a display-friendly name for a model key.
+    private func friendlyModelName(_ key: String) -> String {
+        if catalogManager.isScannedModel(key) {
+            let uuidStr = String(key.dropFirst("scanned_".count))
+            if let uuid = UUID(uuidString: uuidStr),
+               let item = scannedFurnitureManager.items.first(where: { $0.id == uuid }) {
+                return item.name
+            }
+        }
+        return key.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
     private func replaceObject(with usdzFileName: String) {
         room.furnitureReplacements.removeAll { rep in
             guard let t = rep.getTransformMatrix() else { return false }
@@ -1977,7 +2074,7 @@ struct FurniturePickerView: View {
             roomId: room.id,
             replacementId: replacement.id,
             action: .replaced,
-            details: "Replaced \(catDesc) with \(usdzFileName.replacingOccurrences(of: "_", with: " "))"
+            details: "Replaced \(catDesc) with \(friendlyModelName(usdzFileName))"
         )
         dismiss()
     }

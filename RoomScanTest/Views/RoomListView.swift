@@ -15,6 +15,7 @@ struct RoomListView: View {
     // Programmatic navigation after scanning
     @State private var pendingRoom: Room? = nil
     @State private var navigateToNewRoom = false
+    @State private var showHistory = false
 
     var userRooms: [Room] {
         roomManager.getRoomsForCurrentUser()
@@ -65,17 +66,24 @@ struct RoomListView: View {
                 }
             }
         }
-        // Hidden link for programmatic navigation to a newly scanned room
+        // Hidden links for programmatic navigation
         .background(
-            NavigationLink(
-                destination: Group {
-                    if let room = pendingRoom {
-                        RoomDesignerView(room: room)
-                    }
-                },
-                isActive: $navigateToNewRoom,
-                label: { EmptyView() }
-            )
+            Group {
+                NavigationLink(
+                    destination: Group {
+                        if let room = pendingRoom {
+                            RoomDesignerView(room: room)
+                        }
+                    },
+                    isActive: $navigateToNewRoom,
+                    label: { EmptyView() }
+                )
+                NavigationLink(
+                    destination: HistoryView(),
+                    isActive: $showHistory,
+                    label: { EmptyView() }
+                )
+            }
             .hidden()
         )
         .navigationTitle("My Rooms")
@@ -84,11 +92,11 @@ struct RoomListView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showCreateRoom = true }) {
                     Image(systemName: "plus")
-                        .tintedIcon()
+                        .tintedIconGradient()
                 }
             }
             ToolbarItem(placement: .navigationBarLeading) {
-                NavigationLink(destination: HistoryView()) {
+                Button(action: { showHistory = true }) {
                     Image(systemName: "clock.arrow.circlepath")
                         .tintedIcon(AppTheme.glowViolet)
                 }

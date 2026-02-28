@@ -131,10 +131,22 @@ struct TintedIconButton: ViewModifier {
         content
             .font(.system(size: 16, weight: .semibold))
             .foregroundColor(tint)
-            .padding(10)
-            .background(.ultraThinMaterial)
-            .clipShape(Circle())
+            .frame(width: 38, height: 38)
+            .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(tint.opacity(0.25), lineWidth: 1))
+    }
+}
+
+/// Gradient-filled circle icon button (e.g. "+" add button).
+struct TintedIconGradientButton: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 16, weight: .bold))
+            .foregroundColor(.white)
+            .frame(width: 38, height: 38)
+            .background(AppTheme.accentGradientInline, in: Circle())
+            .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
+            .shadow(color: AppTheme.glowCyan.opacity(0.3), radius: 6, y: 2)
     }
 }
 
@@ -145,6 +157,10 @@ extension View {
 
     func tintedIcon(_ tint: Color = AppTheme.glowCyan) -> some View {
         modifier(TintedIconButton(tint: tint))
+    }
+
+    func tintedIconGradient() -> some View {
+        modifier(TintedIconGradientButton())
     }
 }
 

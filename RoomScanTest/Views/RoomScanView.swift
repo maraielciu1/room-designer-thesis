@@ -27,6 +27,7 @@ struct RoomScanView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var hasProcessedRoom = false
+    @State private var instructionsExpanded = true
 
     var body: some View {
         ZStack {
@@ -151,7 +152,7 @@ struct RoomScanView: View {
                 }
 
             } else {
-                // ── Instructions ──
+                // ── Instructions (expandable) ──
                 VStack(spacing: 28) {
                     Spacer()
 
@@ -173,16 +174,65 @@ struct RoomScanView: View {
                         .font(.title2.weight(.bold))
                         .foregroundColor(.white)
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        InstructionRow(icon: "1.circle.fill", text: "Move slowly around the room")
-                        InstructionRow(icon: "2.circle.fill", text: "Point camera at furniture")
-                        InstructionRow(icon: "3.circle.fill", text: "Ensure good lighting")
-                        InstructionRow(icon: "4.circle.fill", text: "Tap 'Start Scan' when ready")
+                    // Collapsible instructions card
+                    VStack(spacing: 0) {
+                        // ── Header / drag handle ──
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                instructionsExpanded.toggle()
+                            }
+                        } label: {
+                            VStack(spacing: 8) {
+                                Capsule()
+                                    .fill(Color.white.opacity(0.25))
+                                    .frame(width: 36, height: 4)
+
+                                HStack {
+                                    Image(systemName: "lightbulb.fill")
+                                        .foregroundStyle(AppTheme.accentGradientInline)
+                                    Text("Scanning Tips")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundColor(AppTheme.secondaryText)
+                                        .rotationEffect(.degrees(instructionsExpanded ? 0 : -180))
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                            .padding(.bottom, instructionsExpanded ? 4 : 14)
+                        }
+                        .buttonStyle(.plain)
+
+                        // ── Expandable content ──
+                        if instructionsExpanded {
+                            VStack(alignment: .leading, spacing: 14) {
+                                InstructionRow(icon: "1.circle.fill", text: "Move slowly around the room")
+                                InstructionRow(icon: "2.circle.fill", text: "Point camera at furniture")
+                                InstructionRow(icon: "3.circle.fill", text: "Ensure good lighting")
+                                InstructionRow(icon: "4.circle.fill", text: "Tap 'Start Scan' when ready")
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 18)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 18)
                     .glassCard(cornerRadius: AppTheme.cornerRadius)
                     .padding(.horizontal, 24)
+                    .gesture(
+                        DragGesture(minimumDistance: 20)
+                            .onEnded { value in
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if value.translation.height > 30 {
+                                        instructionsExpanded = false
+                                    } else if value.translation.height < -30 {
+                                        instructionsExpanded = true
+                                    }
+                                }
+                            }
+                    )
 
                     Button(action: {
                         finalizePreScan()
