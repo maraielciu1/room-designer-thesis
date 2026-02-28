@@ -20,3 +20,6 @@ Package.resolved
 
 # Cursor / IDE
 .cursor/
+
+# Firebase (contains API keys)
+GoogleService-Info.plist
