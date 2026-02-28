@@ -944,8 +944,12 @@ struct RoomModelSceneView: UIViewRepresentable {
                 )
 
                 // ── Choose loading strategy ──
+                // Scanned & marketplace models are at real-world scale (1 unit = 1 m).
+                // Built-in catalogue models need to be scaled to fit the target box.
                 let modelName = replacement.replacedWithUSDZ
-                let model: Entity? = catMgr.isScannedModel(modelName)
+                let useRealScale = catMgr.isScannedModel(modelName)
+                                || catMgr.isMarketplaceModel(modelName)
+                let model: Entity? = useRealScale
                     ? catMgr.loadAtRealWorldScale(named: modelName, targetDimensions: target)
                     : catMgr.loadAndScaleModel(named: modelName, targetDimensions: target)
 
@@ -1072,7 +1076,9 @@ struct RoomModelSceneView: UIViewRepresentable {
             // ── Load model ──
             let modelName = rep.replacedWithUSDZ
             let defaultDims = SIMD3<Float>(0.5, 0.5, 0.5)
-            let model: Entity? = catMgr.isScannedModel(modelName)
+            let useRealScale = catMgr.isScannedModel(modelName)
+                            || catMgr.isMarketplaceModel(modelName)
+            let model: Entity? = useRealScale
                 ? catMgr.loadAtRealWorldScale(named: modelName, targetDimensions: defaultDims)
                 : catMgr.loadAndScaleModel(
                     named: modelName,
@@ -1880,6 +1886,13 @@ struct FurnitureCatalogTray: View {
         scannedFurnitureManager.getFurnitureForCurrentUser()
     }
 
+    /// Marketplace models cached on-device.
+    private var marketplaceDownloads: [DownloadedMarketplaceModel] {
+        DownloadedMarketplaceModel.loadAll().filter {
+            catalogManager.marketplaceModelURL(for: $0.catalogKey) != nil
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Rectangle()
@@ -1932,6 +1945,30 @@ struct FurnitureCatalogTray: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(AppTheme.glowGreen.opacity(0.15), lineWidth: 1)
+                            )
+                        }
+                    }
+
+                    // Downloaded marketplace models
+                    ForEach(marketplaceDownloads) { dl in
+                        Button { onSelectModel(dl.catalogKey) } label: {
+                            VStack(spacing: 4) {
+                                USDZThumbnailView(
+                                    url: catalogManager.modelFileURL(for: dl.catalogKey),
+                                    size: CGSize(width: 48, height: 48)
+                                )
+                                Text(dl.name)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(width: 76, height: 76)
+                            .background(AppTheme.glowCyan.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppTheme.glowCyan.opacity(0.15), lineWidth: 1)
                             )
                         }
                     }
@@ -1989,6 +2026,13 @@ struct FurniturePickerView: View {
         scannedFurnitureManager.getFurnitureForCurrentUser()
     }
 
+    /// Marketplace models that have been downloaded to the device.
+    private var downloadedMarketplace: [DownloadedMarketplaceModel] {
+        DownloadedMarketplaceModel.loadAll().filter { model in
+            catalogManager.marketplaceModelURL(for: model.catalogKey) != nil
+        }
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -2026,6 +2070,23 @@ struct FurniturePickerView: View {
                             .padding(.horizontal, 16)
                         }
                     }
+
+                    // Downloaded marketplace models
+                    if !downloadedMarketplace.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "Downloaded from Marketplace", icon: "arrow.down.circle.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(downloadedMarketplace) { item in
+                                    MarketplaceModelCard(item: item, catalogManager: catalogManager) {
+                                        replaceObject(with: item.catalogKey)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
                 }
                 .padding(.bottom, 10)
             }
@@ -2048,6 +2109,12 @@ struct FurniturePickerView: View {
             if let uuid = UUID(uuidString: uuidStr),
                let item = scannedFurnitureManager.items.first(where: { $0.id == uuid }) {
                 return item.name
+            }
+        }
+        if catalogManager.isMarketplaceModel(key) {
+            let itemId = String(key.dropFirst("marketplace_".count))
+            if let meta = DownloadedMarketplaceModel.loadAll().first(where: { $0.id == itemId }) {
+                return meta.name
             }
         }
         return key.replacingOccurrences(of: "_", with: " ").capitalized
@@ -2099,6 +2166,14 @@ struct AddFurniturePickerView: View {
         scannedFurnitureManager.getFurnitureForCurrentUser()
     }
 
+    /// Marketplace models that have been downloaded to the device.
+    private var downloadedMarketplace: [DownloadedMarketplaceModel] {
+        DownloadedMarketplaceModel.loadAll().filter { model in
+            // Only show if the cached USDZ file still exists on disk
+            catalogManager.marketplaceModelURL(for: model.catalogKey) != nil
+        }
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -2131,6 +2206,23 @@ struct AddFurniturePickerView: View {
                                 ForEach(userScans) { scan in
                                     ScannedFurnitureCard(item: scan) {
                                         onSelect(scan.catalogKey)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+
+                    if !downloadedMarketplace.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "Downloaded from Marketplace", icon: "arrow.down.circle.fill")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(downloadedMarketplace) { item in
+                                    MarketplaceModelCard(item: item, catalogManager: catalogManager) {
+                                        onSelect(item.catalogKey)
                                         dismiss()
                                     }
                                 }
@@ -2334,6 +2426,43 @@ struct ScannedFurnitureCard: View {
                 Text(item.category.capitalized)
                     .font(.caption2)
                     .foregroundColor(AppTheme.secondaryText)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .glassCard()
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MARK: - MarketplaceModelCard
+// ═══════════════════════════════════════════════════════════════════
+
+/// Card for a marketplace model that has been downloaded to the device.
+struct MarketplaceModelCard: View {
+    let item: DownloadedMarketplaceModel
+    let catalogManager: FurnitureCatalogManager
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                USDZThumbnailView(
+                    url: catalogManager.modelFileURL(for: item.catalogKey),
+                    size: CGSize(width: 80, height: 80)
+                )
+                Text(item.name)
+                    .font(.caption.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(AppTheme.primaryText)
+                    .lineLimit(2)
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 8))
+                    Text(item.category.capitalized)
+                        .font(.caption2)
+                }
+                .foregroundColor(AppTheme.glowCyan.opacity(0.8))
             }
             .frame(maxWidth: .infinity)
             .padding()

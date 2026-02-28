@@ -7,7 +7,36 @@
 
 import SwiftUI
 
+// MARK: - Local Landing View (with "Switch Mode" button)
+
+/// Wrapper around the original LandingView that adds a way to switch back to mode selection.
+struct LocalLandingView: View {
+    var switchMode: () -> Void
+
+    @EnvironmentObject var userManager: UserManager
+
+    var body: some View {
+        LandingView(switchMode: switchMode)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        switchMode()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "globe")
+                            Text("Marketplace")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundColor(AppTheme.glowViolet)
+                    }
+                }
+            }
+    }
+}
+
 struct LandingView: View {
+    var switchMode: (() -> Void)? = nil
+
     @EnvironmentObject var userManager: UserManager
     @State private var showUserSelection = false
     @State private var logoScale: CGFloat = 0.6
