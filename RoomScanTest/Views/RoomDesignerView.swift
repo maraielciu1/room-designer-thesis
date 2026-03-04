@@ -67,6 +67,9 @@ struct ScannedObject: Identifiable {
 
     var categoryDescription: String {
         if isAdded {
+            if addedModelName == "wallArt" { return "Wall Art" }
+            if addedModelName == "lighting" { return "Light Fixture" }
+            if addedModelName == "carpet" { return "Carpet / Rug" }
             return addedModelName?.replacingOccurrences(of: "_", with: " ").capitalized
                 ?? "Added Furniture"
         }
@@ -96,9 +99,33 @@ struct RoomDesignerView: View {
     @State private var heightSignal: Int = 0
     @State private var heightDeltaValue: Float = 0
     @State private var showAddFurnitureCatalog = false
+    @State private var showWallArtPicker = false
+    @State private var showLightingPicker = false
+    @State private var showCarpetPicker = false
+    @State private var isFirstPersonCamera = false
     @State private var editorHintsExpanded = true
+    @State private var wallColor: Color
+    @State private var floorColor: Color
+    @State private var wallPattern: SurfacePattern
+    @State private var floorPattern: SurfacePattern
+    @State private var colorChangeCount: Int = 0
 
     @State var room: Room
+
+    init(room: Room) {
+        _room = State(initialValue: room)
+        if let mats = room.roomMaterials {
+            _wallColor    = State(initialValue: mats.wallColor.color)
+            _floorColor   = State(initialValue: mats.floorColor.color)
+            _wallPattern  = State(initialValue: mats.wallPattern)
+            _floorPattern = State(initialValue: mats.floorPattern)
+        } else {
+            _wallColor    = State(initialValue: Color(red: 0.7, green: 0.75, blue: 0.85))
+            _floorColor   = State(initialValue: Color(red: 0.5, green: 0.5, blue: 0.5))
+            _wallPattern  = State(initialValue: .none)
+            _floorPattern = State(initialValue: .none)
+        }
+    }
 
     /// Whether the currently selected scanned object already has a replacement
     private var selectedReplacement: FurnitureReplacement? {
@@ -141,6 +168,11 @@ struct RoomDesignerView: View {
                     heightDelta: heightDeltaValue,
                     catalogManager: catalogManager,
                     roomManager: roomManager,
+                    wallColor: wallColor,
+                    floorColor: floorColor,
+                    wallPattern: wallPattern,
+                    floorPattern: floorPattern,
+                    colorTrigger: colorChangeCount,
                     refreshTrigger: room.furnitureReplacements
                         .map { $0.id.hashValue &+ $0.replacedWithUSDZ.hashValue }
                         .reduce(room.furnitureReplacements.count, &+)
@@ -215,8 +247,40 @@ struct RoomDesignerView: View {
                 addNewFurniture(modelName: modelName)
             }
         }
+        .sheet(isPresented: $showWallArtPicker) {
+            WallArtPickerView { image, frameSize, frameStyle in
+                addWallArt(image: image, frameSize: frameSize, frameStyle: frameStyle)
+            }
+        }
+        .sheet(isPresented: $showLightingPicker) {
+            LightingPickerView { fixtureType, color, intensity in
+                addLightFixture(type: fixtureType, color: color, intensity: intensity)
+            }
+        }
+        .sheet(isPresented: $showCarpetPicker) {
+            CarpetPickerView { size, widthM, depthM, color, pattern in
+                addCarpet(size: size, widthM: widthM, depthM: depthM,
+                          color: color, pattern: pattern)
+            }
+        }
         .onChange(of: room.id) { _, _ in roomManager.updateRoom(room) }
         .onChange(of: room.furnitureReplacements.count) { _, _ in roomManager.updateRoom(room) }
+        .onChange(of: wallColor) { _, _ in
+            saveRoomMaterials()
+            colorChangeCount += 1
+        }
+        .onChange(of: floorColor) { _, _ in
+            saveRoomMaterials()
+            colorChangeCount += 1
+        }
+        .onChange(of: wallPattern) { _, _ in
+            saveRoomMaterials()
+            colorChangeCount += 1
+        }
+        .onChange(of: floorPattern) { _, _ in
+            saveRoomMaterials()
+            colorChangeCount += 1
+        }
     }
 
     // MARK: Top Bar
@@ -243,6 +307,17 @@ struct RoomDesignerView: View {
             .glassCard(cornerRadius: 12)
 
             Spacer()
+
+            Button(action: {
+                isFirstPersonCamera.toggle()
+                switchCameraMode(firstPerson: isFirstPersonCamera)
+            }) {
+                Image(systemName: isFirstPersonCamera
+                      ? "eye.fill" : "eye")
+                    .tintedIcon(isFirstPersonCamera
+                                ? AppTheme.glowGreen : AppTheme.glowCyan)
+            }
+            .help(isFirstPersonCamera ? "Orbit View" : "Room View")
 
             Button(action: takeScreenshot) {
                 Image(systemName: "camera.fill")
@@ -320,10 +395,123 @@ struct RoomDesignerView: View {
                             hintRow(icon: "rotate.right", text: "Twist to rotate selected")
                         }
 
-                        Button(action: { showAddFurnitureCatalog = true }) {
-                            Label("Add New Furniture", systemImage: "plus.circle.fill")
+                        // ── Room Materials ──
+                        VStack(spacing: 0) {
+                            Divider().background(Color.white.opacity(0.1))
+                                .padding(.bottom, 10)
+
+                            HStack(spacing: 6) {
+                                Image(systemName: "paintpalette.fill")
+                                    .foregroundStyle(AppTheme.accentGradientInline)
+                                    .font(.system(size: 12))
+                                Text("Room Materials")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                            }
+                            .padding(.bottom, 8)
+
+                            // ── Walls ──
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(wallColor)
+                                        .frame(width: 26, height: 26)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 5)
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
+                                    Text("Walls")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    ColorPicker("", selection: $wallColor, supportsOpacity: false)
+                                        .labelsHidden()
+                                        .scaleEffect(0.85)
+                                }
+
+                                patternRow(selection: $wallPattern, baseColor: wallColor)
+                            }
+                            .padding(.bottom, 10)
+
+                            // ── Floors ──
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(floorColor)
+                                        .frame(width: 26, height: 26)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 5)
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
+                                    Text("Floor")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    ColorPicker("", selection: $floorColor, supportsOpacity: false)
+                                        .labelsHidden()
+                                        .scaleEffect(0.85)
+                                }
+
+                                patternRow(selection: $floorPattern, baseColor: floorColor)
+                            }
                         }
-                        .buttonStyle(GradientButtonStyle())
+
+                        // ── Add Buttons ──
+                        VStack(spacing: 8) {
+                            Button(action: { showAddFurnitureCatalog = true }) {
+                                Label("Add Furniture", systemImage: "plus.circle.fill")
+                            }
+                            .buttonStyle(GradientButtonStyle())
+
+                            HStack(spacing: 8) {
+                                Button(action: { showWallArtPicker = true }) {
+                                    Label("Wall Art", systemImage: "photo.artframe")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                .fill(Color.white.opacity(0.10))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                        .stroke(AppTheme.glowCyan.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                }
+
+                                Button(action: { showLightingPicker = true }) {
+                                    Label("Lighting", systemImage: "lightbulb.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                .fill(Color.white.opacity(0.10))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                        .stroke(AppTheme.glowOrange.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                }
+
+                                Button(action: { showCarpetPicker = true }) {
+                                    Label("Carpet", systemImage: "square.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                .fill(Color.white.opacity(0.10))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                                        .stroke(AppTheme.glowGreen.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                }
+                            }
+                        }
                         .padding(.top, 2)
                     }
                     .padding(.horizontal, 16)
@@ -441,6 +629,78 @@ struct RoomDesignerView: View {
         }
     }
 
+    // MARK: Material Persistence
+
+    private func saveRoomMaterials() {
+        let wc = CodableColor(from: wallColor)
+        let fc = CodableColor(from: floorColor)
+        if room.roomMaterials != nil {
+            room.roomMaterials?.wallColor    = wc
+            room.roomMaterials?.floorColor   = fc
+            room.roomMaterials?.wallPattern  = wallPattern
+            room.roomMaterials?.floorPattern = floorPattern
+        } else {
+            room.roomMaterials = RoomMaterials(
+                wallColor: wc, floorColor: fc,
+                wallPattern: wallPattern, floorPattern: floorPattern
+            )
+        }
+        roomManager.updateRoom(room)
+    }
+
+    // MARK: Pattern Picker Row
+
+    @ViewBuilder
+    private func patternRow(selection: Binding<SurfacePattern>, baseColor: Color) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(SurfacePattern.allCases) { pattern in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selection.wrappedValue = pattern
+                        }
+                    } label: {
+                        VStack(spacing: 3) {
+                            ZStack {
+                                if pattern == .none {
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(baseColor)
+                                        .frame(width: 38, height: 38)
+                                } else {
+                                    Image(uiImage: TextureGenerator.thumbnail(
+                                        for: pattern,
+                                        color: UIColor(baseColor)
+                                    ))
+                                    .resizable()
+                                    .interpolation(.medium)
+                                    .frame(width: 38, height: 38)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                }
+                            }
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(
+                                        selection.wrappedValue == pattern
+                                            ? Color.cyan : Color.white.opacity(0.15),
+                                        lineWidth: selection.wrappedValue == pattern ? 2 : 1
+                                    )
+                            )
+
+                            Text(pattern.displayName)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(
+                                    selection.wrappedValue == pattern
+                                        ? .white : .white.opacity(0.55)
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     // MARK: Actions
 
     private func replaceSelected(with usdzFileName: String) {
@@ -484,11 +744,23 @@ struct RoomDesignerView: View {
     private func removeReplacement() {
         guard let selected = selectedObject else { return }
         let objPos = selected.transform.columns.3
+
+        // Clean up wall-art image files before removing
+        for rep in room.furnitureReplacements {
+            guard let t = rep.getTransformMatrix() else { continue }
+            let d = t.columns.3 - objPos
+            let isMatch = abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            if isMatch, rep.isWallArt, let imgFile = rep.wallArtImageFile {
+                DecorManager.deleteImage(named: imgFile)
+            }
+        }
+
         room.furnitureReplacements.removeAll { rep in
             guard let t = rep.getTransformMatrix() else { return false }
             let d = t.columns.3 - objPos
             return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
         }
+        roomManager.updateRoom(room)
         selectedObject = nil
     }
 
@@ -544,6 +816,182 @@ struct RoomDesignerView: View {
         )
     }
 
+    // MARK: Add Wall Art
+
+    private func addWallArt(image: UIImage, frameSize: FrameSize, frameStyle: FrameStyle) {
+        guard let capturedRoom = room.getCapturedRoom() else { return }
+        guard let imageFile = DecorManager.saveImage(image) else { return }
+
+        // Find the largest wall
+        let sortedWalls = capturedRoom.walls.sorted {
+            ($0.dimensions.x * $0.dimensions.y) > ($1.dimensions.x * $1.dimensions.y)
+        }
+        guard let wall = sortedWalls.first else { return }
+
+        // Position the art at the wall's centre, offset slightly outward
+        let wallNormal = simd_normalize(SIMD3<Float>(
+            wall.transform.columns.2.x,
+            wall.transform.columns.2.y,
+            wall.transform.columns.2.z))
+        let surfaceOffset = wall.dimensions.z / 2 + frameStyle.frameDepthM / 2 + 0.005
+        var xform = wall.transform
+        xform.columns.3 = SIMD4<Float>(
+            SIMD3<Float>(wall.transform.columns.3.x,
+                         wall.transform.columns.3.y,
+                         wall.transform.columns.3.z) + wallNormal * surfaceOffset,
+            1)
+
+        let rgb = UIColor(Color.white)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+        rgb.getRed(&r, green: &g, blue: &b, alpha: nil)
+
+        let replacement = FurnitureReplacement(
+            objectId: UUID(),
+            originalCategory: "wallArt",
+            replacedWithUSDZ: "wallArt",
+            transform: FurnitureReplacement.fromTransform(xform),
+            wallArtImageFile: imageFile,
+            wallArtFrameSize: frameSize.rawValue,
+            wallArtFrameStyle: frameStyle.rawValue
+        )
+        room.furnitureReplacements.append(replacement)
+        roomManager.updateRoom(room)
+
+        historyManager.addHistoryEntry(
+            roomId: room.id, replacementId: replacement.id, action: .replaced,
+            details: "Added wall art (\(frameSize.label), \(frameStyle.rawValue))")
+    }
+
+    // MARK: Add Light Fixture
+
+    private func addLightFixture(type: LightFixtureType, color: UIColor, intensity: Float) {
+        guard let capturedRoom = room.getCapturedRoom() else { return }
+
+        // Room bounds for placement
+        var minB = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var maxB = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        for wall in capturedRoom.walls {
+            let p = SIMD3<Float>(wall.transform.columns.3.x,
+                                 wall.transform.columns.3.y,
+                                 wall.transform.columns.3.z)
+            minB = min(minB, p - wall.dimensions * 0.5)
+            maxB = max(maxB, p + wall.dimensions * 0.5)
+        }
+        let center = (minB + maxB) * 0.5
+
+        // Floor & ceiling Y
+        var floorY = minB.y
+        if let f = capturedRoom.floors.first {
+            floorY = f.transform.columns.3.y
+        }
+        let ceilingY = maxB.y
+
+        var xform = matrix_identity_float4x4
+        switch type.placement {
+        case .ceiling:
+            xform.columns.3 = SIMD4<Float>(center.x, ceilingY, center.z, 1)
+        case .floor:
+            xform.columns.3 = SIMD4<Float>(center.x, floorY, center.z, 1)
+        case .wall:
+            // Attach to the largest wall, at mid-height
+            if let wall = capturedRoom.walls.max(by: {
+                $0.dimensions.x * $0.dimensions.y < $1.dimensions.x * $1.dimensions.y
+            }) {
+                let wallNormal = simd_normalize(SIMD3<Float>(
+                    wall.transform.columns.2.x,
+                    wall.transform.columns.2.y,
+                    wall.transform.columns.2.z))
+                let surfaceOffset = wall.dimensions.z / 2 + 0.02
+                xform = wall.transform
+                xform.columns.3 = SIMD4<Float>(
+                    SIMD3<Float>(wall.transform.columns.3.x,
+                                 wall.transform.columns.3.y,
+                                 wall.transform.columns.3.z) + wallNormal * surfaceOffset,
+                    1)
+            } else {
+                xform.columns.3 = SIMD4<Float>(center.x, (floorY + ceilingY) * 0.5, center.z, 1)
+            }
+        }
+
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: nil)
+
+        let replacement = FurnitureReplacement(
+            objectId: UUID(),
+            originalCategory: "lighting",
+            replacedWithUSDZ: "lighting",
+            transform: FurnitureReplacement.fromTransform(xform),
+            lightFixtureType: type.rawValue,
+            lightColorRGB: [Double(r), Double(g), Double(b)],
+            lightIntensity: Double(intensity)
+        )
+        room.furnitureReplacements.append(replacement)
+        roomManager.updateRoom(room)
+
+        historyManager.addHistoryEntry(
+            roomId: room.id, replacementId: replacement.id, action: .replaced,
+            details: "Added \(type.label) light fixture")
+    }
+
+    // MARK: Add Carpet
+
+    private func addCarpet(size: CarpetSize, widthM: Float, depthM: Float,
+                           color: UIColor, pattern: CarpetPattern) {
+        guard let capturedRoom = room.getCapturedRoom() else { return }
+
+        // Place at the floor centre
+        var minB = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var maxB = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        for wall in capturedRoom.walls {
+            let p = SIMD3<Float>(wall.transform.columns.3.x,
+                                 wall.transform.columns.3.y,
+                                 wall.transform.columns.3.z)
+            minB = min(minB, p - wall.dimensions * 0.5)
+            maxB = max(maxB, p + wall.dimensions * 0.5)
+        }
+        let center = (minB + maxB) * 0.5
+
+        var floorY = minB.y
+        if let f = capturedRoom.floors.first {
+            floorY = f.transform.columns.3.y
+        }
+
+        var xform = matrix_identity_float4x4
+        xform.columns.3 = SIMD4<Float>(center.x, floorY, center.z, 1)
+
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: nil)
+
+        let replacement = FurnitureReplacement(
+            objectId: UUID(),
+            originalCategory: "carpet",
+            replacedWithUSDZ: "carpet",
+            transform: FurnitureReplacement.fromTransform(xform),
+            carpetSize: size.rawValue,
+            carpetPattern: pattern.rawValue,
+            carpetColorRGB: [Double(r), Double(g), Double(b)],
+            carpetCustomWidthCm: size == .custom ? Double(widthM * 100) : nil,
+            carpetCustomDepthCm: size == .custom ? Double(depthM * 100) : nil
+        )
+        room.furnitureReplacements.append(replacement)
+        roomManager.updateRoom(room)
+
+        let wCm = Int(widthM * 100)
+        let dCm = Int(depthM * 100)
+        historyManager.addHistoryEntry(
+            roomId: room.id, replacementId: replacement.id, action: .replaced,
+            details: "Added \(pattern.label) carpet (\(wCm)×\(dCm) cm)")
+    }
+
+    // MARK: Camera Mode Switch
+
+    private func switchCameraMode(firstPerson: Bool) {
+        NotificationCenter.default.post(
+            name: .switchCameraMode,
+            object: nil,
+            userInfo: ["firstPerson": firstPerson])
+    }
+
     private func takeScreenshot() {
         arView?.snapshot(saveToHDR: false) { image in
             DispatchQueue.main.async {
@@ -572,6 +1020,11 @@ struct RoomModelSceneView: UIViewRepresentable {
     let heightDelta: Float
     let catalogManager: FurnitureCatalogManager
     let roomManager: RoomManager
+    let wallColor: Color
+    let floorColor: Color
+    let wallPattern: SurfacePattern
+    let floorPattern: SurfacePattern
+    let colorTrigger: Int
     let refreshTrigger: Int
 
     // ── makeUIView ────────────────────────────────────────────────
@@ -627,6 +1080,12 @@ struct RoomModelSceneView: UIViewRepresentable {
         if heightSignal != coord.lastHeightSignal {
             coord.lastHeightSignal = heightSignal
             coord.adjustHeight(by: heightDelta)
+        }
+
+        // Handle structure colour changes (wall / floor picker)
+        if colorTrigger != coord.lastColorTrigger {
+            coord.lastColorTrigger = colorTrigger
+            updateStructureColors(in: uiView)
         }
 
         // Rebuild furniture when replacements change
@@ -809,16 +1268,34 @@ struct RoomModelSceneView: UIViewRepresentable {
     // ── addRoomStructure — walls, floors, doors, windows ──────────
 
     private func addRoomStructure(to view: ARView) {
+        // Use the user-chosen colours (from colour picker / captured scan)
+        let wallPanelColor  = UIColor(wallColor)
+        let floorPanelColor = UIColor(floorColor)
+
+        func lighterTint(of color: UIColor) -> UIColor {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return UIColor(red: min(r + 0.15, 1), green: min(g + 0.15, 1), blue: min(b + 0.15, 1), alpha: a)
+        }
+
+        let wallWireColor  = lighterTint(of: wallPanelColor)
+        let floorWireColor = lighterTint(of: floorPanelColor)
+
+        // Fully opaque — solid walls and floors
+        let wallOpacity:  Float = 1.0
+        let floorOpacity: Float = 1.0
+
         // ── Walls ──
         for wall in capturedRoom.walls {
             addStructuralElement(
                 to: view,
                 transform: wall.transform,
                 dimensions: wall.dimensions,
-                panelColor: UIColor(red: 0.7, green: 0.75, blue: 0.85, alpha: 1.0),
-                panelOpacity: 0.12,
-                wireColor: UIColor(red: 0.6, green: 0.65, blue: 0.8, alpha: 1.0),
-                name: "__wall__"
+                panelColor: wallPanelColor,
+                panelOpacity: wallOpacity,
+                wireColor: wallWireColor,
+                name: "__wall__",
+                pattern: wallPattern
             )
         }
 
@@ -828,10 +1305,11 @@ struct RoomModelSceneView: UIViewRepresentable {
                 to: view,
                 transform: floor.transform,
                 dimensions: floor.dimensions,
-                panelColor: UIColor(white: 0.5, alpha: 1.0),
-                panelOpacity: 0.15,
-                wireColor: UIColor(white: 0.45, alpha: 1.0),
-                name: "__floor__"
+                panelColor: floorPanelColor,
+                panelOpacity: floorOpacity,
+                wireColor: floorWireColor,
+                name: "__floor__",
+                pattern: floorPattern
             )
         }
 
@@ -862,7 +1340,61 @@ struct RoomModelSceneView: UIViewRepresentable {
         }
     }
 
-    /// Adds a semi-transparent panel + wireframe edges for a room surface
+    /// Updates wall and floor materials in-place (no rebuild, no flicker).
+    /// Handles both solid-colour and textured (patterned) surfaces.
+    private func updateStructureColors(in view: ARView) {
+        let wallUI  = UIColor(wallColor)
+        let floorUI = UIColor(floorColor)
+
+        func lighterTint(of color: UIColor) -> UIColor {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return UIColor(red: min(r + 0.15, 1), green: min(g + 0.15, 1), blue: min(b + 0.15, 1), alpha: a)
+        }
+
+        let wallWire  = lighterTint(of: wallUI)
+        let floorWire = lighterTint(of: floorUI)
+
+        for anchor in view.scene.anchors {
+            let isWall  = anchor.name == "__wall__"
+            let isFloor = anchor.name == "__floor__"
+            guard isWall || isFloor else { continue }
+
+            let panelColor: UIColor      = isWall ? wallUI  : floorUI
+            let wireColor: UIColor       = isWall ? wallWire : floorWire
+            let pattern: SurfacePattern  = isWall ? wallPattern : floorPattern
+
+            for child in anchor.children {
+                if let panel = child as? ModelEntity, panel.model != nil {
+                    // Rebuild material — textured or solid
+                    var mat = SimpleMaterial(color: panelColor, isMetallic: false)
+                    if pattern != .none, let mesh = panel.model?.mesh {
+                        let ext = mesh.bounds.extents
+                        let texW: Float = isFloor ? ext.x : max(ext.x, ext.z)
+                        let texH: Float = isFloor ? ext.z : ext.y
+                        if let cg = TextureGenerator.texture(
+                               for: pattern, color: panelColor,
+                               widthM: texW, heightM: texH),
+                           let tr = try? TextureResource(
+                               image: cg, options: .init(semantic: .color)) {
+                            mat.color = .init(tint: .white, texture: .init(tr))
+                        }
+                    }
+                    panel.model?.materials = [mat]
+                    panel.components.set(OpacityComponent(opacity: 1.0))
+                } else {
+                    // Wireframe container — update each edge
+                    for edge in child.children {
+                        if let edgeModel = edge as? ModelEntity {
+                            edgeModel.model?.materials = [UnlitMaterial(color: wireColor)]
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Adds a panel (solid or textured) + wireframe edges for a room surface
     private func addStructuralElement(
         to view: ARView,
         transform: simd_float4x4,
@@ -870,7 +1402,8 @@ struct RoomModelSceneView: UIViewRepresentable {
         panelColor: UIColor,
         panelOpacity: Float,
         wireColor: UIColor,
-        name: String
+        name: String,
+        pattern: SurfacePattern = .none
     ) {
         let d = SIMD3<Float>(
             max(dimensions.x, 0.01),
@@ -881,12 +1414,23 @@ struct RoomModelSceneView: UIViewRepresentable {
         let anchor = AnchorEntity(world: transform)
         anchor.name = name
 
-        // Semi-transparent solid panel
         let panelMesh = MeshResource.generateBox(size: d)
-        let panel = ModelEntity(
-            mesh: panelMesh,
-            materials: [SimpleMaterial(color: panelColor, isMetallic: false)]
-        )
+
+        // Build material — textured or solid colour
+        var panelMaterial = SimpleMaterial(color: panelColor, isMetallic: false)
+        if pattern != .none {
+            let texW: Float = name.contains("floor") ? d.x : max(d.x, d.z)
+            let texH: Float = name.contains("floor") ? d.z : d.y
+            if let cgImage = TextureGenerator.texture(
+                   for: pattern, color: panelColor,
+                   widthM: texW, heightM: texH),
+               let tr = try? TextureResource(
+                   image: cgImage, options: .init(semantic: .color)) {
+                panelMaterial.color = .init(tint: .white, texture: .init(tr))
+            }
+        }
+
+        let panel = ModelEntity(mesh: panelMesh, materials: [panelMaterial])
         panel.components.set(OpacityComponent(opacity: panelOpacity))
         anchor.addChild(panel)
 
@@ -974,13 +1518,9 @@ struct RoomModelSceneView: UIViewRepresentable {
                     coord.initialScaleMap[key] = baseScale
                 }
 
-                // Invisible hit box for selection
+                // Invisible collision shape for selection (no mesh → won't occlude walls)
                 let bs = SIMD3<Float>(max(dims.x, 0.1), max(dims.y, 0.1), max(dims.z, 0.1))
-                let hitBox = ModelEntity(
-                    mesh: .generateBox(size: bs),
-                    materials: [SimpleMaterial(color: .white, isMetallic: false)]
-                )
-                hitBox.components.set(OpacityComponent(opacity: 0.001))
+                let hitBox = Entity()
                 hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: bs)]))
                 hitBox.name = key
                 mover.addChild(hitBox)
@@ -1019,20 +1559,8 @@ struct RoomModelSceneView: UIViewRepresentable {
                 mover.addChild(wireframe)
                 coord.wireframeContentMap[key] = wireframe
 
-                // Subtle fill for depth perception
-                let fill = ModelEntity(
-                    mesh: .generateBox(size: bs),
-                    materials: [SimpleMaterial(color: color.withAlphaComponent(1.0), isMetallic: false)]
-                )
-                fill.components.set(OpacityComponent(opacity: 0.06))
-                mover.addChild(fill)
-
-                // Collision box for hit testing
-                let hitBox = ModelEntity(
-                    mesh: .generateBox(size: bs),
-                    materials: [SimpleMaterial(color: .white, isMetallic: false)]
-                )
-                hitBox.components.set(OpacityComponent(opacity: 0.001))
+                // Invisible collision shape for selection (no mesh → won't occlude walls)
+                let hitBox = Entity()
                 hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: bs)]))
                 hitBox.name = key
                 mover.addChild(hitBox)
@@ -1107,7 +1635,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                 coord.initialScaleMap[key] = baseScale
             }
 
-            // Collision box for hit testing / selection
+            // Invisible collision shape for selection (no mesh → won't occlude walls)
             let hitDims: SIMD3<Float>
             if let model = model {
                 let b = model.visualBounds(relativeTo: mover)
@@ -1116,11 +1644,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             } else {
                 hitDims = defaultDims
             }
-            let hitBox = ModelEntity(
-                mesh: .generateBox(size: hitDims),
-                materials: [SimpleMaterial(color: .white, isMetallic: false)]
-            )
-            hitBox.components.set(OpacityComponent(opacity: 0.001))
+            let hitBox = Entity()
             hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
             hitBox.name = key
             mover.addChild(hitBox)
@@ -1131,6 +1655,222 @@ struct RoomModelSceneView: UIViewRepresentable {
             coord.moverMap[key] = mover
 
             // Apply saved offset AFTER entity is in-scene
+            if let off = rep.positionOffset, off.count >= 3 {
+                let origPos = SIMD3<Float>(xform.columns.3.x,
+                                           xform.columns.3.y,
+                                           xform.columns.3.z)
+                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                mover.setPosition(targetPos, relativeTo: nil)
+            }
+        }
+
+        // ═══ WALL ART ═══
+        let wallArtReplacements = room.furnitureReplacements.filter { $0.isWallArt }
+        for rep in wallArtReplacements {
+            guard let xform = rep.getTransformMatrix(),
+                  let imageFile = rep.wallArtImageFile,
+                  let frameSizeRaw = rep.wallArtFrameSize,
+                  let frameStyleRaw = rep.wallArtFrameStyle,
+                  let fSize = FrameSize(rawValue: frameSizeRaw),
+                  let fStyle = FrameStyle(rawValue: frameStyleRaw)
+            else { continue }
+
+            let key = "wallArt_\(rep.id.uuidString)"
+            guard coord.anchorMap[key] == nil else { continue }
+
+            let anchor = AnchorEntity(world: xform)
+            anchor.name = key + "_anchor"
+
+            let mover = Entity()
+            mover.name = key
+            anchor.addChild(mover)
+
+            // Create a selectable ScannedObject entry
+            let artObj = ScannedObject(
+                stableId: key, transform: xform,
+                addedModelName: "wallArt",
+                dimensions: SIMD3<Float>(fSize.widthM, fSize.heightM, 0.05)
+            )
+            coord.allObjectMap[key] = artObj
+
+            // Build the wall art entity
+            if let entity = DecorManager.createWallArtEntity(
+                imageFileName: imageFile, frameSize: fSize, frameStyle: fStyle
+            ) {
+                if let yRot = rep.yRotation {
+                    entity.orientation = simd_quatf(angle: Float(yRot), axis: [0, 1, 0])
+                }
+                mover.addChild(entity)
+                coord.replacedContentMap[key] = entity
+            }
+
+            // Collision for selection
+            let hitDims = SIMD3<Float>(fSize.widthM + 0.04, fSize.heightM + 0.04, 0.06)
+            let hitBox = Entity()
+            hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
+            hitBox.name = key
+            mover.addChild(hitBox)
+
+            view.scene.addAnchor(anchor)
+            coord.anchorMap[key] = anchor
+            coord.moverMap[key] = mover
+
+            if let off = rep.positionOffset, off.count >= 3 {
+                let origPos = SIMD3<Float>(xform.columns.3.x,
+                                           xform.columns.3.y,
+                                           xform.columns.3.z)
+                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                mover.setPosition(targetPos, relativeTo: nil)
+            }
+        }
+
+        // ═══ LIGHTING FIXTURES ═══
+        let lightReplacements = room.furnitureReplacements.filter { $0.isLighting }
+        for rep in lightReplacements {
+            guard let xform = rep.getTransformMatrix(),
+                  let fixtureRaw = rep.lightFixtureType,
+                  let fixtureType = LightFixtureType(rawValue: fixtureRaw)
+            else { continue }
+
+            let key = "lighting_\(rep.id.uuidString)"
+            guard coord.anchorMap[key] == nil else { continue }
+
+            let anchor = AnchorEntity(world: xform)
+            anchor.name = key + "_anchor"
+
+            let mover = Entity()
+            mover.name = key
+            anchor.addChild(mover)
+
+            // Create a selectable ScannedObject entry
+            let lightObj = ScannedObject(
+                stableId: key, transform: xform,
+                addedModelName: "lighting",
+                dimensions: SIMD3<Float>(0.4, 0.5, 0.4)
+            )
+            coord.allObjectMap[key] = lightObj
+
+            // Build the light fixture entity
+            let lightColor: UIColor
+            if let rgb = rep.lightColorRGB, rgb.count >= 3 {
+                lightColor = UIColor(red: CGFloat(rgb[0]), green: CGFloat(rgb[1]),
+                                     blue: CGFloat(rgb[2]), alpha: 1)
+            } else {
+                lightColor = .white
+            }
+            let intensity = Float(rep.lightIntensity ?? 3000)
+
+            let entity = DecorManager.createLightFixture(
+                type: fixtureType, color: lightColor, intensity: intensity
+            )
+            if let yRot = rep.yRotation {
+                entity.orientation = simd_quatf(angle: Float(yRot), axis: [0, 1, 0])
+            }
+            mover.addChild(entity)
+            coord.replacedContentMap[key] = entity
+
+            // Collision for selection
+            let bounds = entity.visualBounds(relativeTo: mover)
+            let ext = bounds.extents
+            let hitDims = SIMD3<Float>(max(ext.x, 0.15), max(ext.y, 0.15), max(ext.z, 0.15))
+            let hitBox = Entity()
+            hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
+            hitBox.name = key
+            mover.addChild(hitBox)
+
+            view.scene.addAnchor(anchor)
+            coord.anchorMap[key] = anchor
+            coord.moverMap[key] = mover
+
+            if let off = rep.positionOffset, off.count >= 3 {
+                let origPos = SIMD3<Float>(xform.columns.3.x,
+                                           xform.columns.3.y,
+                                           xform.columns.3.z)
+                let targetPos = origPos + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+                mover.setPosition(targetPos, relativeTo: nil)
+            }
+        }
+
+        // ═══ CARPETS ═══
+        let carpetReplacements = room.furnitureReplacements.filter { $0.isCarpet }
+        for rep in carpetReplacements {
+            guard let xform = rep.getTransformMatrix(),
+                  let sizeRaw = rep.carpetSize,
+                  let patternRaw = rep.carpetPattern,
+                  let carpetPattern = CarpetPattern(rawValue: patternRaw)
+            else { continue }
+
+            let key = "carpet_\(rep.id.uuidString)"
+            guard coord.anchorMap[key] == nil else { continue }
+
+            let anchor = AnchorEntity(world: xform)
+            anchor.name = key + "_anchor"
+
+            let mover = Entity()
+            mover.name = key
+            anchor.addChild(mover)
+
+            // Resolve actual dimensions
+            let carpetSize = CarpetSize(rawValue: sizeRaw)
+            let widthM: Float
+            let depthM: Float
+            if carpetSize == .custom,
+               let cw = rep.carpetCustomWidthCm,
+               let cd = rep.carpetCustomDepthCm {
+                widthM = Float(cw) / 100
+                depthM = Float(cd) / 100
+            } else {
+                widthM = carpetSize?.widthM ?? 1.5
+                depthM = carpetSize?.depthM ?? 2.0
+            }
+
+            let isRound = carpetSize?.isRound ?? false
+
+            // Resolve colour
+            let carpetColor: UIColor
+            if let rgb = rep.carpetColorRGB, rgb.count >= 3 {
+                carpetColor = UIColor(red: CGFloat(rgb[0]), green: CGFloat(rgb[1]),
+                                      blue: CGFloat(rgb[2]), alpha: 1)
+            } else {
+                carpetColor = UIColor(red: 0.55, green: 0.40, blue: 0.30, alpha: 1)
+            }
+
+            // Create selectable ScannedObject entry
+            let carpetObj = ScannedObject(
+                stableId: key, transform: xform,
+                addedModelName: "carpet",
+                dimensions: SIMD3<Float>(widthM, 0.015, depthM)
+            )
+            coord.allObjectMap[key] = carpetObj
+
+            // Build the carpet entity
+            let entity = DecorManager.createCarpetEntity(
+                widthM: widthM, depthM: depthM,
+                isRound: isRound, color: carpetColor,
+                pattern: carpetPattern
+            )
+            if let yRot = rep.yRotation {
+                entity.orientation = simd_quatf(angle: Float(yRot), axis: [0, 1, 0])
+            }
+            mover.addChild(entity)
+            coord.replacedContentMap[key] = entity
+
+            // Collision for selection
+            let hitDims: SIMD3<Float>
+            if isRound {
+                hitDims = SIMD3<Float>(widthM + 0.04, 0.06, widthM + 0.04)
+            } else {
+                hitDims = SIMD3<Float>(widthM + 0.04, 0.06, depthM + 0.04)
+            }
+            let hitBox = Entity()
+            hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
+            hitBox.name = key
+            mover.addChild(hitBox)
+
+            view.scene.addAnchor(anchor)
+            coord.anchorMap[key] = anchor
+            coord.moverMap[key] = mover
+
             if let off = rep.positionOffset, off.count >= 3 {
                 let origPos = SIMD3<Float>(xform.columns.3.x,
                                            xform.columns.3.y,
@@ -1282,6 +2022,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         var roomManager: RoomManager?
         var lastRefreshTrigger: Int = 0
         var lastResetSignal: Bool = false
+        var lastColorTrigger: Int = 0
 
         // ── Camera state (orbit) ──
         var cameraEntity: PerspectiveCamera?
@@ -1294,6 +2035,13 @@ struct RoomModelSceneView: UIViewRepresentable {
         var roomBoundsMax: SIMD3<Float> = .one
         var floorY: Float = 0
         var lastHeightSignal: Int = 0
+
+        // ── Camera state (first-person / in-room) ──
+        var isFirstPerson: Bool = false
+        var fpYaw: Float = 0            // horizontal look angle (radians)
+        var fpPitch: Float = 0          // vertical look angle (clamped)
+        var fpPosition: SIMD3<Float> = .zero   // eye position in world space
+        private var cameraModeObserver: NSObjectProtocol?
 
         // ── Object maps ──
         var allObjectMap:        [String: ScannedObject] = [:]
@@ -1341,16 +2089,59 @@ struct RoomModelSceneView: UIViewRepresentable {
             _isManipulating  = isManipulating
             self.roomBinding = room
             self.capturedRoom = capturedRoom
+            super.init()
+
+            // Listen for camera-mode switch from the SwiftUI overlay
+            cameraModeObserver = NotificationCenter.default.addObserver(
+                forName: .switchCameraMode, object: nil, queue: .main
+            ) { [weak self] note in
+                guard let self = self,
+                      let fp = note.userInfo?["firstPerson"] as? Bool else { return }
+                self.setFirstPerson(fp)
+            }
+        }
+
+        deinit {
+            if let obs = cameraModeObserver {
+                NotificationCenter.default.removeObserver(obs)
+            }
+        }
+
+        // ── First-Person Mode Toggle ────────────────────────────────
+
+        func setFirstPerson(_ enabled: Bool) {
+            isFirstPerson = enabled
+            if enabled {
+                // Place the camera at room center, at eye height (1.6 m above floor)
+                let center = (roomBoundsMin + roomBoundsMax) / 2
+                fpPosition = SIMD3<Float>(center.x, floorY + 1.6, center.z)
+                fpYaw = orbitAzimuth    // face the same direction the orbit was pointing
+                fpPitch = 0
+                cameraEntity?.camera.fieldOfViewInDegrees = 75   // wider for immersion
+            } else {
+                cameraEntity?.camera.fieldOfViewInDegrees = 60   // restore orbit FOV
+            }
+            updateCameraTransform()
         }
 
         // ── Camera Transform ─────────────────────────────────────
 
         func updateCameraTransform() {
             guard let cam = cameraEntity else { return }
-            let x = orbitCenter.x + orbitDistance * cos(orbitElevation) * sin(orbitAzimuth)
-            let y = orbitCenter.y + orbitDistance * sin(orbitElevation)
-            let z = orbitCenter.z + orbitDistance * cos(orbitElevation) * cos(orbitAzimuth)
-            cam.look(at: orbitCenter, from: [x, y, z], upVector: [0, 1, 0], relativeTo: nil)
+
+            if isFirstPerson {
+                // First-person: position at fpPosition, look direction from yaw/pitch
+                let lookX = cos(fpPitch) * sin(fpYaw)
+                let lookY = sin(fpPitch)
+                let lookZ = cos(fpPitch) * cos(fpYaw)
+                let lookAt = fpPosition + SIMD3<Float>(lookX, lookY, lookZ)
+                cam.look(at: lookAt, from: fpPosition, upVector: [0, 1, 0], relativeTo: nil)
+            } else {
+                let x = orbitCenter.x + orbitDistance * cos(orbitElevation) * sin(orbitAzimuth)
+                let y = orbitCenter.y + orbitDistance * sin(orbitElevation)
+                let z = orbitCenter.z + orbitDistance * cos(orbitElevation) * cos(orbitAzimuth)
+                cam.look(at: orbitCenter, from: [x, y, z], upVector: [0, 1, 0], relativeTo: nil)
+            }
         }
 
         // ── Hit Testing ──────────────────────────────────────────
@@ -1408,9 +2199,17 @@ struct RoomModelSceneView: UIViewRepresentable {
         @objc func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
             guard gesture.state == .changed else { return }
             let t = gesture.translation(in: view)
-            orbitAzimuth  -= Float(t.x) * 0.005
-            orbitElevation = max(0.05, min(Float.pi / 2 - 0.05,
-                                            orbitElevation + Float(t.y) * 0.005))
+
+            if isFirstPerson {
+                // Look around (two-finger pan)
+                fpYaw   -= Float(t.x) * 0.005
+                fpPitch  = max(-.pi / 3, min(.pi / 3,
+                               fpPitch + Float(t.y) * 0.005))
+            } else {
+                orbitAzimuth  -= Float(t.x) * 0.005
+                orbitElevation = max(0.05, min(Float.pi / 2 - 0.05,
+                                                orbitElevation + Float(t.y) * 0.005))
+            }
             gesture.setTranslation(.zero, in: view)
             updateCameraTransform()
         }
@@ -1419,7 +2218,24 @@ struct RoomModelSceneView: UIViewRepresentable {
 
         @objc func handleZoom(_ gesture: UIPinchGestureRecognizer) {
             guard gesture.state == .changed else { return }
-            orbitDistance = max(0.5, min(40, orbitDistance / Float(gesture.scale)))
+
+            if isFirstPerson {
+                // Pinch to walk forward / backward
+                let delta = Float(gesture.scale) - 1.0
+                let forward = SIMD3<Float>(sin(fpYaw), 0, cos(fpYaw))
+                fpPosition += forward * delta * 2.0
+
+                // Keep inside room bounds (10 cm inset from walls)
+                let inset: Float = 0.10
+                fpPosition.x = max(roomBoundsMin.x + inset,
+                                   min(roomBoundsMax.x - inset, fpPosition.x))
+                fpPosition.z = max(roomBoundsMin.z + inset,
+                                   min(roomBoundsMax.z - inset, fpPosition.z))
+                // Lock Y at eye height
+                fpPosition.y = floorY + 1.6
+            } else {
+                orbitDistance = max(0.5, min(40, orbitDistance / Float(gesture.scale)))
+            }
             gesture.scale = 1
             updateCameraTransform()
         }

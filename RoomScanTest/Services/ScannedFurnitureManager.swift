@@ -140,6 +140,38 @@ class ScannedFurnitureManager: ObservableObject {
         }
     }
 
+    // MARK: - Gaussian Splatting
+
+    /// Associate a trained Gaussian Splat .ply file with an existing scanned object.
+    func attachSplat(to item: ScannedFurniture,
+                     splatFileName: String,
+                     gaussianCount: Int?,
+                     fileSizeBytes: Int64?) {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[idx].splatFileName = splatFileName
+        items[idx].splatGaussianCount = gaussianCount
+        items[idx].splatFileSizeBytes = fileSizeBytes
+        items[idx].reconstructionMethod = "both"
+        saveItems()
+        print("[ScannedFurnitureManager] Attached splat (\(gaussianCount ?? 0) Gaussians) to '\(item.name)'")
+    }
+
+    /// Remove the Gaussian Splat from a scanned object (keeps the USDZ).
+    func removeSplat(from item: ScannedFurniture) {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        // Remove .ply file from disk
+        if let splatName = items[idx].splatFileName {
+            let splatURL = Self.modelDirectory.appendingPathComponent(splatName)
+            try? FileManager.default.removeItem(at: splatURL)
+        }
+        items[idx].splatFileName = nil
+        items[idx].splatGaussianCount = nil
+        items[idx].splatFileSizeBytes = nil
+        items[idx].reconstructionMethod = "objectCapture"
+        saveItems()
+        print("[ScannedFurnitureManager] Removed splat from '\(item.name)'")
+    }
+
     // MARK: - Lookup (used by FurnitureCatalogManager)
 
     /// Resolve a `catalogKey` like `"scanned_<uuid>"` to a file URL.

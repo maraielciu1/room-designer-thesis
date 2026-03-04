@@ -17,9 +17,14 @@ struct Room: Identifiable, Codable {
     var capturedRoomExportURL: String? // Legacy — kept for backward compat
     var furnitureReplacements: [FurnitureReplacement]
     
+    /// Wall / floor colours captured from ARKit frames during the RoomPlan scan.
+    /// nil when the scan didn't capture colour data (e.g. older rooms).
+    var roomMaterials: RoomMaterials?
+    
     init(id: UUID = UUID(), name: String, userId: UUID, createdAt: Date = Date(),
          updatedAt: Date = Date(), capturedRoomExportURL: String? = nil,
-         furnitureReplacements: [FurnitureReplacement] = []) {
+         furnitureReplacements: [FurnitureReplacement] = [],
+         roomMaterials: RoomMaterials? = nil) {
         self.id = id
         self.name = name
         self.userId = userId
@@ -27,6 +32,7 @@ struct Room: Identifiable, Codable {
         self.updatedAt = updatedAt
         self.capturedRoomExportURL = capturedRoomExportURL
         self.furnitureReplacements = furnitureReplacements
+        self.roomMaterials = roomMaterials
     }
 }
 

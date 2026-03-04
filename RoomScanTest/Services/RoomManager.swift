@@ -22,12 +22,12 @@ class RoomManager: ObservableObject {
         Room.cleanOrphanedScanFiles(existingRoomIds: Set(rooms.map(\.id)))
     }
     
-    func createRoom(name: String, capturedRoom: CapturedRoom? = nil) -> Room {
+    func createRoom(name: String, capturedRoom: CapturedRoom? = nil, roomMaterials: RoomMaterials? = nil) -> Room {
         guard let userId = userManager.currentUser?.id else {
             fatalError("No current user")
         }
         
-        var room = Room(name: name, userId: userId)
+        var room = Room(name: name, userId: userId, roomMaterials: roomMaterials)
         if let capturedRoom = capturedRoom {
             room.setCapturedRoom(capturedRoom) // saves to memory + disk
         }

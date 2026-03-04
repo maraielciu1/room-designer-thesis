@@ -53,6 +53,12 @@ struct ObjectScanView: View {
     @State private var furnitureName = ""
     @State private var selectedCategory: FurnitureCategory = .other
 
+    // Image export for Gaussian Splatting
+    @State private var showExportSheet = false
+    @State private var exportURL: URL?
+    @State private var isExporting = false
+    @State private var showGSGuide = false
+
     // Errors
     @State private var showError = false
     @State private var errorMessage = ""
@@ -467,16 +473,60 @@ struct ObjectScanView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
+            // ── Gaussian Splatting export option ──
+            VStack(spacing: 12) {
+                Divider().padding(.horizontal, 40)
+
+                Text("Gaussian Splatting")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text("Export the captured images to train a Gaussian Splat model for comparison with Object Capture.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+
+                if isExporting {
+                    ProgressView("Packaging images…")
+                        .font(.caption)
+                } else {
+                    Button(action: exportImagesForGS) {
+                        HStack {
+                            Image(systemName: "photo.stack")
+                            Text("Export Images for 3DGS Training")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.purple)
+                        .cornerRadius(12)
+                    }
+                }
+
+                Button(action: { showGSGuide = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "questionmark.circle")
+                        Text("How to Train a Gaussian Splat")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.secondary)
+                }
+            }
+            .padding(.top, 8)
+
             Spacer()
 
-            Button("Done") { onDismiss() }
+            Button("Done") {
+                scannedFurnitureManager.cleanupSessionFiles()
+                onDismiss()
+            }
                 .buttonStyle(.borderedProminent)
                 .padding(.bottom, 50)
         }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                onDismiss()
-            }
+        .sheet(isPresented: $showGSGuide) {
+            GaussianSplattingGuideView()
         }
     }
 
@@ -722,7 +772,9 @@ struct ObjectScanView: View {
             usdzURL: modelURL
         )
 
-        scannedFurnitureManager.cleanupSessionFiles()
+        // NOTE: Do NOT clean up session files here — the user may still want
+        // to export the captured images for Gaussian Splatting training from
+        // the "done" screen. Cleanup happens when the user taps "Done".
         phase = .done
     }
 
@@ -738,5 +790,42 @@ struct ObjectScanView: View {
         sessionState = "Ready"
         numberOfShotsTaken = 0
         phase = .intro
+    }
+
+    // MARK: - Gaussian Splatting Image Export
+
+    private func exportImagesForGS() {
+        guard let imagesDir = imagesDirectory else {
+            errorMessage = "No images directory found. Images are only available right after scanning."
+            showError = true
+            return
+        }
+
+        let count = ImageExportService.imageCount(in: imagesDir)
+        guard count > 0 else {
+            errorMessage = "No captured images found in the session directory."
+            showError = true
+            return
+        }
+
+        isExporting = true
+
+        Task {
+            do {
+                let zipURL = try await ImageExportService.createZip(from: imagesDir)
+                await MainActor.run {
+                    isExporting = false
+                    exportURL = zipURL
+                    // Present share sheet
+                    ImageExportService.share(fileURL: zipURL)
+                }
+            } catch {
+                await MainActor.run {
+                    isExporting = false
+                    errorMessage = "Failed to export images: \(error.localizedDescription)"
+                    showError = true
+                }
+            }
+        }
     }
 }

@@ -24,10 +24,28 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
     /// values correspond directly to the physical object's size.
     var realWorldDimensions: [Double]?
 
+    // ── Gaussian Splatting ──
+
+    /// File name of the associated .ply Gaussian Splat (nil if none imported).
+    var splatFileName: String?
+
+    /// Number of Gaussians in the splat file (set when imported).
+    var splatGaussianCount: Int?
+
+    /// File size of the .ply splat file in bytes.
+    var splatFileSizeBytes: Int64?
+
+    /// Method used for reconstruction: "objectCapture", "gaussianSplat", or "both".
+    var reconstructionMethod: String?
+
     init(id: UUID = UUID(), name: String, userId: UUID,
          usdzFileName: String, category: String = "other",
          createdAt: Date = Date(), fileSizeBytes: Int64? = nil,
-         realWorldDimensions: [Double]? = nil) {
+         realWorldDimensions: [Double]? = nil,
+         splatFileName: String? = nil,
+         splatGaussianCount: Int? = nil,
+         splatFileSizeBytes: Int64? = nil,
+         reconstructionMethod: String? = nil) {
         self.id = id
         self.name = name
         self.userId = userId
@@ -36,6 +54,10 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
         self.createdAt = createdAt
         self.fileSizeBytes = fileSizeBytes
         self.realWorldDimensions = realWorldDimensions
+        self.splatFileName = splatFileName
+        self.splatGaussianCount = splatGaussianCount
+        self.splatFileSizeBytes = splatFileSizeBytes
+        self.reconstructionMethod = reconstructionMethod
     }
 
     /// The real-world size as a SIMD3 vector (metres), or nil if not measured.
@@ -62,6 +84,28 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
+
+    // MARK: - Gaussian Splatting helpers
+
+    /// Whether this object has an associated Gaussian Splat .ply file.
+    var hasSplat: Bool { splatFileName != nil }
+
+    /// Absolute URL of the .ply splat file on disk.
+    var splatURL: URL? {
+        guard let name = splatFileName else { return nil }
+        return ScannedFurnitureManager.modelDirectory.appendingPathComponent(name)
+    }
+
+    /// Human-readable file size for the splat.
+    var formattedSplatSize: String {
+        guard let bytes = splatFileSizeBytes else { return "—" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+
+    /// Whether both reconstruction methods are available.
+    var hasBothMethods: Bool { hasSplat }
 }
 
 /// Available categories the user can assign when naming their scanned object.

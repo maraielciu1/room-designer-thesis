@@ -144,7 +144,7 @@ class FurnitureCatalogManager: ObservableObject {
             + "y=\(String(format: "%.3f", ext.y))m  "
             + "z=\(String(format: "%.3f", ext.z))m")
 
-        // ── No scaling — keep the model at 1:1 real-world size ──
+        // ─ No scaling - keep the model at 1:1 real-world size ─
         // model.scale stays at whatever the USDZ file defines (typically 1,1,1)
 
         // Wrap in a container and CENTER the model

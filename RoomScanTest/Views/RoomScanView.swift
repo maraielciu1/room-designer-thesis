@@ -29,6 +29,9 @@ struct RoomScanView: View {
     @State private var hasProcessedRoom = false
     @State private var instructionsExpanded = true
 
+    /// Captures ARKit camera frames during the scan to extract wall/floor colours
+    @State private var colorCaptureService = RoomColorCaptureService()
+
     var body: some View {
         ZStack {
             Color(hex: 0x0B0D17).ignoresSafeArea()
@@ -81,6 +84,9 @@ struct RoomScanView: View {
                                 self.hasProcessedRoom = true
                                 self.isProcessing = false
 
+                                // Stop colour capture and collect the results
+                                let materials = self.colorCaptureService.stopCapturing()
+
                                 #if DEBUG
                                 let transitionDelay: TimeInterval = 1.0
                                 #else
@@ -89,12 +95,13 @@ struct RoomScanView: View {
 
                                 DispatchQueue.main.asyncAfter(deadline: .now() + transitionDelay) {
                                     self.roomCaptureView?.captureSession.stop()
-                                    self.createdRoom = self.createRoomFromScan(capturedRoom)
+                                    self.createdRoom = self.createRoomFromScan(capturedRoom, materials: materials)
                                 }
                             }
                         },
                         onError: { error in
                             DispatchQueue.main.async {
+                                _ = self.colorCaptureService.stopCapturing()
                                 self.isProcessing = false
                                 self.isScanning = false
                                 self.errorMessage = "Scanning error: \(error.localizedDescription)"
@@ -255,6 +262,7 @@ struct RoomScanView: View {
         }
         .onDisappear {
             DispatchQueue.main.async {
+                _ = colorCaptureService.stopCapturing()
                 roomCaptureView?.captureSession.stop()
                 roomCaptureView = nil
             }
@@ -267,7 +275,8 @@ struct RoomScanView: View {
         createdRoom = nil
         hasProcessedRoom = false
         isProcessing = false
-        roomCaptureView = RoomCaptureView()
+        let newCaptureView = RoomCaptureView()
+        roomCaptureView = newCaptureView
 
         #if DEBUG
         let scanStartDelay: TimeInterval = 0.3
@@ -278,10 +287,16 @@ struct RoomScanView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + scanStartDelay) {
             isScanning = true
         }
+
+        // Start colour capture once the ARSession has had time to initialise.
+        // We add a longer delay so RoomPlan has begun producing frames.
+        DispatchQueue.main.asyncAfter(deadline: .now() + scanStartDelay + 1.5) {
+            colorCaptureService.startCapturing(session: newCaptureView.captureSession)
+        }
     }
 
-    private func createRoomFromScan(_ capturedRoom: CapturedRoom) -> Room {
-        let room = roomManager.createRoom(name: roomName, capturedRoom: capturedRoom)
+    private func createRoomFromScan(_ capturedRoom: CapturedRoom, materials: RoomMaterials? = nil) -> Room {
+        let room = roomManager.createRoom(name: roomName, capturedRoom: capturedRoom, roomMaterials: materials)
         roomManager.removeDuplicateRooms()
         return room
     }
