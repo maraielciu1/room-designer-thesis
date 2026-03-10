@@ -1,0 +1,156 @@
+Design Patterns Identified in RoomScanTest
+============================================
+
+1. CREATIONAL — Factory Method
+-------------------------------
+Location: DecorManager.swift, TextureGenerator.swift
+
+DecorManager exposes three static factory methods that build completely different
+RealityKit entity hierarchies depending on the inputs, without the caller needing
+to know the construction details:
+
+  • createWallArtEntity(imageFileName:frameSize:frameStyle:) → Entity?
+    Builds a frame panel + canvas with a photo texture.
+
+  • createLightFixture(type:color:intensity:) → Entity
+    Switches on LightFixtureType and delegates to private helpers
+    (pendantGlobe, pendantDrum, chandelier, ceilingFlush, wallSconce, floorLamp).
+
+  • createCarpetEntity(widthM:depthM:isRound:color:pattern:) → Entity
+    Generates a box or cylinder mesh with pattern overlay geometry.
+
+TextureGenerator.texture(for:color:widthM:heightM:) follows the same pattern —
+it switches on SurfacePattern and delegates to private helpers (wood, tiles,
+bricks, parquet, concrete, marble) to produce procedural CGImage textures.
+
+The caller simply asks for "a carpet entity" or "a wood texture" and receives
+the finished product — classic Factory Method.
+
+
+2. STRUCTURAL — Adapter (UIViewRepresentable + Coordinator)
+------------------------------------------------------------
+Location: RoomDesignerView.swift (RoomModelSceneView), RoomPlanView.swift
+          (RoomCaptureViewWrapper), GaussianSplatView.swift (GaussianSplatMetalView)
+
+RoomModelSceneView implements UIViewRepresentable to wrap a UIKit ARView for use
+inside SwiftUI. The Coordinator class (NSObject, UIGestureRecognizerDelegate)
+bridges UIKit gesture recognizers and delegates back to SwiftUI @Binding state:
+
+  • makeUIView(context:) creates the ARView and wires up the 3D scene.
+  • makeCoordinator() instantiates the Coordinator with SwiftUI bindings.
+  • The Coordinator handles UIPanGestureRecognizer, UIPinchGestureRecognizer,
+    UIRotationGestureRecognizer and writes results into @Binding<ScannedObject?>,
+    @Binding<Bool>, etc.
+
+The same Adapter pattern is repeated in:
+  • RoomCaptureViewWrapper — wraps RoomCaptureView (RoomPlan) via UIViewRepresentable.
+  • GaussianSplatMetalView — wraps MTKView (Metal) via UIViewRepresentable,
+    with its own Coordinator acting as MTKViewDelegate.
+
+
+3. BEHAVIORAL — Observer (@Published / ObservableObject + NotificationCenter)
+------------------------------------------------------------------------------
+Location: All manager classes, Notification+Extensions.swift, RoomDesignerView.swift
+
+a) SwiftUI's built-in Observer pattern:
+   Every manager class conforms to ObservableObject, and its @Published properties
+   automatically notify observing views of changes:
+
+     • RoomManager         — @Published var rooms
+     • UserManager         — @Published var currentUser, @Published var users
+     • MarketplaceManager  — @Published var items, myUploads, isLoading, errorMessage
+     • FirebaseAuthManager — @Published var firebaseUser, signedIn, isLoading, errorMessage
+     • HistoryManager      — @Published var historyEntries
+     • ScannedFurnitureManager — @Published var items
+     • FurnitureCatalogManager — @Published catalog state
+
+   Views observe these via @EnvironmentObject or @StateObject and re-render
+   automatically when the published properties change.
+
+b) NotificationCenter is used explicitly for the camera-mode toggle:
+   The SwiftUI layer posts:
+     NotificationCenter.default.post(name: .switchCameraMode, ...)
+   The UIKit Coordinator observes:
+     NotificationCenter.default.addObserver(forName: .switchCameraMode, ...)
+   This decouples the SwiftUI overlay from the UIKit Coordinator that actually
+   manipulates the camera entity.
+
+
+4. ARCHITECTURAL — MVVM (Model–View–ViewModel)
+------------------------------------------------
+Location: Entire application structure
+
+SwiftUI naturally enforces the MVVM architecture:
+
+  Model layer:
+    • Room, FurnitureReplacement, ScannedObject
+    • MarketplaceItem, MarketplaceUser
+    • CarpetSize, CarpetPattern, FrameSize, FrameStyle, LightFixtureType
+    • SurfacePattern
+
+  ViewModel layer (ObservableObject manager classes):
+    • RoomManager           — room CRUD + persistence
+    • UserManager           — user account management
+    • MarketplaceManager    — Firebase marketplace operations
+    • FirebaseAuthManager   — authentication state
+    • HistoryManager        — modification history
+    • ScannedFurnitureManager — user-scanned 3D models
+    • FurnitureCatalogManager — model loading + scaling
+
+  View layer:
+    • RoomDesignerView, CarpetPickerView, LightingPickerView
+    • FurniturePickerView, ObjectScanView, GaussianSplatView
+    • RoomPlanView (RoomCaptureViewWrapper)
+    • ModeSelectionView, LocalLandingView, MarketplaceLandingView
+
+  The managers are instantiated in AppRootView and injected down the hierarchy
+  via .environmentObject() and a ManagerEnvironmentModifier. Views never touch
+  persistence (UserDefaults, disk, Firebase) directly — they go through the
+  ViewModel managers.
+
+
+5. ENTERPRISE — Repository (MarketplaceManager)
+-------------------------------------------------
+Location: MarketplaceManager.swift
+
+MarketplaceManager is a textbook Repository — it abstracts all Firebase Firestore
+and Storage CRUD behind a clean async API. Callers never touch Firestore or
+StorageReference directly:
+
+  Operation       Method
+  --------------- -------------------------------------------------------
+  Browse          fetchItems(category:searchText:)
+  Read user       fetchUserProfile(uid:)
+  Create          uploadModel(name:description:category:tags:usdzFileURL:
+                              dimensions:uploader:)
+  Download        downloadModel(_:) — with local cache in MarketplaceCache/
+  Delete          deleteItem(_:) — cleans Storage + Firestore + local cache
+  Upsert user     ensureUserProfile(_:)
+
+  Internally it holds:
+    private let db = Firestore.firestore()
+    private let storage = Storage.storage()
+    private var itemsCollection → db.collection("marketplace_items")
+    private var usersCollection → db.collection("marketplace_users")
+
+  RoomManager and UserManager also follow the Repository pattern for local
+  persistence (backed by UserDefaults), but MarketplaceManager is the clearest
+  enterprise-grade example since it wraps a remote cloud database.
+
+
+Summary Table
+=============
+
+  Category       Pattern          Where
+  -------------- ---------------- ------------------------------------------------
+  Creational     Factory Method   DecorManager (createWallArtEntity,
+                                  createLightFixture, createCarpetEntity),
+                                  TextureGenerator.texture(for:)
+  Structural     Adapter          RoomModelSceneView: UIViewRepresentable
+                                  + Coordinator
+  Behavioral     Observer         @Published / ObservableObject on all managers
+                                  + NotificationCenter for camera mode
+  Architectural  MVVM             Models → Manager ViewModels → SwiftUI Views,
+                                  wired via @EnvironmentObject
+  Enterprise     Repository       MarketplaceManager abstracting Firebase
+                                  Firestore + Storage

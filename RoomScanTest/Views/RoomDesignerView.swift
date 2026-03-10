@@ -78,6 +78,22 @@ struct ScannedObject: Identifiable {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// MARK: - Helpers
+// ═══════════════════════════════════════════════════════════════════
+
+/// Extracts the `FurnitureReplacement.id` UUID embedded in a scene key.
+/// Decor / added keys use the format "prefix_<UUID>", e.g. "wallArt_XXXXXXXX-…".
+/// Returns `nil` for position-keyed objects like "obj_0_1.20_0.00_-0.50".
+private func extractReplacementId(from key: String) -> UUID? {
+    for prefix in ["wallArt_", "lighting_", "carpet_", "added_"] {
+        if key.hasPrefix(prefix) {
+            return UUID(uuidString: String(key.dropFirst(prefix.count)))
+        }
+    }
+    return nil
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // MARK: - RoomDesignerView
 // ═══════════════════════════════════════════════════════════════════
 
@@ -130,6 +146,11 @@ struct RoomDesignerView: View {
     /// Whether the currently selected scanned object already has a replacement
     private var selectedReplacement: FurnitureReplacement? {
         guard let sel = selectedObject else { return nil }
+        // Decor / added items embed their replacement UUID in the key — use it directly
+        if let repId = extractReplacementId(from: sel.stableId) {
+            return room.furnitureReplacements.first { $0.id == repId }
+        }
+        // Scanned furniture: fall back to position matching
         return room.furnitureReplacements.first { rep in
             guard let t = rep.getTransformMatrix() else { return false }
             let d = t.columns.3 - sel.transform.columns.3
@@ -705,10 +726,14 @@ struct RoomDesignerView: View {
 
     private func replaceSelected(with usdzFileName: String) {
         guard let selected = selectedObject else { return }
-        room.furnitureReplacements.removeAll { rep in
-            guard let t = rep.getTransformMatrix() else { return false }
-            let d = t.columns.3 - selected.transform.columns.3
-            return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+        if let repId = extractReplacementId(from: selected.stableId) {
+            room.furnitureReplacements.removeAll { $0.id == repId }
+        } else {
+            room.furnitureReplacements.removeAll { rep in
+                guard let t = rep.getTransformMatrix() else { return false }
+                let d = t.columns.3 - selected.transform.columns.3
+                return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            }
         }
         let catDesc = selected.object?.category.description ?? "added"
         let replacement = FurnitureReplacement(
@@ -727,12 +752,19 @@ struct RoomDesignerView: View {
 
     private func resetPosition() {
         guard let selected = selectedObject else { return }
-        let objPos = selected.transform.columns.3
-        if let idx = room.furnitureReplacements.firstIndex(where: { rep in
-            guard let t = rep.getTransformMatrix() else { return false }
-            let d = t.columns.3 - objPos
-            return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
-        }) {
+        // Decor / added items: match by UUID; scanned furniture: match by position
+        let idx: Int?
+        if let repId = extractReplacementId(from: selected.stableId) {
+            idx = room.furnitureReplacements.firstIndex { $0.id == repId }
+        } else {
+            let objPos = selected.transform.columns.3
+            idx = room.furnitureReplacements.firstIndex(where: { rep in
+                guard let t = rep.getTransformMatrix() else { return false }
+                let d = t.columns.3 - objPos
+                return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            })
+        }
+        if let idx = idx {
             room.furnitureReplacements[idx].positionOffset = nil
             room.furnitureReplacements[idx].yRotation = nil
             room.furnitureReplacements[idx].customScale = nil
@@ -743,22 +775,30 @@ struct RoomDesignerView: View {
 
     private func removeReplacement() {
         guard let selected = selectedObject else { return }
-        let objPos = selected.transform.columns.3
 
-        // Clean up wall-art image files before removing
-        for rep in room.furnitureReplacements {
-            guard let t = rep.getTransformMatrix() else { continue }
-            let d = t.columns.3 - objPos
-            let isMatch = abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
-            if isMatch, rep.isWallArt, let imgFile = rep.wallArtImageFile {
+        if let repId = extractReplacementId(from: selected.stableId) {
+            // Decor / added item — match by UUID
+            if let rep = room.furnitureReplacements.first(where: { $0.id == repId }),
+               rep.isWallArt, let imgFile = rep.wallArtImageFile {
                 DecorManager.deleteImage(named: imgFile)
             }
-        }
-
-        room.furnitureReplacements.removeAll { rep in
-            guard let t = rep.getTransformMatrix() else { return false }
-            let d = t.columns.3 - objPos
-            return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            room.furnitureReplacements.removeAll { $0.id == repId }
+        } else {
+            // Scanned furniture — match by position
+            let objPos = selected.transform.columns.3
+            for rep in room.furnitureReplacements {
+                guard let t = rep.getTransformMatrix() else { continue }
+                let d = t.columns.3 - objPos
+                let isMatch = abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+                if isMatch, rep.isWallArt, let imgFile = rep.wallArtImageFile {
+                    DecorManager.deleteImage(named: imgFile)
+                }
+            }
+            room.furnitureReplacements.removeAll { rep in
+                guard let t = rep.getTransformMatrix() else { return false }
+                let d = t.columns.3 - objPos
+                return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            }
         }
         roomManager.updateRoom(room)
         selectedObject = nil
@@ -1465,8 +1505,11 @@ struct RoomModelSceneView: UIViewRepresentable {
             )
             coord.allObjectMap[key] = scannedObj
 
+            // Only match non-decor replacements — wall art, lighting and
+            // carpets are rendered by their own dedicated sections below.
             let replacement = room.furnitureReplacements.first { rep in
-                guard let t = rep.getTransformMatrix() else { return false }
+                guard !rep.isDecor,
+                      let t = rep.getTransformMatrix() else { return false }
                 let d = t.columns.3 - object.transform.columns.3
                 return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
             }
@@ -1835,14 +1878,6 @@ struct RoomModelSceneView: UIViewRepresentable {
                 carpetColor = UIColor(red: 0.55, green: 0.40, blue: 0.30, alpha: 1)
             }
 
-            // Create selectable ScannedObject entry
-            let carpetObj = ScannedObject(
-                stableId: key, transform: xform,
-                addedModelName: "carpet",
-                dimensions: SIMD3<Float>(widthM, 0.015, depthM)
-            )
-            coord.allObjectMap[key] = carpetObj
-
             // Build the carpet entity
             let entity = DecorManager.createCarpetEntity(
                 widthM: widthM, depthM: depthM,
@@ -1855,15 +1890,26 @@ struct RoomModelSceneView: UIViewRepresentable {
             mover.addChild(entity)
             coord.replacedContentMap[key] = entity
 
-            // Collision for selection
-            let hitDims: SIMD3<Float>
-            if isRound {
-                hitDims = SIMD3<Float>(widthM + 0.04, 0.06, widthM + 0.04)
-            } else {
-                hitDims = SIMD3<Float>(widthM + 0.04, 0.06, depthM + 0.04)
-            }
+            // Use actual visual bounds for accurate hit-testing & highlight
+            let bounds = entity.visualBounds(relativeTo: mover)
+            let ext = bounds.extents
+            let actualDims = SIMD3<Float>(
+                max(ext.x, widthM), max(ext.y, 0.015), max(ext.z, depthM)
+            )
+
+            // Create selectable ScannedObject entry with measured dimensions
+            let carpetObj = ScannedObject(
+                stableId: key, transform: xform,
+                addedModelName: "carpet",
+                dimensions: actualDims
+            )
+            coord.allObjectMap[key] = carpetObj
+
+            // Collision for selection — use measured extents
+            let hitDims = SIMD3<Float>(actualDims.x + 0.04, 0.06, actualDims.z + 0.04)
             let hitBox = Entity()
             hitBox.components.set(CollisionComponent(shapes: [.generateBox(size: hitDims)]))
+            hitBox.position.y = bounds.center.y   // align with carpet body centre
             hitBox.name = key
             mover.addChild(hitBox)
 
@@ -2419,11 +2465,20 @@ struct RoomModelSceneView: UIViewRepresentable {
                   let mover = moverMap[key] else { return }
 
             let origPos = obj.transform.columns.3
-            guard let idx = roomBinding.wrappedValue.furnitureReplacements.firstIndex(where: { rep in
-                guard let t = rep.getTransformMatrix() else { return false }
-                let d = t.columns.3 - origPos
-                return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
-            }) else { return }
+
+            // Decor / added items embed their replacement UUID in the key — match directly.
+            // Scanned furniture falls back to position-based matching.
+            let idx: Int?
+            if let repId = extractReplacementId(from: key) {
+                idx = roomBinding.wrappedValue.furnitureReplacements.firstIndex { $0.id == repId }
+            } else {
+                idx = roomBinding.wrappedValue.furnitureReplacements.firstIndex(where: { rep in
+                    guard let t = rep.getTransformMatrix() else { return false }
+                    let d = t.columns.3 - origPos
+                    return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+                })
+            }
+            guard let idx = idx else { return }
 
             // Position offset from original
             let curPos = mover.position(relativeTo: nil)
@@ -2627,9 +2682,12 @@ struct RoomModelSceneView: UIViewRepresentable {
 
             let dims = obj.dimensions
             let pad: Float = 0.04
+            // For very flat items (e.g. carpets) don't inflate the Y to 10 cm;
+            // keep the highlight snug around the actual geometry.
+            let minY: Float = dims.y < 0.05 ? dims.y + 0.01 : 0.1
             let boxSize = SIMD3<Float>(
                 max(dims.x, 0.1) + pad,
-                max(dims.y, 0.1) + pad,
+                max(dims.y, minY) + pad,
                 max(dims.z, 0.1) + pad
             )
             let color: UIColor = replacedContentMap[key] != nil ? .systemGreen : .systemYellow
@@ -2937,10 +2995,14 @@ struct FurniturePickerView: View {
     }
 
     private func replaceObject(with usdzFileName: String) {
-        room.furnitureReplacements.removeAll { rep in
-            guard let t = rep.getTransformMatrix() else { return false }
-            let d = t.columns.3 - selectedObject.transform.columns.3
-            return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+        if let repId = extractReplacementId(from: selectedObject.stableId) {
+            room.furnitureReplacements.removeAll { $0.id == repId }
+        } else {
+            room.furnitureReplacements.removeAll { rep in
+                guard let t = rep.getTransformMatrix() else { return false }
+                let d = t.columns.3 - selectedObject.transform.columns.3
+                return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
+            }
         }
 
         let catDesc = selectedObject.object?.category.description ?? "added"

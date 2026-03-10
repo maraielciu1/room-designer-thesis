@@ -31,9 +31,23 @@ enum DecorManager {
 
     @discardableResult
     static func saveImage(_ image: UIImage, id: UUID = UUID()) -> String? {
+        // Normalise orientation before encoding so the saved JPEG
+        // pixels are always in the correct visual order (no EXIF rotation).
+        let normalised: UIImage
+        if image.imageOrientation != .up {
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = 1.0
+            let renderer = UIGraphicsImageRenderer(size: image.size, format: fmt)
+            normalised = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: image.size))
+            }
+        } else {
+            normalised = image
+        }
+
         let fileName = "\(id.uuidString).jpg"
         let url = wallArtDirectory.appendingPathComponent(fileName)
-        guard let data = image.jpegData(compressionQuality: 0.85) else { return nil }
+        guard let data = normalised.jpegData(compressionQuality: 0.85) else { return nil }
         do {
             try data.write(to: url, options: .atomic)
             return fileName
@@ -64,8 +78,25 @@ enum DecorManager {
         frameSize: FrameSize,
         frameStyle: FrameStyle
     ) -> Entity? {
-        guard let image = loadImage(named: imageFileName),
-              let cgImage = image.cgImage else { return nil }
+        guard let rawImage = loadImage(named: imageFileName) else { return nil }
+
+        // Normalise EXIF orientation so the CGImage pixels match
+        // what the user sees — prevents portrait photos appearing rotated.
+        let image: UIImage
+        if rawImage.imageOrientation != .up {
+            // Force scale 1.0 so the bitmap keeps the original pixel
+            // dimensions instead of multiplying by screen-scale (2×/3×),
+            // which would exceed GPU texture limits and silently fail.
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = 1.0
+            let renderer = UIGraphicsImageRenderer(size: rawImage.size, format: fmt)
+            image = renderer.image { _ in
+                rawImage.draw(in: CGRect(origin: .zero, size: rawImage.size))
+            }
+        } else {
+            image = rawImage
+        }
+        guard let cgImage = image.cgImage else { return nil }
 
         let container = Entity()
         container.name = "__wallArt__"
