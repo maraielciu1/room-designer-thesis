@@ -1,0 +1,77 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  THESIS CONTENT OUTLINE
+%  Augmented Reality-Based Interior Design: A Mobile Application for
+%  Parametric Room Scanning and Interactive 3D Scene Reconstruction
+%  Author: Mara Ielciu
+% ═══════════════════════════════════════════════════════════════════════════
+%
+% This file describes the structure and content of the thesis. It is not
+% included in the main document; it serves as a roadmap for the writing.
+%
+% ---------------------------------------------------------------------------
+% FRONT MATTER
+% ---------------------------------------------------------------------------
+% - Title, author, supervisor, abstract (English)
+% - Table of contents
+%
+% ---------------------------------------------------------------------------
+% CONTEXT AND RELATED WORK (section)
+% ---------------------------------------------------------------------------
+% - Indoor scene understanding (ScanNet, semantic 3D)
+% - AR for interior design (Kan et al., recommender, visualisation)
+% - UX in mobile AR interior design (Kandil et al., SUS, HARUS)
+%
+% ---------------------------------------------------------------------------
+% CHAPTER 1 — INTRODUCTION
+% ---------------------------------------------------------------------------
+% - Problem statement and goals
+% - Scope of the thesis
+% - Document structure (how the rest of the thesis is organised)
+%
+% ---------------------------------------------------------------------------
+% CHAPTER 2 — THEORETICAL FOUNDATIONS I: CAPTURE AND RECONSTRUCTION
+% ---------------------------------------------------------------------------
+% 2.1  Motivation for the Work
+%      - Why AR-based interior design; why parametric room scanning;
+%        need for editable, semantic 3D; relation to prior work.
+% 2.2  Photogrammetry
+%      - Definition: 3D from images; overlap, parallax, triangulation.
+%      - Pipeline overview: feature detection, matching, SfM, MVS,
+%        surface reconstruction, texturing.
+% 2.3  Object Capture and Room Plan
+%      - Object Capture: Apple framework; guided capture; photogrammetry
+%        pipeline on-device; USDZ output.
+%      - Room Plan: parametric room scanning; walls, doors, windows,
+%        furniture; CapturedRoom; relation to ARKit and LiDAR.
+%
+% ---------------------------------------------------------------------------
+% CHAPTER 3 — THEORETICAL FOUNDATIONS II: 3D GAUSSIAN SPLATTING
+% ---------------------------------------------------------------------------
+% 3.1  What is 3D Gaussian Splatting
+%      - Alternative to mesh-based reconstruction; primitives as 3D Gaussians.
+% 3.2  Representation: 3D Gaussians
+%      - Position, covariance (scale + rotation), opacity, colour (SH or RGB).
+% 3.3  Splatting: Projection and Rasterisation
+%      - Project 3D to 2D; sort by depth; alpha-blend.
+% 3.4  Training and Relation to Object Capture
+%      - Differentiable splatting; training from multi-view images;
+%        comparison with mesh-based Object Capture in the application.
+%
+% ---------------------------------------------------------------------------
+% CHAPTER 4 — IMPLEMENTATION / APPLICATION (to be written)
+% ---------------------------------------------------------------------------
+% - System architecture (MVVM, SwiftUI, RealityKit)
+% - Room scanning flow (RoomPlan), room editor, furniture replacement
+% - Object Capture integration, 3DGS viewing pipeline
+% - Data persistence, concurrency
+%
+% ---------------------------------------------------------------------------
+% CHAPTER 6 — CONCLUSIONS
+% ---------------------------------------------------------------------------
+% - Summary of contributions
+% - Limitations and future work
+%
+% ---------------------------------------------------------------------------
+% BIBLIOGRAPHY
+% ---------------------------------------------------------------------------
+% - references.bib

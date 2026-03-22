@@ -1,0 +1,16 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  CHAPTER 4 — IMPLEMENTATION AND APPLICATION
+% ═══════════════════════════════════════════════════════════════════════════
+
+\chapter{Implementation and Application}
+\label{ch:implementation}
+
+This chapter describes the implementation of the mobile application for parametric room scanning and interactive 3D scene reconstruction. The system is built with SwiftUI and integrates Room Plan, Object Capture, RealityKit, and a custom Metal-based renderer for 3D Gaussian Splatting.
+
+\section{Overview}
+
+The application follows the Model--View--ViewModel (MVVM) design pattern. Room scanning is performed via Room Plan's \texttt{RoomCaptureSession}; the resulting \texttt{CapturedRoom} is persisted and used to build a virtual 3D scene in RealityKit. Users can replace detected furniture with USDZ models (from the library or from Object Capture), with gesture-based translation, rotation, and scaling. Object Capture is used for scanning individual objects into USDZ; optionally, images are exported for external 3D Gaussian Splatting training, and the resulting \texttt{.ply} files can be imported and viewed in-app via a custom Gaussian splatting renderer.
+
+\section{Placeholder for Full Content}
+
+The full description of the architecture, data flow, persistence, concurrency, and the Gaussian splatting viewing pipeline will be expanded here in the final thesis.

@@ -18,7 +18,6 @@ struct FurnitureLibraryView: View {
     @State private var showImportSplat = false
     @State private var importTargetItem: ScannedFurniture?
     @State private var selectedTab: LibraryTab = .scanned
-    @State private var showGSGuide = false
 
     enum LibraryTab: String, CaseIterable {
         case scanned = "My Scans"
@@ -34,7 +33,7 @@ struct FurnitureLibraryView: View {
             Color(hex: 0x0B0D17).ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Custom segmented picker ──
+                // ── Segmented picker (same top padding as Rooms page content) ──
                 HStack(spacing: 6) {
                     ForEach(LibraryTab.allCases, id: \.self) { tab in
                         Button {
@@ -55,7 +54,8 @@ struct FurnitureLibraryView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
 
                 switch selectedTab {
                 case .scanned: scannedSection
@@ -64,19 +64,18 @@ struct FurnitureLibraryView: View {
             }
         }
         .navigationTitle("My Furniture")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 8) {
-                    Button(action: { showGSGuide = true }) {
-                        Image(systemName: "questionmark.circle")
-                            .tintedIcon(AppTheme.glowGreen)
-                    }
-                    Button(action: { showObjectScan = true }) {
-                        Image(systemName: "cube.transparent")
-                            .tintedIcon()
-                    }
+                Button(action: { showObjectScan = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppTheme.accentGradientInline)
                 }
+                .accessibilityLabel("New scan")
             }
         }
         .fullScreenCover(isPresented: $showObjectScan) {
@@ -88,9 +87,6 @@ struct FurnitureLibraryView: View {
             allowsMultipleSelection: false
         ) { result in
             handleSplatImport(result)
-        }
-        .sheet(isPresented: $showGSGuide) {
-            GaussianSplattingGuideView()
         }
     }
 

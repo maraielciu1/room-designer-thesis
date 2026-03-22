@@ -87,19 +87,26 @@ struct RoomListView: View {
             .hidden()
         )
         .navigationTitle("My Rooms")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showCreateRoom = true }) {
-                    Image(systemName: "plus")
-                        .tintedIconGradient()
-                }
-            }
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: { showHistory = true }) {
                     Image(systemName: "clock.arrow.circlepath")
-                        .tintedIcon(AppTheme.glowViolet)
+                        .font(.system(size: 18))
+                        .foregroundColor(AppTheme.secondaryText)
                 }
+                .accessibilityLabel("History")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showCreateRoom = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppTheme.accentGradientInline)
+                }
+                .accessibilityLabel("Scan a room")
             }
         }
         .sheet(isPresented: $showCreateRoom, onDismiss: {

@@ -23,3 +23,7 @@ Package.resolved
 
 # Firebase (contains API keys)
 GoogleService-Info.plist
+
+# Backend (Python venv + job data)
+backend_3dgs/.venv/
+backend_3dgs/work/

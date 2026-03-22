@@ -1,0 +1,20 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  CHAPTER 6 — CONCLUSIONS
+% ═══════════════════════════════════════════════════════════════════════════
+
+\chapter{Conclusions}
+\label{ch:conclusions}
+
+This thesis presented an augmented reality-based interior design application that combines parametric room scanning (Room Plan), object-scale capture (Object Capture), and support for 3D Gaussian Splatting reconstructions. The theoretical foundations covered photogrammetry, Object Capture, Room Plan, and 3D Gaussian Splatting; the implementation integrated these technologies in a single iOS application with a persistent 3D room editor and furniture replacement workflow.
+
+\section{Summary of Contributions}
+
+\begin{itemize}
+    \item Integration of Room Plan for semantically annotated, parametric room models and of Object Capture for textured USDZ object models.
+    \item A non-AR 3D room editor with gesture-based manipulation and persistence, allowing users to replace detected furniture with virtual models.
+    \item Support for viewing and comparing 3D Gaussian Splatting reconstructions (import of \texttt{.ply} and Metal-based rendering) alongside mesh-based Object Capture output.
+\end{itemize}
+
+\section{Limitations and Future Work}
+
+Limitations include the dependency on Apple frameworks and LiDAR-capable devices for best room scanning results, and the fact that 3DGS training is performed off-device. Future work may address on-device 3DGS training, improved level-of-detail for large splat scenes, and extended semantic editing of the room model.

@@ -16,6 +16,53 @@ The application integrates several Apple-native frameworks — \textbf{RoomPlan}
 
 This chapter discusses each technology in depth, examining the computational models they employ, their role within the application, and the design decisions that guided their integration.
 
+\subsection{Motivation and Related Work}
+
+Indoor scene understanding and 3D reconstruction have been central to computer vision research, with datasets and benchmarks driving progress in semantic segmentation and object detection. ScanNet \cite{dai2017scannet} is a large-scale dataset of richly annotated 3D reconstructions of indoor scenes, with 2.5 million views across more than 1,500 scans and instance-level semantic segmentations. That work established the importance of combining geometric reconstruction with semantic labelling (walls, furniture, openings) for applications such as robotics and spatial reasoning. The present application aligns with this direction by leveraging Apple's RoomPlan to produce a parametric, semantically annotated room model from a consumer device, rather than from offline processing of RGB-D videos.
+
+The use of augmented reality for interior design and furniture visualisation has been explored in both industry and academia. K\'an et al.\ \cite{kan2021ar} present an AR system for automatic interior design based on a hierarchical tree of procedural rules, enabling interactive and personalised furniture configuration with a recommender component; they compare AR-based visualisation to traditional methods and report positive user feedback. Such studies confirm that AR can support decision-making and spatial reasoning when users need to envision furniture and finishes in their own spaces. This thesis extends that idea by allowing users not only to place virtual furniture, but to \emph{replace} detected real furniture in a reconstructed 3D scene, thus supporting ``what-if'' redesign directly tied to the current room layout.
+
+User experience in mobile AR interior design applications has been studied to improve usability and adoption. Kandil et al.\ \cite{kandil2021ux} evaluate interior design mobile AR applications using established scales such as the System Usability Scale (SUS) and the Handheld Augmented Reality Usability Scale (HARUS), with a focus on gesture-based interaction and one-handed use. Their findings underline the need for clear onboarding, stable tracking, and intuitive manipulation of virtual objects. The application developed in this thesis addresses these concerns by using RoomPlan's guided scanning flow, RealityKit's responsive rendering, and SwiftUI's declarative interface to keep interactions consistent and learnable.
+
+\subsection{Scope of This Thesis: What Was Done, Why, and Which Concepts Apply}
+\label{sec:scope}
+
+This thesis develops an iOS application for \textbf{parametric room scanning} and \textbf{interactive 3D scene reconstruction} for interior design. Concretely:
+
+\begin{itemize}
+    \item \textbf{What was done}: (1) Integration of RoomPlan for scanning rooms and obtaining a structured \texttt{CapturedRoom} (walls, doors, windows, furniture with poses and dimensions). (2) A non-AR 3D room editor where users replace detected furniture with virtual USDZ models, with gesture-based manipulation (translate, rotate, scale) and persistence. (3) Integration of Object Capture for scanning individual objects into USDZ models. (4) Support for viewing and comparing \textbf{3D Gaussian Splatting} reconstructions (import of trained .ply files and Metal-based rendering) alongside Object Capture meshes.
+    \item \textbf{Why}: To let users visualise interior design changes in a persistent, reproducible way without requiring them to remain in the physical space; to combine room-scale semantics (RoomPlan) with object-scale capture (Object Capture) and an alternative representation (Gaussian splatting) for comparison and future extensions.
+    \item \textbf{Theoretical concepts used}: (a) \textbf{AR and the reality--virtuality continuum} (Azuma, Milgram--Kishino) for positioning the app between live AR and fully virtual editing. (b) \textbf{Visual-inertial odometry (VIO)} and \textbf{LiDAR-based depth} for 6DoF tracking and scale. (c) \textbf{Volumetric fusion (TSDF)} and \textbf{semantic segmentation} (ARKit/RoomPlan) for scene understanding. (d) \textbf{Photogrammetry}: SfM, bundle adjustment, MVS, Poisson surface reconstruction (Object Capture). (e) \textbf{3D Gaussian Splatting} as an alternative scene representation with differentiable splatting. (f) \textbf{PBR} and \textbf{scene graphs} (RealityKit). (g) \textbf{MVVM} and reactive data flow (SwiftUI, Combine).
+\end{itemize}
+
+\subsection{How Apple's Kit and Sensors Are Used}
+\label{sec:apple_kit_sensors}
+
+Table~\ref{tab:apple_kit_sensors} summarises how each Apple framework and sensor is used in the application.
+
+\begin{table}[h]
+\centering
+\caption{Use of Apple frameworks and sensors in the application.}
+\label{tab:apple_kit_sensors}
+\begin{tabular}{|l|l|p{6.2cm}|}
+\hline
+\textbf{Component} & \textbf{Type} & \textbf{How it is used} \\
+\hline
+LiDAR Scanner & Hardware sensor & Time-of-flight depth (up to 5\,m); feeds ARKit and RoomPlan for real-time depth maps, plane detection, and mesh reconstruction. \\
+Wide-angle camera & Hardware & RGB frames for VIO feature tracking, RoomPlan structural/object detection, and Object Capture image capture. \\
+IMU (gyro + accelerometer) & Hardware & Fused with vision in ARKit's VIO for 6DoF pose between frames; disambiguates scale when LiDAR is present. \\
+ARKit & Framework & World tracking, plane detection, scene mesh (\texttt{ARMeshAnchor}), raycasting; underpins RoomPlan and Object Capture pose estimation. \\
+RoomPlan & Framework & \texttt{RoomCaptureSession} + \texttt{RoomCaptureView}: guides user to scan room; outputs \texttt{CapturedRoom} (walls, doors, windows, objects with transforms and dimensions). \\
+RealityKit & Framework & Renders the 3D room editor (non-AR): scene graph, \texttt{ModelEntity}, PBR, orbit camera, gesture-driven manipulation. \\
+Object Capture & Framework & \texttt{ObjectCaptureSession} for guided multi-view capture; \texttt{PhotogrammetrySession} for SfM + MVS + mesh + USDZ on-device. \\
+Metal & Framework & Low-level GPU: used by RealityKit; also used by the custom \texttt{GaussianSplatRenderer} for rendering imported 3D Gaussian Splat .ply files. \\
+Apple Neural Engine & Hardware & On-device inference for RoomPlan's segmentation and object detection networks. \\
+\hline
+\end{tabular}
+\end{table}
+
+Data flow in the room pipeline: \textbf{LiDAR + camera + IMU} $\rightarrow$ \textbf{ARKit} (tracking, mesh) $\rightarrow$ \textbf{RoomPlan} (parametric room + furniture) $\rightarrow$ \textbf{RealityKit} (virtual scene with replacement models). For object capture: \textbf{camera + ARKit poses} $\rightarrow$ \textbf{Object Capture} (images) $\rightarrow$ \textbf{PhotogrammetrySession} (USDZ mesh); optionally the same images are exported for external 3D Gaussian Splatting training, and the resulting .ply is rendered in-app via \textbf{Metal}.
+
 
 % ═══════════════════════════════════════════════════════════════════════════
 \section{Augmented Reality and Spatial Computing}
@@ -251,6 +298,85 @@ The application configures the \texttt{PhotogrammetrySession} with:
 \subsubsection{Image Count Validation}
 
 Photogrammetric reconstruction requires sufficient overlap between views. The application enforces a minimum of 20 images before attempting reconstruction. This threshold is derived from the requirement that each surface point must be visible in at least 3 images with sufficient parallax for reliable triangulation. At 20 images covering a full 360° orbit, the average inter-image angular separation is 18°, providing approximately 5--8$\times$ redundancy for most surface points.
+
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{3D Gaussian Splatting: Theory and Role in the Application}
+\label{sec:gaussian_splatting}
+
+\subsection{Motivation: Alternative to Mesh-Based Reconstruction}
+
+Object Capture produces a \emph{mesh-based} representation: a triangle mesh with textures. An alternative paradigm is \textbf{3D Gaussian Splatting} (3DGS) \cite{kerbl20233dgs}, which represents the scene as a set of 3D Gaussian primitives that are \emph{splatted} onto the image plane and alpha-blended to form the final image. This representation is differentiable and allows training from multi-view images without explicit mesh or surface extraction; it also yields high visual quality and real-time rendering. The application supports both: Object Capture for on-device USDZ meshes and \emph{import} of pre-trained 3DGS models (.ply) for side-by-side comparison and viewing.
+
+\subsection{Representation: 3D Gaussians}
+
+Each primitive is an anisotropic 3D Gaussian defined by:
+
+\begin{itemize}
+    \item \textbf{Position} $\boldsymbol{\mu} \in \mathbb{R}^3$ (centre).
+    \item \textbf{Covariance} $\boldsymbol{\Sigma} \in \mathbb{R}^{3 \times 3}$ (symmetric positive definite). For stability and differentiability, 3DGS parameterises it as \textbf{scale} $\mathbf{s} \in \mathbb{R}^3$ (positive) and \textbf{rotation} represented as a unit quaternion $\mathbf{q}$, so that $\boldsymbol{\Sigma} = \mathbf{R} \mathbf{S} \mathbf{S}^\top \mathbf{R}^\top$ where $\mathbf{R}$ is the rotation matrix of $\mathbf{q}$ and $\mathbf{S} = \operatorname{diag}(\mathbf{s})$.
+    \item \textbf{Opacity} $\alpha \in [0,1]$ (used in alpha-blending).
+    \item \textbf{Colour}: typically stored as spherical harmonics (SH) coefficients for view-dependent effects, or as RGB per primitive. The application's .ply parser and Metal renderer use per-Gaussian RGB (linear).
+\end{itemize}
+
+The 3D Gaussian is defined as $G(\mathbf{x}) = e^{-\frac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x}-\boldsymbol{\mu})}$. For rendering, this is projected to 2D in screen space (see below).
+
+\subsection{Splatting: Projection and Rasterisation}
+
+Rendering proceeds by \textbf{splatting} each Gaussian onto the image plane:
+
+\begin{enumerate}
+    \item \textbf{View projection}: The 3D mean $\boldsymbol{\mu}$ is projected to 2D screen coordinates. The 3D covariance $\boldsymbol{\Sigma}$ is projected to a 2D covariance $\boldsymbol{\Sigma}'$ in screen space using the Jacobian of the projection at $\boldsymbol{\mu}$ (see \cite{kerbl20233dgs}).
+    \item \textbf{Sorting}: Primitives are sorted by depth (e.g.\ by the $z$-coordinate of $\boldsymbol{\mu}$ in camera space) so that back-to-front alpha blending is well-defined (or a tile-based order is used).
+    \item \textbf{Rasterisation}: Each Gaussian is drawn as a quad (or ellipse) with a 2D Gaussian weight. The fragment shader evaluates the 2D Gaussian (or an approximation) and multiplies by opacity and colour, then composites with the frame buffer using alpha blending: $\mathbf{c}_{\text{out}} = \alpha \cdot \mathbf{c}_{\text{G}} + (1-\alpha) \mathbf{c}_{\text{in}}$.
+\end{enumerate}
+
+This process is \textbf{differentiable} with respect to the Gaussian parameters, so that gradients from an image loss can be backpropagated to update positions, scales, rotations, opacity, and colour during training.
+
+\subsection{Training Pipeline (External to the App)}
+
+3DGS is typically trained off-device (e.g.\ on a GPU server or in a Colab notebook):
+
+\begin{enumerate}
+    \item \textbf{Input}: Multi-view RGB images and camera poses (e.g.\ from COLMAP or from ARKit/Object Capture session poses if exported).
+    \item \textbf{Initialisation}: Often from a sparse point cloud (e.g.\ SfM/COLMAP), converted to initial Gaussians (position, heuristic scale, opacity, colour from images).
+    \item \textbf{Optimisation}: Differentiable splatting is used to render training views; a loss (e.g.\ L1 or L2 vs.\ ground-truth pixels) is minimised with respect to Gaussian parameters. Pruning and densification steps control the number of primitives.
+    \item \textbf{Output}: A .ply file containing per-vertex (per-Gaussian) attributes: \texttt{x,y,z}, \texttt{red,green,blue}, \texttt{opacity}, \texttt{scale\_0,1,2}, \texttt{rot\_0,1,2,3} (quaternion), and optionally SH coefficients.
+\end{enumerate}
+
+The application does \emph{not} run this training on-device (it would require COLMAP or equivalent SfM plus iterative GPU optimisation); instead, users export Object Capture images, train externally, and import the resulting .ply. The in-app pipeline is: \textbf{load .ply} $\rightarrow$ \textbf{parse} $\rightarrow$ \textbf{upload to GPU} $\rightarrow$ \textbf{Metal splatting renderer} (Section~\ref{sec:app_3dgs_pipeline}).
+
+\subsection{Relation to Object Capture}
+
+\begin{itemize}
+    \item \textbf{Object Capture}: Explicit geometry (mesh) + textures; on-device SfM + MVS + Poisson + UV mapping; output USDZ. Well-suited for clean, editable assets and real-time rendering in RealityKit.
+    \item \textbf{3D Gaussian Splatting}: Implicit scene representation (Gaussians); training off-device with differentiable splatting; output .ply. Excellent visual quality and view-dependent effects; no explicit mesh, so editing (e.g.\ boolean ops) is harder. The app uses 3DGS as a \emph{comparison} and \emph{viewing} option alongside Object Capture.
+\end{itemize}
+
+\subsection{In-App Gaussian Splatting Pipeline}
+\label{sec:app_3dgs_pipeline}
+
+The application implements a \textbf{viewing} pipeline for 3DGS (training remains external):
+
+\begin{enumerate}
+    \item \textbf{Import}: The user attaches a .ply file to a scanned object (e.g.\ via ``Import .ply Splat'' in the furniture library or comparison view). The file is copied to \texttt{Documents/ScannedFurniture/} with a name derived from the object's UUID.
+    \item \textbf{Parsing}: \texttt{PLYParser.parse(url:)} (in \texttt{GaussianSplatData.swift}) reads the binary or ASCII .ply: it locates \texttt{end_header}, infers vertex count and property layout (\texttt{x,y,z}, \texttt{red,green,blue} or \texttt{f\_dc\_*}, \texttt{opacity}, \texttt{scale\_*}, \texttt{rot\_*}), and builds a \texttt{GaussianSplatScene} (array of \texttt{GaussianPrimitive} with position, colour, opacity, scale, rotation quaternion) plus a bounding box.
+    \item \textbf{GPU upload}: \texttt{GaussianSplatRenderer.loadScene(_:)} converts each primitive to a \texttt{GaussianGPU} struct (layout matching the Metal shader), uploads a single \texttt{MTLBuffer} of all Gaussians, and prepares an index buffer for sorted drawing.
+    \item \textbf{Rendering}: Each frame, the renderer (a) computes view and projection matrices from the orbit camera, (b) sorts Gaussian indices by depth (distance from camera along view axis), (c) encodes a draw call with the vertex shader \texttt{gaussianVertex} (projects centre and 3D covariance to 2D, emits a quad per Gaussian) and fragment shader \texttt{gaussianFragment} (evaluates 2D Gaussian falloff, multiplies by opacity and colour, alpha-blends). The result is displayed in \texttt{GaussianSplatView} (SwiftUI wrapper around an \texttt{MTKView}).
+\end{enumerate}
+
+This pipeline is the ``Gaussian splatting implementation'' in the app: \emph{load -- parse -- upload -- render}. Extending it with on-device training would require integrating SfM (e.g.\ Vision framework or a minimal COLMAP-like pipeline) and an iterative 3DGS optimisation loop on GPU, which is a substantial research and engineering effort and can be framed as future work.
+
+\subsubsection{How to Extend or Implement the Full Pipeline}
+
+If the goal is to ``implement the Gaussian splatting pipeline'' in the app, the following options apply:
+
+\begin{enumerate}
+    \item \textbf{Current in-app pipeline (already implemented)}: Treat the pipeline as \emph{import $\rightarrow$ parse .ply $\rightarrow$ Metal render}. This is already in place: \texttt{GaussianSplatData.swift} (parsing), \texttt{GaussianSplatRenderer.swift} (Metal splatting), \texttt{GaussianSplatView.swift} (SwiftUI). Document this as the ``viewing and comparison'' part of the pipeline; training remains external (Colab, desktop 3DGS repo).
+    \item \textbf{Improve the viewing pipeline}: (a) Support more .ply variants (e.g.\ spherical harmonics in the fragment shader). (b) Level-of-detail (LOD): subsample or cluster distant Gaussians to keep frame rate high for large scenes. (c) Async loading and progress UI for very large .ply files.
+    \item \textbf{On-device training (research-heavy)}: To run 3DGS \emph{training} on the device: (a) Reuse Object Capture images and export camera poses (if available from \texttt{ObjectCaptureSession} or a custom ARKit-based capture). (b) Implement or port a minimal SfM (e.g.\ Vision's \texttt{VNGenerateImageFeaturePrintRequest} for features, then triangulation and bundle adjustment) to get a sparse point cloud and poses. (c) Initialise Gaussians from the sparse cloud (one Gaussian per point, small initial scale). (d) Implement a differentiable splatting kernel (Metal compute or render) and a small training loop (e.g.\ 500--1000 iterations, low resolution) with gradient updates. This is suitable as a thesis ``proof of concept'' or future work rather than a production feature.
+    \item \textbf{Hybrid}: Keep using external training; add in-app export of \emph{poses} along with images (e.g.\ from ARKit frame poses during Object Capture) so that external 3DGS training can use consistent camera parameters without running COLMAP.
+\end{enumerate}
 
 
 % ═══════════════════════════════════════════════════════════════════════════
@@ -581,7 +707,8 @@ RoomPlan & iOS 16+ & Room scanning, structural detection, furniture classificati
 RealityKit & iOS 13+ & 3D rendering, PBR materials, scene graph management \\
 Object Capture API & iOS 17+ & Individual object scanning, session management \\
 PhotogrammetrySession & iOS 17+ & SfM, MVS, mesh reconstruction, USDZ export \\
-Metal & iOS 8+ & GPU-accelerated rendering backend \\
+Metal & iOS 8+ & GPU-accelerated rendering backend; also custom 3D Gaussian Splatting renderer (.ply) \\
+3D Gaussian Splatting (.ply) & In-app & Import pre-trained .ply; parse (GaussianSplatData); render (GaussianSplatRenderer) \\
 Combine & iOS 13+ & Reactive data binding (\texttt{ObservableObject}, \texttt{@Published}) \\
 LiDAR Scanner & Hardware & Time-of-flight depth sensing (5m range) \\
 Apple Neural Engine & Hardware & On-device ML inference for scene understanding \\
@@ -630,5 +757,17 @@ Pixar Animation Studios, ``Universal Scene Description,'' \url{https://openusd.o
 
 \bibitem{microsoft_mvvm}
 Microsoft, ``The MVVM Pattern,'' \textit{.NET Application Architecture Guidance}, 2012.
+
+\bibitem{dai2017scannet}
+A.~Dai et al., ``ScanNet: Richly-annotated 3D reconstructions of indoor scenes,'' in \textit{Proc.~IEEE CVPR}, pp.~5828--5839, 2017.
+
+\bibitem{kan2021ar}
+P.~K\'an et al., ``Automatic interior design in augmented reality based on hierarchical tree of procedural rules,'' \textit{Electronics}, vol.~10, no.~3, p.~245, 2021.
+
+\bibitem{kandil2021ux}
+A.~Kandil, B.~Al-Jumaah, and I.~Doush, ``Enhancing user experience of interior design mobile augmented reality applications,'' in \textit{Proc.~16th Int.~Joint Conf.~Computer Vision, Imaging and Computer Graphics Theory and Applications (GRAPP)}, pp.~304--311, 2021.
+
+\bibitem{kerbl20233dgs}
+B.~Kerbl, G.~Kopanas, T.~Leimk\"uhler, and G.~Drettakis, ``3D Gaussian splatting for real-time radiance field rendering,'' \textit{ACM Trans.~Graphics (SIGGRAPH)}, vol.~42, no.~4, 2023.
 
 \end{thebibliography}

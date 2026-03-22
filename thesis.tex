@@ -1,0 +1,81 @@
+%\documentclass[12pt]{scrreprt}
+\documentclass[12pt]{report} 
+
+% language may be romanian or english (default is english)
+% type may be bachelor or master (default is bachelor)
+\usepackage[language=english, type=bachelor]{style}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+%\geometry{a4paper,top=2.5cm,left=3cm,right=2.5cm,bottom=2.5cm}
+%in style
+%controlling the appearance of your headers and footers
+\usepackage{fancyhdr}
+\setlength{\headheight}{27.35799pt}
+\pagestyle{fancy}
+\lhead{}
+\chead{}
+\renewcommand{\headrulewidth}{0.2pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+\begin{document}
+
+\specialization{Computer Science}	
+\title{Augmented Reality-Based Interior Design: A Mobile Application for Parametric Room Scanning and Interactive 3D Scene Reconstruction}					   
+\author{Mara Ielciu}											
+\supervisor{Professor Dr. Darabant Sergiu Adrian}				
+				
+\maketitle
+
+
+\newpage
+\thispagestyle{empty}
+\mbox{}
+\newpage
+\pagenumbering{roman} 
+
+\cleardoublepage
+ABSTRACT
+\vspace{0.5cm}	
+\hrule
+\vspace{0.5cm}	
+%\cleardoublepage
+
+Abstract: un rezumat în limba engleză cu prezentarea, pe scurt, a conținutului pe capitole, punând accent pe contribuțiile proprii și originalitate
+
+
+
+\tableofcontents
+
+
+\newpage
+\pagenumbering{arabic}
+
+% ---------------------------------------------------------------------------
+% Context and related work (3 paragraphs + 3 bibliographic resources)
+% ---------------------------------------------------------------------------
+\section*{Context and Related Work}
+\addcontentsline{toc}{section}{Context and Related Work}
+
+Indoor scene understanding and 3D reconstruction have been central to computer vision research, with datasets and benchmarks driving progress in semantic segmentation and object detection. ScanNet \cite{dai2017scannet} is a large-scale dataset of richly annotated 3D reconstructions of indoor scenes, with 2.5 million views across more than 1,500 scans and instance-level semantic segmentations. That work established the importance of combining geometric reconstruction with semantic labelling (walls, furniture, openings) for applications such as robotics and spatial reasoning. The present application aligns with this direction by leveraging Apple's RoomPlan to produce a parametric, semantically annotated room model from a consumer device, rather than from offline processing of RGB-D videos.
+
+The use of augmented reality for interior design and furniture visualisation has been explored in both industry and academia. K\'an et al.\ \cite{kan2021ar} present an AR system for automatic interior design based on a hierarchical tree of procedural rules, enabling interactive and personalised furniture configuration with a recommender component; they compare AR-based visualisation to traditional methods and report positive user feedback. Such studies confirm that AR can support decision-making and spatial reasoning when users need to envision furniture and finishes in their own spaces. This thesis extends that idea by allowing users not only to place virtual furniture, but to \emph{replace} detected real furniture in a reconstructed 3D scene, thus supporting ``what-if'' redesign directly tied to the current room layout.
+
+User experience in mobile AR interior design applications has been studied to improve usability and adoption. Kandil et al.\ \cite{kandil2021ux} evaluate interior design mobile AR applications using established scales such as the System Usability Scale (SUS) and the Handheld Augmented Reality Usability Scale (HARUS), with a focus on gesture-based interaction and one-handed use. Their findings underline the need for clear onboarding, stable tracking, and intuitive manipulation of virtual objects. The application developed in this thesis addresses these concerns by using RoomPlan's guided scanning flow, RealityKit's responsive rendering, and SwiftUI's declarative interface to keep interactions consistent and learnable.
+
+
+\input{chapters/chapter1_introduction}
+%\addcontentsline{toc}{chapter}{Introducere}
+%\addcontentsline{toc}{chapter}{Introduction}
+
+\input{chapters/chapter2}
+\input{chapters/chapter3}
+\input{chapters/chapter4}
+
+\input{chapters/chapter6_conclusions}
+%\addcontentsline{toc}{chapter}{Concluzii}
+%\addcontentsline{toc}{chapter}{Conclusions}
+
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,5 @@
+flask>=2.0.0
+
+# Optional (Mac only): Metal 3D Gaussian Splatting. Install for "Train in Cloud" on your Mac:
+#   pip install msplat
+# The backend auto-uses msplat on Darwin when available.

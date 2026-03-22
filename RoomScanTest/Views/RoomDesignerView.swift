@@ -118,6 +118,7 @@ struct RoomDesignerView: View {
     @State private var showWallArtPicker = false
     @State private var showLightingPicker = false
     @State private var showCarpetPicker = false
+    @State private var showStatistics = false
     @State private var isFirstPersonCamera = false
     @State private var editorHintsExpanded = true
     @State private var wallColor: Color
@@ -284,6 +285,9 @@ struct RoomDesignerView: View {
                           color: color, pattern: pattern)
             }
         }
+        .sheet(isPresented: $showStatistics) {
+            RoomStatisticsView(room: room)
+        }
         .onChange(of: room.id) { _, _ in roomManager.updateRoom(room) }
         .onChange(of: room.furnitureReplacements.count) { _, _ in roomManager.updateRoom(room) }
         .onChange(of: wallColor) { _, _ in
@@ -339,6 +343,12 @@ struct RoomDesignerView: View {
                                 ? AppTheme.glowGreen : AppTheme.glowCyan)
             }
             .help(isFirstPersonCamera ? "Orbit View" : "Room View")
+
+            Button(action: { showStatistics = true }) {
+                Image(systemName: "ruler")
+                    .tintedIcon(AppTheme.glowOrange)
+            }
+            .help("Room Statistics")
 
             Button(action: takeScreenshot) {
                 Image(systemName: "camera.fill")
@@ -610,6 +620,19 @@ struct RoomDesignerView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(AppTheme.tertiaryText).font(.title3)
                 }
+            }
+
+            // ── Object dimensions ──
+            let objDims = MeasurementService.measureScannedObject(
+                dimensions: object.dimensions, category: object.categoryDescription)
+            HStack(spacing: 12) {
+                Image(systemName: "ruler")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.accentGradientInline)
+                Text(objDims.formattedDimensions)
+                    .font(.caption.weight(.medium).monospacedDigit())
+                    .foregroundColor(AppTheme.secondaryText)
+                Spacer()
             }
 
             // ── Axis legend + actions ──

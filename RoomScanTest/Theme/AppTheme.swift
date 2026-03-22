@@ -2,8 +2,8 @@
 //  AppTheme.swift
 //  RoomScanTest
 //
-//  Centralised design tokens and reusable modifiers for a modern,
-//  sleek, dark-mode-first UI.
+//  Centralised design tokens: modern, minimal, light technical feel.
+//  No purple; accent is blue → cyan/teal.
 //
 
 import SwiftUI
@@ -12,15 +12,15 @@ import SwiftUI
 
 enum AppTheme {
 
-    // Accent gradient
+    // Accent gradient (blue → cyan/teal, no purple)
     static let accentGradient = LinearGradient(
         colors: [Color("AccentStart"), Color("AccentEnd")],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
 
-    // Fallback inline gradient (used before asset catalog colours are set)
+    // Fallback inline gradient: soft blue → cyan
     static let accentGradientInline = LinearGradient(
-        colors: [Color(hex: 0x6C63FF), Color(hex: 0x00D4FF)],
+        colors: [Color(hex: 0x3B82F6), Color(hex: 0x06B6D4)],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
 
@@ -36,9 +36,11 @@ enum AppTheme {
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
 
-    // Subtle glow for feature cards
-    static let glowCyan   = Color(hex: 0x00D4FF)
-    static let glowViolet = Color(hex: 0x6C63FF)
+    // Accent colors (technical, minimal)
+    static let glowCyan   = Color(hex: 0x06B6D4)
+    static let glowBlue   = Color(hex: 0x3B82F6)
+    /// Kept for compatibility; use glowBlue for new UI
+    static let glowViolet = Color(hex: 0x3B82F6)
     static let glowGreen  = Color(hex: 0x34D399)
     static let glowOrange = Color(hex: 0xFB923C)
     static let glowRed    = Color(hex: 0xEF4444)
@@ -47,6 +49,12 @@ enum AppTheme {
     static let primaryText   = Color.white
     static let secondaryText = Color.white.opacity(0.6)
     static let tertiaryText  = Color.white.opacity(0.4)
+
+    // Bottom tab bar (light, minimal)
+    static let tabBarBackground = Color(hex: 0x1E293B)
+    static let tabBarItemInactive = Color.white.opacity(0.5)
+    static let tabBarItemActive = Color.white
+    static let tabBarPill = Color.white.opacity(0.12)
 
     // Fixed sizes
     static let cornerRadius: CGFloat = 18
@@ -174,9 +182,9 @@ struct AnimatedMeshBackground: View {
             // Base
             Color(hex: 0x0B0D17)
 
-            // Animated blobs
+            // Animated blobs (blue + cyan, no purple)
             Circle()
-                .fill(AppTheme.glowViolet.opacity(0.18))
+                .fill(AppTheme.glowBlue.opacity(0.14))
                 .frame(width: 340, height: 340)
                 .blur(radius: 100)
                 .offset(x: animatePhase ? -60 : 60, y: animatePhase ? -120 : -80)

@@ -183,11 +183,11 @@ nonisolated enum PLYParser {
         for i in 0..<vertexCount {
             let base = bodyStart + i * stride
 
-            // ── Position ──
+            // ── Position (COLMAP Y-down Z-forward → Y-up Z-back) ──
             let x = readFloat(data: data, offset: base + offsets[propIndex["x"]!])
             let y = readFloat(data: data, offset: base + offsets[propIndex["y"]!])
             let z = readFloat(data: data, offset: base + offsets[propIndex["z"]!])
-            let pos = SIMD3<Float>(x, y, z)
+            let pos = colmapToYUp(position: SIMD3<Float>(x, y, z))
 
             // ── Color (SH DC or direct RGB) ──
             var color = SIMD3<Float>(0.5, 0.5, 0.5)
@@ -230,7 +230,7 @@ nonisolated enum PLYParser {
                 )
             }
 
-            // ── Rotation quaternion ──
+            // ── Rotation quaternion (then COLMAP → Y-up) ──
             var rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
             if let i0 = propIndex["rot_0"],
                let i1 = propIndex["rot_1"],
@@ -240,7 +240,7 @@ nonisolated enum PLYParser {
                 let qx = readFloat(data: data, offset: base + offsets[i1])
                 let qy = readFloat(data: data, offset: base + offsets[i2])
                 let qz = readFloat(data: data, offset: base + offsets[i3])
-                rotation = simd_normalize(simd_quatf(ix: qx, iy: qy, iz: qz, r: w))
+                rotation = colmapToYUp(rotation: simd_normalize(simd_quatf(ix: qx, iy: qy, iz: qz, r: w)))
             }
 
             // Filter degenerate Gaussians
@@ -284,11 +284,11 @@ nonisolated enum PLYParser {
             let values = lines[i].split(separator: " ").compactMap { Float($0) }
             guard values.count >= properties.count else { continue }
 
-            let pos = SIMD3<Float>(
+            let pos = colmapToYUp(position: SIMD3<Float>(
                 values[propIndex["x"]!],
                 values[propIndex["y"]!],
                 values[propIndex["z"]!]
-            )
+            ))
 
             var color = SIMD3<Float>(0.5, 0.5, 0.5)
             if let i0 = propIndex["f_dc_0"],
@@ -318,9 +318,9 @@ nonisolated enum PLYParser {
                let i1 = propIndex["rot_1"],
                let i2 = propIndex["rot_2"],
                let i3 = propIndex["rot_3"] {
-                rotation = simd_normalize(
+                rotation = colmapToYUp(rotation: simd_normalize(
                     simd_quatf(ix: values[i1], iy: values[i2], iz: values[i3], r: values[i0])
-                )
+                ))
             }
 
             guard opacity > 0.005 else { continue }
@@ -337,13 +337,30 @@ nonisolated enum PLYParser {
         return GaussianSplatScene(gaussians: gaussians, boundingBox: (bbMin, bbMax))
     }
 
+    // MARK: - COLMAP → Y-up transform
+
+    /// COLMAP/msplat use Y-down, Z-forward. Convert to Y-up, Z-back for rendering.
+    private static func colmapToYUp(position: SIMD3<Float>) -> SIMD3<Float> {
+        SIMD3<Float>(position.x, -position.y, -position.z)
+    }
+
+    /// Reflect quaternion for Y and Z flip so ellipsoid orientation matches transformed space.
+    private static func colmapToYUp(rotation: simd_quatf) -> simd_quatf {
+        simd_normalize(simd_quatf(
+            ix: rotation.imag.x,
+            iy: -rotation.imag.y,
+            iz: -rotation.imag.z,
+            r: rotation.real
+        ))
+    }
+
     // MARK: - Helpers
 
     private static func sigmoid(_ x: Float) -> Float { 1.0 / (1.0 + exp(-x)) }
     private static func clamp01(_ x: Float) -> Float { max(0, min(1, x)) }
 
     private static func readFloat(data: Data, offset: Int) -> Float {
-        data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: Float.self) }
+        data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: Float.self) }
     }
 
     private static func readUInt8(data: Data, offset: Int) -> UInt8 {

@@ -21,10 +21,15 @@ struct Room: Identifiable, Codable {
     /// nil when the scan didn't capture colour data (e.g. older rooms).
     var roomMaterials: RoomMaterials?
     
+    /// Optional reference to a multi-room project.
+    /// nil when the room is standalone (not part of any project).
+    var projectId: UUID?
+    
     init(id: UUID = UUID(), name: String, userId: UUID, createdAt: Date = Date(),
          updatedAt: Date = Date(), capturedRoomExportURL: String? = nil,
          furnitureReplacements: [FurnitureReplacement] = [],
-         roomMaterials: RoomMaterials? = nil) {
+         roomMaterials: RoomMaterials? = nil,
+         projectId: UUID? = nil) {
         self.id = id
         self.name = name
         self.userId = userId
@@ -33,6 +38,7 @@ struct Room: Identifiable, Codable {
         self.capturedRoomExportURL = capturedRoomExportURL
         self.furnitureReplacements = furnitureReplacements
         self.roomMaterials = roomMaterials
+        self.projectId = projectId
     }
 }
 

@@ -1,0 +1,33 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  CHAPTER 1 — INTRODUCTION
+% ═══════════════════════════════════════════════════════════════════════════
+
+\chapter{Introduction}
+\label{ch:introduction}
+
+This thesis presents the design and development of a mobile application that combines \textbf{parametric room scanning} and \textbf{interactive 3D scene reconstruction} for augmented reality (AR)--based interior design. The goal is to allow users to scan a room with a consumer device, obtain a structured representation of the space---including walls, openings, and furniture---and then visualise and edit the scene by replacing detected real furniture with virtual alternatives. The application thus supports ``what-if'' redesign directly tied to the user's own environment.
+
+\section{Problem Statement and Goals}
+
+Interior design decisions are often difficult to visualise without seeing furniture and finishes in place. Traditional tools range from 2D floor plans and mood boards to physical samples; these do not provide an immersive, spatially accurate preview of the final result. AR has emerged as a way to overlay virtual content onto the real world, but many solutions require the user to remain in the physical space with the device pointed at the room. A persistent, editable 3D model of the room---obtained once by scanning---enables users to explore design options at any time, without being on-site.
+
+The main goals of this work are:
+
+\begin{enumerate}
+    \item To integrate \textbf{room-scale} capture (Apple's RoomPlan) to obtain a parametric, semantically annotated model of the room, including detected furniture with poses and dimensions.
+    \item To provide an \textbf{interactive 3D room editor} where users can replace detected furniture with virtual 3D models (USDZ), with gesture-based manipulation and persistence.
+    \item To support \textbf{object-scale} capture (Apple's Object Capture) for scanning individual objects into 3D models, and to allow \textbf{comparison with 3D Gaussian Splatting} reconstructions as an alternative representation.
+\end{enumerate}
+
+\section{Scope of the Thesis}
+
+The thesis focuses on the theoretical foundations and the design of the application. \textbf{Chapter~\ref{ch:theory1}} covers the motivation for the work, the principles of photogrammetry, and the role of Object Capture and Room Plan in the pipeline. \textbf{Chapter~\ref{ch:theory2}} introduces 3D Gaussian Splatting as an alternative to mesh-based reconstruction and explains how it is used in the application for viewing and comparison. Later chapters address the implementation, architecture, and conclusions.
+
+\section{Document Structure}
+
+\begin{itemize}
+    \item \textbf{Chapter~\ref{ch:theory1}} --- Theoretical Foundations I: motivation, photogrammetry, Object Capture, and Room Plan.
+    \item \textbf{Chapter~\ref{ch:theory2}} --- Theoretical Foundations II: 3D Gaussian Splatting.
+    \item \textbf{Chapter~4} --- Implementation and application architecture.
+    \item \textbf{Chapter~6} --- Conclusions and future work.
+\end{itemize}

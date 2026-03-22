@@ -1,0 +1,68 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  CHAPTER 3 — THEORETICAL FOUNDATIONS II: 3D GAUSSIAN SPLATTING
+% ═══════════════════════════════════════════════════════════════════════════
+
+\chapter{Theoretical Foundations II: 3D Gaussian Splatting}
+\label{ch:theory2}
+
+Object Capture and the photogrammetry pipeline of Chapter~\ref{ch:theory1} produce a \textbf{mesh-based} representation: a triangle mesh with textures. This chapter introduces \textbf{3D Gaussian Splatting} (3DGS) \cite{kerbl20233dgs}, an alternative scene representation that uses a set of 3D Gaussian primitives splatted onto the image plane and alpha-blended for rendering. 3DGS yields high visual quality and real-time rendering, and is differentiable, so it can be trained from multi-view images without explicit mesh or surface extraction. The application supports both mesh-based (Object Capture) and 3DGS reconstructions, allowing users to compare the two representations.
+
+% ---------------------------------------------------------------------------
+\section{What is 3D Gaussian Splatting}
+\label{sec:3dgs_intro}
+
+3D Gaussian Splatting represents a scene as a large set of \textbf{3D Gaussian primitives}. Each primitive has a position in 3D space, an anisotropic shape (scale and orientation), an opacity, and a colour (or view-dependent colour). To render an image, each Gaussian is \textbf{projected} onto the 2D image plane, where it becomes a 2D Gaussian (or an elliptical blob). The primitives are then \textbf{sorted by depth} and \textbf{alpha-blended} back-to-front to produce the final pixel colours. The entire process is differentiable with respect to the Gaussian parameters, so that gradients from an image loss can be backpropagated during training to optimise positions, shapes, opacity, and colour from multi-view photographs.
+
+Unlike mesh-based reconstruction, 3DGS does not require an explicit surface (e.g.\ Poisson reconstruction or mesh extraction). The scene is represented implicitly by the set of Gaussians, which can model complex geometry and view-dependent effects. In the application developed in this thesis, 3DGS models are typically trained off-device (e.g.\ from images exported by Object Capture or from a separate capture); the app then \emph{imports} the resulting \texttt{.ply} file and renders it with a custom Metal-based splatting pipeline for viewing and comparison with Object Capture meshes.
+
+% ---------------------------------------------------------------------------
+\section{Representation: 3D Gaussians}
+\label{sec:3dgs_representation}
+
+Each primitive is an \textbf{anisotropic 3D Gaussian} defined by:
+
+\begin{itemize}
+    \item \textbf{Position} $\boldsymbol{\mu} \in \mathbb{R}^3$: the centre of the Gaussian in world space.
+
+    \item \textbf{Covariance} $\boldsymbol{\Sigma} \in \mathbb{R}^{3 \times 3}$: a symmetric positive definite matrix that defines the shape and orientation of the Gaussian. For stability and differentiability, 3DGS parameterises it using \textbf{scale} $\mathbf{s} \in \mathbb{R}^3$ (positive per-axis scales) and \textbf{rotation} as a unit quaternion $\mathbf{q}$. Then $\boldsymbol{\Sigma} = \mathbf{R} \mathbf{S} \mathbf{S}^\top \mathbf{R}^\top$, where $\mathbf{R}$ is the rotation matrix of $\mathbf{q}$ and $\mathbf{S} = \operatorname{diag}(\mathbf{s})$.
+
+    \item \textbf{Opacity} $\alpha \in [0,1]$: used in alpha-blending during rasterisation.
+
+    \item \textbf{Colour}: typically stored as spherical harmonics (SH) coefficients for view-dependent effects, or as a single RGB value per primitive. The application's \texttt{.ply} parser and Metal renderer use per-Gaussian RGB (linear space).
+\end{itemize}
+
+The 3D Gaussian function is
+\[
+G(\mathbf{x}) = \exp\bigl(-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x}-\boldsymbol{\mu})\bigr).
+\]
+For rendering, this 3D function is projected to 2D in screen space, as described in the next section.
+
+% ---------------------------------------------------------------------------
+\section{Splatting: Projection and Rasterisation}
+\label{sec:3dgs_splatting}
+
+Rendering proceeds by \textbf{splatting} each Gaussian onto the image plane:
+
+\begin{enumerate}
+    \item \textbf{View projection}: The 3D mean $\boldsymbol{\mu}$ is projected to 2D screen coordinates using the camera's view and projection matrices. The 3D covariance $\boldsymbol{\Sigma}$ is projected to a 2D covariance $\boldsymbol{\Sigma}'$ in screen space using the Jacobian of the projection at $\boldsymbol{\mu}$ \cite{kerbl20233dgs}. This 2D covariance defines an ellipse in the image plane.
+
+    \item \textbf{Sorting}: Primitives must be composited in a consistent order for alpha-blending. Typically they are sorted by depth (e.g.\ by the $z$-coordinate of $\boldsymbol{\mu}$ in camera space) so that back-to-front blending is well-defined. Tile-based sorting can also be used for efficiency.
+
+    \item \textbf{Rasterisation}: Each Gaussian is drawn as a quad or ellipse. The fragment shader evaluates the 2D Gaussian weight (or an approximation thereof), multiplies by opacity and colour, and composites with the frame buffer using alpha blending: $\mathbf{c}_{\mathrm{out}} = \alpha \cdot \mathbf{c}_{\mathrm{G}} + (1-\alpha) \mathbf{c}_{\mathrm{in}}$.
+\end{enumerate}
+
+Because each step is differentiable, the full pipeline allows gradients from a photometric loss (e.g.\ L1 or L2 between rendered and ground-truth pixels) to be backpropagated to update the Gaussian parameters during training. Training is usually performed off-device: given multi-view RGB images and camera poses (e.g.\ from COLMAP or from an AR/Object Capture session), the Gaussians are initialised from a sparse point cloud, then optimised by minimising the rendering loss, with optional pruning and densification to control the number of primitives. The output is a \texttt{.ply} file containing per-vertex (per-Gaussian) attributes: position, colour, opacity, scale, and rotation.
+
+% ---------------------------------------------------------------------------
+\section{Relation to Mesh-Based Reconstruction}
+\label{sec:3dgs_vs_mesh}
+
+In the context of this thesis, the two main scene representations are:
+
+\begin{itemize}
+    \item \textbf{Object Capture (mesh)}: Explicit geometry (triangle mesh) with textures; on-device SfM, MVS, Poisson reconstruction, and UV mapping; output USDZ. Well-suited for editable assets, placement in the room editor, and real-time rendering in RealityKit.
+
+    \item \textbf{3D Gaussian Splatting}: Implicit representation (set of Gaussians); training off-device with differentiable splatting; output \texttt{.ply}. High visual quality and view-dependent effects; no explicit mesh, so geometric editing (e.g.\ boolean operations) is harder. The application uses 3DGS for \emph{viewing} and \emph{comparison} alongside Object Capture, not for replacing furniture in the room editor.
+\end{itemize}
+
+By supporting both, the application lets users compare the same object or scene as a mesh (Object Capture) and as a Gaussian splat, and provides a foundation for future extensions (e.g.\ hybrid workflows or on-device 3DGS training as future work).

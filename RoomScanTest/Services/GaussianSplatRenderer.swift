@@ -117,13 +117,23 @@ class GaussianSplatRenderer: NSObject {
         let indexBytes = sortedIndices.count * MemoryLayout<UInt32>.stride
         indexBuffer = device.makeBuffer(length: indexBytes, options: .storageModeShared)
 
-        // Set initial camera based on bounding box
+        // Set initial camera: frame center region (object is usually there in full-scene reconstructions)
         orbitCenter = scene.center
-        orbitDistance = max(scene.extent * 1.5, 0.5)
+        orbitDistance = max(scene.extent * 0.4, 0.2)
+        orbitDistance = min(orbitDistance, 50)
         orbitTheta = 0
         orbitPhi = Float.pi / 6
 
         print("[GaussianSplatRenderer] Loaded \(gaussianCount) Gaussians")
+    }
+
+    /// Zoom camera in to the center region (object is often there in object-centric scans).
+    /// Call after loadScene to frame the likely object area instead of the full scene.
+    func frameCenterRegion(zoomFactor: Float = 0.4) {
+        guard let scene = scene else { return }
+        orbitCenter = scene.center
+        orbitDistance = max(scene.extent * zoomFactor, 0.2)
+        orbitDistance = min(orbitDistance, 50)
     }
 
     // MARK: - Rendering

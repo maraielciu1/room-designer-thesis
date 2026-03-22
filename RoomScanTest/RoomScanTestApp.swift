@@ -49,6 +49,7 @@ struct AppRootView: View {
     @State private var roomManager: RoomManager?
     @State private var historyManager: HistoryManager?
     @State private var scannedFurnitureManager: ScannedFurnitureManager?
+    @State private var projectManager: ProjectManager?
 
     // Persisted mode selection (nil = show picker)
     @AppStorage("selectedAppMode") private var storedMode: String = ""
@@ -68,7 +69,9 @@ struct AppRootView: View {
             }
         }
         .onAppear {
-            // Restore persisted mode (empty string = first launch)
+            // Create managers immediately so they exist before any tab (Local or Marketplace) is shown.
+            ensureLocalManagers()
+            // Restore persisted mode (empty string = first launch).
             if !storedMode.isEmpty, let mode = AppMode(rawValue: storedMode) {
                 selectedMode = mode
             }
@@ -76,6 +79,9 @@ struct AppRootView: View {
         .onChange(of: selectedMode) { _, newMode in
             if let newMode {
                 storedMode = newMode.rawValue
+                // Create managers as soon as we switch to a mode that needs them,
+                // so they're available on first render (avoid "No ObservableObject" crash).
+                ensureLocalManagers()
             } else {
                 storedMode = ""
             }
@@ -85,17 +91,16 @@ struct AppRootView: View {
     // MARK: - Local Mode (original flow)
 
     private var localModeRoot: some View {
-        NavigationView {
-            LocalLandingView(switchMode: { selectedMode = nil })
-        }
-        .environmentObject(userManager)
-        .environmentObject(catalogManager)
-        .onAppear { ensureLocalManagers() }
-        .modifier(ManagerEnvironmentModifier(
-            roomManager: roomManager,
-            historyManager: historyManager,
-            scannedFurnitureManager: scannedFurnitureManager
-        ))
+        LocalLandingView(switchMode: { selectedMode = nil })
+            .environmentObject(userManager)
+            .environmentObject(catalogManager)
+            .onAppear { ensureLocalManagers() }
+            .modifier(ManagerEnvironmentModifier(
+                roomManager: roomManager,
+                historyManager: historyManager,
+                scannedFurnitureManager: scannedFurnitureManager,
+                projectManager: projectManager
+            ))
     }
 
     // MARK: - Marketplace Mode (Firebase flow)
@@ -117,7 +122,8 @@ struct AppRootView: View {
         .modifier(ManagerEnvironmentModifier(
             roomManager: roomManager,
             historyManager: historyManager,
-            scannedFurnitureManager: scannedFurnitureManager
+            scannedFurnitureManager: scannedFurnitureManager,
+            projectManager: projectManager
         ))
     }
 
@@ -127,6 +133,9 @@ struct AppRootView: View {
         if roomManager == nil { roomManager = RoomManager(userManager: userManager) }
         if historyManager == nil { historyManager = HistoryManager(userManager: userManager) }
         if scannedFurnitureManager == nil { scannedFurnitureManager = ScannedFurnitureManager(userManager: userManager) }
+        if projectManager == nil, let rm = roomManager {
+            projectManager = ProjectManager(userManager: userManager, roomManager: rm)
+        }
     }
 }
 
@@ -136,16 +145,19 @@ struct ManagerEnvironmentModifier: ViewModifier {
     let roomManager: RoomManager?
     let historyManager: HistoryManager?
     let scannedFurnitureManager: ScannedFurnitureManager?
+    let projectManager: ProjectManager?
 
     func body(content: Content) -> some View {
         Group {
             if let roomManager = roomManager,
                let historyManager = historyManager,
-               let scannedFurnitureManager = scannedFurnitureManager {
+               let scannedFurnitureManager = scannedFurnitureManager,
+               let projectManager = projectManager {
                 content
                     .environmentObject(roomManager)
                     .environmentObject(historyManager)
                     .environmentObject(scannedFurnitureManager)
+                    .environmentObject(projectManager)
             } else {
                 content
             }

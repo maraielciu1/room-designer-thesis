@@ -59,6 +59,13 @@ struct ObjectScanView: View {
     @State private var isExporting = false
     @State private var showGSGuide = false
 
+    // Cloud training (upload zip → server runs 3DGS → download .ply)
+    @State private var lastAddedFurniture: ScannedFurniture?
+    @State private var isCloudTraining = false
+    @State private var cloudStatusMessage: String?
+    @State private var cloudError: String?
+    @AppStorage(GaussianSplatCloudConfig.serverBaseURLKey) private var cloudServerBaseURL: String = ""
+
     // Errors
     @State private var showError = false
     @State private var errorMessage = ""
@@ -505,6 +512,51 @@ struct ObjectScanView: View {
                     }
                 }
 
+                // ── Train in Cloud (server runs 3DGS, then app downloads .ply) ──
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Server URL (your backend that runs 3DGS)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    TextField("https://your-server.com/gs", text: $cloudServerBaseURL)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.caption)
+                }
+                .padding(.horizontal, 24)
+
+                if isCloudTraining {
+                    VStack(spacing: 4) {
+                        ProgressView()
+                        Text(cloudStatusMessage ?? "Training…")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    if let err = cloudError {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                        Text("Tap below to try again.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Button(action: startCloudTraining) {
+                        HStack {
+                            Image(systemName: "cloud.fill")
+                            Text("Train in Cloud")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue)
+                        .cornerRadius(12)
+                    }
+                    .disabled(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || lastAddedFurniture == nil)
+                }
+
                 Button(action: { showGSGuide = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "questionmark.circle")
@@ -766,7 +818,7 @@ struct ObjectScanView: View {
     private func saveScannedFurniture() {
         guard let modelURL = generatedModelURL else { return }
 
-        scannedFurnitureManager.addFurniture(
+        lastAddedFurniture = scannedFurnitureManager.addFurniture(
             name: furnitureName.trimmingCharacters(in: .whitespaces),
             category: selectedCategory.rawValue,
             usdzURL: modelURL
@@ -824,6 +876,90 @@ struct ObjectScanView: View {
                     isExporting = false
                     errorMessage = "Failed to export images: \(error.localizedDescription)"
                     showError = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Cloud Training (server runs 3DGS, app downloads .ply)
+
+    private func startCloudTraining() {
+        guard let imagesDir = imagesDirectory else {
+            cloudError = "Images no longer available. Export or train right after saving."
+            return
+        }
+        guard let item = lastAddedFurniture else {
+            cloudError = "No object to attach the splat to."
+            return
+        }
+        let base = cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, let serverURL = URL(string: base.hasSuffix("/") ? String(base.dropLast()) : base) else {
+            cloudError = "Enter a valid server URL (e.g. https://your-server.com/gs)."
+            return
+        }
+        let count = ImageExportService.imageCount(in: imagesDir)
+        guard count >= 20 else {
+            cloudError = "Need at least 20 images. You have \(count)."
+            return
+        }
+
+        cloudError = nil
+        isCloudTraining = true
+        cloudStatusMessage = "Packaging images…"
+
+        Task {
+            do {
+                let zipURL = try await ImageExportService.createZip(from: imagesDir)
+                await MainActor.run { cloudStatusMessage = "Uploading…" }
+
+                let plyData = try await GaussianSplatCloudService.trainAndDownload(
+                    zipURL: zipURL,
+                    serverBaseURL: serverURL,
+                    pollInterval: 4.0
+                ) { progress, message in
+                    Task { @MainActor in
+                        if let p = progress {
+                            cloudStatusMessage = "Training… \(p)%"
+                        } else if let m = message, !m.isEmpty {
+                            cloudStatusMessage = m
+                        } else {
+                            cloudStatusMessage = "Training…"
+                        }
+                    }
+                }
+
+                await MainActor.run {
+                    let splatName = "\(item.id.uuidString)_splat.ply"
+                    let splatURL = ScannedFurnitureManager.modelDirectory.appendingPathComponent(splatName)
+                    do {
+                        try plyData.write(to: splatURL)
+                        let fileSize = Int64(plyData.count)
+                        var gaussianCount: Int?
+                        if let scene = try? PLYParser.parse(data: plyData) {
+                            gaussianCount = scene.gaussians.count
+                        }
+                        scannedFurnitureManager.attachSplat(
+                            to: item,
+                            splatFileName: splatName,
+                            gaussianCount: gaussianCount,
+                            fileSizeBytes: fileSize
+                        )
+                        cloudStatusMessage = "Done! Splat attached to \"\(item.name)\"."
+                        cloudError = nil
+                    } catch {
+                        cloudError = "Could not save .ply: \(error.localizedDescription)"
+                    }
+                    isCloudTraining = false
+                }
+            } catch {
+                await MainActor.run {
+                    isCloudTraining = false
+                    let msg = error.localizedDescription
+                    if msg.lowercased().contains("offline") || msg.lowercased().contains("internet") {
+                        cloudError = "Can’t reach the server. Check: (1) iPhone and Mac on same Wi‑Fi, (2) Server URL is correct (e.g. http://192.168.1.206:5001), (3) Allow \"Local Network\" when the app prompts, or enable it in Settings → Privacy & Security → Local Network."
+                    } else {
+                        cloudError = msg
+                    }
                 }
             }
         }
