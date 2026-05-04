@@ -1,0 +1,333 @@
+\chapter{State of the Art}
+\label{ch:soa}
+
+This chapter surveys the work that motivates, contextualises, and positions
+the system developed in this thesis. It is organised into five areas:
+commercial AR interior design applications and their limitations
+(Section~\ref{sec:soa:commercial}); indoor scene understanding datasets and
+methods that establish the semantic reconstruction context
+(Section~\ref{sec:soa:indoor}); dense SLAM and volumetric reconstruction
+systems that form the technological lineage of depth-based room capture
+(Section~\ref{sec:soa:slam}); mobile AR usability evaluation methodology
+(Section~\ref{sec:soa:usability}); and the evolution of novel-view synthesis
+from neural radiance fields to 3D Gaussian Splatting
+(Section~\ref{sec:soa:nvs}). Section~\ref{sec:soa:gap} synthesises the
+research gap that this thesis addresses.
+
+% ------------------------------------------------------------------
+\section{Commercial AR Interior Design Applications}
+\label{sec:soa:commercial}
+% ------------------------------------------------------------------
+
+A number of consumer-facing augmented reality tools allow users to preview
+furniture in their physical environment before purchase. The most widely
+deployed example is IKEA~Place, released in 2017 as one of the first
+ARKit-based shopping applications. It uses ARKit's plane detection to
+identify the floor surface and anchors a scaled virtual product model to that
+plane, allowing the user to walk around a composited sofa or bookcase in the
+live camera feed. Similar mechanics underpin the AR viewers embedded in the
+Wayfair, Houzz, and Amazon applications. These tools have demonstrably
+reduced purchase uncertainty for a subset of users, but they share a
+structural limitation: the room is not modelled. Plane detection locates one
+or more horizontal surfaces; it does not produce walls, identify windows or
+doors, record the positions of existing furniture, or generate any artefact
+that persists beyond the session. Each product preview starts from scratch,
+and the user must be physically inside the room to perform it.
+
+K{\'a}n~et~al.~\cite{kan2021ar} address a complementary limitation: even
+when an AR tool allows placement, it provides no layout intelligence. Their
+system constructs a hierarchical tree of procedural rules encoding spatial
+relations and style constraints, then uses a recommender engine to propose
+furniture arrangements that satisfy those rules; the AR component overlays
+the suggested layout on the live camera feed. This work goes substantially
+further than product-viewer apps in terms of automated design support.
+However, it does not start from a captured parametric model of the existing
+room: the constraint solver operates in an abstract space whose connection to
+metric room geometry depends on the quality of transient plane detection, and
+no mechanism for off-site editing is described.
+
+Research into AR interior workflows with semantic scene understanding has
+explored using depth-sensing cameras and learned 3D object detectors to make
+virtual object grounding more robust~\cite{Geo2023}. Pugh~et~al.~\cite{Geo2023}
+demonstrate that synthetic indoor datasets with photorealistic rendering and
+rich semantic labels can substantially improve indoor scene understanding for
+AR applications, an approach complementary to the real-scan pipeline used
+in this thesis.
+
+The gap that all these systems leave open is the absence of a single
+application that (i)~captures the room as a structured, metric, persistent
+model; (ii)~allows editing of that model independently of being on-site;
+and (iii)~generates or imports three-dimensional assets through an on-device
+photogrammetric pipeline. This thesis addresses that gap.
+
+% ------------------------------------------------------------------
+\section{Indoor Scene Understanding and Semantic Datasets}
+\label{sec:soa:indoor}
+% ------------------------------------------------------------------
+
+The feasibility of semantic room capture on consumer hardware is grounded in
+a body of indoor scene understanding research that established both datasets
+and benchmarks.
+
+ScanNet~\cite{dai2017scannet}, introduced by Dai~et~al., comprises 1\,513
+RGB-D scans of real indoor environments reconstructed offline and annotated
+with per-vertex semantic labels across 20 object categories. ScanNet
+demonstrated that rich 3D semantics are achievable at scale with commodity
+depth sensors and enabled a generation of learning-based methods for 3D
+object detection, semantic segmentation, and scene completion. Crucially, it
+showed that labelled 3D structure, knowing not only where a surface is but
+also \emph{what} it is, dramatically improves downstream task performance
+compared to raw geometry alone.
+
+Matterport3D~\cite{CAS+17}, introduced by Chang~et~al., extended this to
+building scale: 90 buildings comprising 10\,800 panoramic RGB-D views and
+surface reconstructions, with instance-level semantic labels for 40
+categories. The larger scale and higher-resolution surface models of
+Matterport3D enabled research on room-level layout understanding, floor plan
+estimation, and cross-room navigation, tasks relevant to applications that
+must understand not just a single room but a home or office as a whole.
+
+These datasets established that the semantic granularity required for useful
+interior design support, distinguishing structural surfaces from furniture,
+classifying furniture by category, estimating bounding dimensions, is
+achievable in principle on real hardware at real scale. Apple's RoomPlan
+API~\cite{apple2024roomplan2} brings a consumer subset of this capability to
+supported devices, outputting a \texttt{CapturedRoom} whose typed surfaces
+and object instances reflect the same conceptual taxonomy that ScanNet and
+Matterport3D made trainable. The key difference is the deployment context:
+whereas ScanNet's pipeline required offline reconstruction and manual
+annotation over many hours, RoomPlan runs entirely on-device in real time
+during an interactive scanning session of one to three minutes.
+
+% ------------------------------------------------------------------
+\section{Dense SLAM and Volumetric Reconstruction}
+\label{sec:soa:slam}
+% ------------------------------------------------------------------
+
+The technological lineage of depth-based room capture runs through a series
+of dense simultaneous localisation and mapping (SLAM) systems that
+progressively made real-time volumetric reconstruction practical on
+increasingly constrained hardware.
+
+\textbf{KinectFusion}~\cite{newcombe2011kinectfusion}, introduced by
+Newcombe~et~al.\ at ISMAR~2011, was the first system to demonstrate
+real-time dense surface reconstruction using a consumer depth sensor. It
+represents the scene as a truncated signed distance function (TSDF) stored
+in a fixed-resolution voxel grid: each incoming depth frame updates the TSDF
+along viewing rays using a weighted running average, and a tracking step
+registers each frame to the current model using Iterative Closest Point
+(ICP) on projective depth residuals. KinectFusion established the TSDF as
+the standard representation for dense RGB-D SLAM and showed that noise in
+structured-light depth measurements averages down effectively over many
+frames, producing coherent surfaces from individually noisy observations.
+Its limitation was scale: a fixed voxel volume of, typically, $512^3$ cells
+cannot represent scenes larger than a few cubic metres without reducing
+resolution or exhausting GPU memory.
+
+\textbf{ElasticFusion}~\cite{WLS+15}, by Whelan~et~al., addressed the loop
+closure problem that arises in room-scale capture: when the sensor returns
+to a previously observed area after accumulating pose drift, the map
+develops misalignment seams. Rather than correcting these with a pose graph
+and rigid re-projection, ElasticFusion applies a non-rigid surface
+deformation to bring the entire map into global consistency when a loop is
+detected. The result is a dense, coloured surface reconstruction of
+room-scale environments without the visible discontinuities characteristic
+of pose-graph approaches.
+
+\textbf{BundleFusion}~\cite{DAN+17}, by Dai~et~al., pushed the state of
+the art further by combining dense geometric alignment with sparse
+feature-based re-localisation in a unified online optimisation. BundleFusion
+operates in real time and produces globally consistent reconstructions of
+full apartment-scale scenes through on-the-fly surface
+reintegration, re-fusing surface observations whenever a new global
+alignment is computed. It was used as the reconstruction backend for the
+ScanNet dataset~\cite{dai2017scannet}, establishing a direct link between
+the volumetric reconstruction literature and the semantic dataset research
+reviewed in Section~\ref{sec:soa:indoor}.
+
+\textbf{ORB-SLAM3}~\cite{CEG+21}, by Campos~et~al., represents the current
+state of the art in open-source visual and visual-inertial SLAM. Although
+primarily a sparse mapping system that builds a landmark-based map rather
+than a dense surface, ORB-SLAM3 is relevant here because ARKit's
+Visual-Inertial Odometry (VIO), which underpins both Object Capture and
+RoomPlan, uses structurally similar principles: a tightly coupled
+camera--IMU estimator maintaining a sliding-window bundle adjustment over
+recent keyframes. Understanding this VIO tracking layer clarifies both the
+accuracy characteristics and the failure modes of RoomPlan scans,
+particularly in textureless environments or during rapid device motion.
+
+The progression from KinectFusion~\cite{newcombe2011kinectfusion} through
+ElasticFusion~\cite{WLS+15} and BundleFusion~\cite{DAN+17} to ARKit-based
+capture represents a reduction of hardware requirements from a tethered GPU
+workstation to an iPhone held in one hand, at the cost of some geometric
+resolution and flexibility. RoomPlan adds semantic interpretation on top of
+this depth fusion foundation, trading raw surface detail for the structured,
+editable output that makes furniture replacement possible.
+
+% ------------------------------------------------------------------
+\section{Mobile AR Usability Evaluation}
+\label{sec:soa:usability}
+% ------------------------------------------------------------------
+
+The design decisions in this thesis, in particular the choice to provide a
+non-AR, persistence-first editor alongside live AR previewing, are informed
+by empirical findings on how users interact with mobile AR interior
+applications.
+
+Kandil~et~al.~\cite{kandil2021ux} conducted a comparative evaluation of
+five commercial AR interior design applications using two complementary
+instruments: the System Usability Scale (SUS) and the Handheld Augmented
+Reality Usability Scale (HARUS). SUS is a widely used 10-item Likert
+questionnaire for measuring overall perceived usability; a score above 70 is
+conventionally considered acceptable and above 85 is
+excellent~\cite{kandil2021ux}. HARUS extends SUS with items specific to
+handheld AR, addressing factors such as physical fatigue from sustained
+device holding, accuracy of virtual object placement relative to real
+geometry, and the cognitive load of simultaneously navigating real and
+virtual spaces.
+
+Kandil~et~al.\ found that across the five tested applications, the
+lowest-scoring dimensions were \emph{manipulation precision}, how
+accurately a user could position and orient a virtual object, and
+\emph{environmental awareness}, how well the AR composite preserved the
+user's spatial understanding of the real room. Both failure modes are
+directly addressed by the design of this thesis: manipulation precision
+improves when editing is performed in a stable 3D scene with a free-moving
+camera rather than in a live AR feed where the device must be held up and
+pointed; environmental awareness improves when virtual objects are grounded
+to a captured, metric room model rather than to a transiently detected floor
+plane. The study also noted that persistent project state, the ability to
+save a staging session and return to it later, was mentioned by participants
+as a desired feature absent from all evaluated applications, motivating
+Requirement~R-2 of this thesis directly.
+
+Although this thesis does not itself conduct a formal SUS/HARUS evaluation,
+the usability criteria identified by Kandil~et~al.~\cite{kandil2021ux}
+inform the non-functional requirements specified in
+Chapter~\ref{ch:requirements}, and the methodology described
+in~\cite{kandil2021ux} provides a ready-made framework for a future user
+study.
+
+% ------------------------------------------------------------------
+\section{Novel View Synthesis: From NeRF to 3D Gaussian Splatting}
+\label{sec:soa:nvs}
+% ------------------------------------------------------------------
+
+Novel-view synthesis, rendering a scene from a viewpoint not present in the
+training images, underwent a step change in 2020 with the introduction of
+Neural Radiance Fields (NeRF) by Mildenhall~et~al.~\cite{mildenhall2020nerf}.
+NeRF represents a scene as a continuous volumetric function
+$F_\Theta : (\mathbf{x}, \mathbf{d}) \mapsto (\mathbf{c}, \sigma)$
+approximated by a multi-layer perceptron (MLP), mapping a 3D position
+$\mathbf{x}$ and viewing direction $\mathbf{d}$ to colour $\mathbf{c}$ and
+volume density $\sigma$. Pixel colours are computed by numerical integration
+of the classical volume rendering equation along camera rays. Trained on a
+set of posed images, NeRF achieves previously unattained view synthesis
+quality, capturing fine view-dependent effects such as specular highlights
+and semi-transparency. The two limitations of the original formulation are
+training time (tens of hours per scene) and rendering speed (several seconds
+per frame), both of which prevent interactive use.
+
+Instant Neural Graphics Primitives (Instant-NGP)~\cite{MESK22}, introduced
+by M\"{u}ller~et~al., reduced training to seconds by replacing the MLP's
+positional encoding with a multiresolution hash grid that maps 3D positions
+to compact learned feature vectors. The MLP itself becomes shallow, the
+hash grid captures most of the spatial variation, and the total parameter
+count drops dramatically. Instant-NGP brought NeRF-quality novel-view
+synthesis within reach for interactive applications, though rendering
+remained ray-marching based and therefore not real-time on commodity
+hardware.
+
+Mip-NeRF~360~\cite{BMV+22}, by Barron~et~al., addressed quality limitations
+in unbounded indoor and outdoor scenes. Standard NeRF uses a point sample
+along each ray, which causes aliasing when the same scene element is
+observed at very different scales; Mip-NeRF~360 uses cone frustum samples
+and integrates the encoding over the cone, substantially reducing aliasing
+artefacts. It also introduces a parameterisation for unbounded scene extent
+using a contracted coordinate space. Mip-NeRF~360 currently defines one of
+the quality upper bounds against which subsequent methods, including 3DGS,
+are evaluated.
+
+\textbf{3D Gaussian Splatting} (3DGS)~\cite{kerbl20233dgs}, introduced by
+Kerbl~et~al.\ at SIGGRAPH~2023, replaces the neural implicit representation
+with an explicit cloud of anisotropic Gaussian primitives. Each primitive
+stores a mean $\boldsymbol{\mu} \in \mathbb{R}^3$, a covariance $\Sigma$
+decomposed as $\Sigma = RSS^\top R^\top$ (rotation $R$, diagonal scale $S$),
+an opacity $\alpha$, and view-dependent colour encoded as low-degree
+spherical harmonic (SH) coefficients. SH provide a compact, differentiable
+approximation to view-dependent radiance: degree-0 SH captures diffuse
+colour; higher degrees capture glossy and specular effects. Rendering
+projects each Gaussian onto the image plane via the Jacobian of the
+perspective mapping, sorts the resulting footprints by depth, and composites
+them with the standard alpha-blending operator. Because this is a
+rasterisation operation rather than ray marching, Kerbl~et~al.\ report
+rendering speeds exceeding 100\,FPS at 1080p on a desktop GPU while
+matching or exceeding Mip-NeRF~360 quality on standard
+benchmarks~\cite{kerbl20233dgs}. Training initialises from a COLMAP sparse
+point cloud, linking 3DGS directly to the Structure-from-Motion, and optimisation alternates
+gradient steps with adaptive density control: large Gaussians are split to
+capture fine detail, and nearly-transparent primitives are pruned to control
+memory.
+
+For mobile deployment, PocketGS~\cite{Guo26} demonstrates on-device 3DGS
+training on iPhone hardware, showing that the Gaussian representation is
+approaching the constraints of the platform used in this thesis. In the
+current application, training is off-device; the Metal-based renderer
+described in Chapter~\ref{ch:implementation} loads a pretrained
+\texttt{.ply} file. The architecture is designed so that if on-device
+training becomes practical, the import step can be replaced without
+modifying the renderer.
+
+% ------------------------------------------------------------------
+\section{Summary and Research Gap}
+\label{sec:soa:gap}
+% ------------------------------------------------------------------
+
+Table~\ref{tab:soa:comparison} positions this thesis against the four
+categories of related work surveyed above across dimensions that are
+directly relevant to practical interior design support on mobile hardware.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Positioning of this thesis relative to representative related
+systems. \checkmark~=~supported; $\circ$~=~partial or session-only;
+$\times$~=~not supported.}
+\label{tab:soa:comparison}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{System} &
+\makecell{\textbf{Metric}\\\textbf{room model}} &
+\textbf{Persistence} &
+\makecell{\textbf{On-device}\\\textbf{assets}} &
+\makecell{\textbf{Splat}\\\textbf{viewing}} \\
+\midrule
+IKEA Place / Wayfair AR                 & $\times$   & $\times$   & $\times$   & $\times$ \\
+K{\'a}n~et~al.~\cite{kan2021ar}         & $\circ$    & $\times$   & $\times$   & $\times$ \\
+ScanNet pipeline~\cite{dai2017scannet}  & \checkmark & \checkmark & $\times$   & $\times$ \\
+3DGS~\cite{kerbl20233dgs} (standalone) & $\times$   & \checkmark & $\times$   & \checkmark \\
+\textbf{This thesis}                    & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+The survey reveals a consistent gap: existing consumer AR tools either lack
+a structured room model entirely, or possess one but offer no interactive
+editing and no on-device asset authoring. Research systems such as the
+ScanNet reconstruction pipeline~\cite{dai2017scannet} produce high-quality
+semantic models but require offline processing pipelines unsuitable for
+end-user workflows. Procedural layout systems such as
+K{\'a}n~et~al.~\cite{kan2021ar} add design intelligence but not persistent
+capture. 3DGS toolchains~\cite{kerbl20233dgs} produce high-fidelity scene
+representations but no parametric structure suitable for furniture
+replacement.
+
+This thesis occupies the intersection: Apple's on-device
+APIs~\cite{apple2024roomplan2} provide a metric, typed room model;
+RealityKit provides an editable, persistent scene graph; Object Capture
+provides on-device photogrammetric asset authoring; and a Metal-based splat
+renderer provides a forward-looking viewing path for the Gaussian
+representation. The usability evaluation methodology of
+Kandil~et~al.~\cite{kandil2021ux} provides the framework for validating
+the result in a future formal study.

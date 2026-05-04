@@ -1,55 +1,39 @@
+// LandingView.swift
+// RoomScanTest
 //
-//  LandingView.swift
-//  RoomScanTest
-//
-//  Created by Mara Ielciu on 16.02.2026.
-//
-//  Local mode: bottom tab bar (Furniture, Rooms, Projects) + Marketplace in toolbar.
-//
+// Local mode root: floating pill tab bar, static background.
 
 import SwiftUI
 
-// MARK: - Local Landing View (bottom tab bar + Marketplace)
+// MARK: - Local Landing View
 
-/// Main local-mode root. Same structure as MarketplaceTabRoot: VStack(content + tabBar) inside NavigationView.
 struct LocalLandingView: View {
-    var switchMode: () -> Void
-
     @EnvironmentObject var userManager: UserManager
     @State private var selectedTab: MainTab = .rooms
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                MainTabContent(selectedTab: selectedTab, switchMode: switchMode)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                MainTabBar(selection: $selectedTab)
-            }
-            .background(Color(hex: 0x0B0D17))
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: switchMode) {
-                        Image(systemName: "globe")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(AppTheme.accentGradientInline)
-                    }
-                    .accessibilityLabel("Switch to Marketplace")
+        // Tab roots set their own title display mode (lists use `.inline` so titles stay visible).
+        NavigationStack {
+            MainTabContent(selectedTab: selectedTab)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.background.ignoresSafeArea())
+                .safeAreaInset(edge: .bottom) {
+                    MainTabBar(selection: $selectedTab)
+                        .padding(.bottom, 20)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.clear)
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.60), for: .navigationBar)
-            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                .toolbarBackground(AppTheme.background, for: .navigationBar)
+                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .navigationViewStyle(.stack)
     }
 }
 
-// MARK: - Tab content (Furniture / Rooms / Projects)
+// MARK: - Tab content
 
 private struct MainTabContent: View {
     let selectedTab: MainTab
-    let switchMode: () -> Void
 
     var body: some View {
         Group {
@@ -59,17 +43,14 @@ private struct MainTabContent: View {
             case .projects:  ProjectListView()
             }
         }
-        .id(selectedTab)
         .animation(nil, value: selectedTab)
         .transaction { t in t.disablesAnimations = true }
     }
 }
 
-// MARK: - Legacy full-screen landing (kept for preview / reuse if needed)
+// MARK: - Legacy landing (kept for preview reuse)
 
 struct LandingView: View {
-    var switchMode: (() -> Void)? = nil
-
     @EnvironmentObject var userManager: UserManager
     @State private var showUserSelection = false
     @State private var logoScale: CGFloat = 0.6
@@ -79,33 +60,35 @@ struct LandingView: View {
 
     var body: some View {
         ZStack {
-            AnimatedMeshBackground()
+            // Static background on content screens
+            AppTheme.background.ignoresSafeArea()
+
             VStack(spacing: 0) {
                 Spacer()
+
                 VStack(spacing: 16) {
                     ZStack {
                         Circle()
-                            .fill(AppTheme.glowCyan.opacity(0.12))
+                            .fill(AppTheme.accentMuted)
                             .frame(width: 140, height: 140)
                             .blur(radius: 30)
                         Image(systemName: "cube.transparent.fill")
                             .font(.system(size: 48, weight: .light))
-                            .foregroundStyle(AppTheme.accentGradientInline)
+                            .foregroundStyle(AppTheme.accentGradient)
                             .frame(width: 100, height: 100)
-                            .background(.ultraThinMaterial)
+                            .background(AppTheme.surfacePrimary)
                             .clipShape(Circle())
                             .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [Color.white.opacity(0.25), Color.white.opacity(0.05)],
-                                            startPoint: .topLeading, endPoint: .bottomTrailing
-                                        ), lineWidth: 1
-                                    )
+                                Circle().strokeBorder(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.20), Color.white.opacity(0.04)],
+                                        startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    lineWidth: 1)
                             )
                     }
                     .scaleEffect(logoScale)
                     .opacity(logoOpacity)
+
                     VStack(spacing: 8) {
                         Text("Room Designer")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -116,89 +99,98 @@ struct LandingView: View {
                     }
                     .opacity(logoOpacity)
                 }
+
                 Spacer().frame(height: 48)
+
                 if let user = userManager.currentUser {
                     Button(action: { showUserSelection = true }) {
                         HStack(spacing: 10) {
                             Image(systemName: "person.crop.circle.fill")
-                                .foregroundStyle(AppTheme.accentGradientInline)
+                                .foregroundStyle(AppTheme.accentGradient)
                             Text(user.name)
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(AppTheme.primaryText)
                             Spacer()
                             Text("Switch")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(AppTheme.glowCyan)
+                                .font(.appCaption2.weight(.semibold))
+                                .foregroundColor(AppTheme.accentLight)
                         }
-                        .font(.subheadline)
+                        .font(.appCallout)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 12)
-                        .glassCard(cornerRadius: 14)
+                        .classicCard(cornerRadius: 14)
                     }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 36)
                     .opacity(buttonsOpacity)
                     .offset(y: buttonsOffset)
                 }
+
                 Spacer()
-                VStack(spacing: 14) {
+
+                VStack(spacing: 12) {
                     NavigationLink(destination: RoomListView()) {
-                        landingCard(icon: "house.fill", iconTint: AppTheme.glowCyan, title: "My Rooms", subtitle: "View & edit scanned rooms")
+                        landingCard(icon: "house.fill", tint: AppTheme.accent,
+                                    title: "My Rooms", subtitle: "View & edit scanned rooms")
                     }
                     NavigationLink(destination: FurnitureLibraryView()) {
-                        landingCard(icon: "cube.fill", iconTint: AppTheme.glowBlue, title: "My Furniture", subtitle: "Scanned models & built-in library")
+                        landingCard(icon: "cube.fill", tint: AppTheme.accentLight,
+                                    title: "My Furniture", subtitle: "Scanned models & built-in library")
                     }
                     NavigationLink(destination: ProjectListView()) {
-                        landingCard(icon: "folder.fill", iconTint: AppTheme.glowGreen, title: "My Projects", subtitle: "Group rooms into multi-room projects")
+                        landingCard(icon: "folder.fill", tint: AppTheme.glowGreen,
+                                    title: "My Projects", subtitle: "Group rooms into projects")
                     }
                 }
                 .padding(.horizontal, 24)
                 .opacity(buttonsOpacity)
                 .offset(y: buttonsOffset)
+
                 Spacer().frame(height: 50)
             }
         }
         .sheet(isPresented: $showUserSelection) { UserSelectionView() }
         .onAppear {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.7).delay(0.1)) {
-                logoScale = 1.0
-                logoOpacity = 1.0
+                logoScale = 1.0; logoOpacity = 1.0
             }
             withAnimation(.easeOut(duration: 0.6).delay(0.35)) {
-                buttonsOffset = 0
-                buttonsOpacity = 1.0
+                buttonsOffset = 0; buttonsOpacity = 1.0
             }
         }
     }
 
-    private func landingCard(icon: String, iconTint: Color, title: String, subtitle: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(iconTint)
-                .frame(width: 40, height: 40)
-                .background(iconTint.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 2) {
+    private func landingCard(icon: String, tint: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(tint.opacity(0.14))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(tint)
+            }
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.headline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .font(.appHeadline)
+                    .foregroundColor(AppTheme.primaryText)
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(AppTheme.secondaryText)
+                    .font(.appCaption)
+                    .foregroundColor(AppTheme.tertiaryText)
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(AppTheme.tertiaryText)
         }
         .padding(16)
-        .glassCard(cornerRadius: AppTheme.cornerRadius)
+        .classicCard(cornerRadius: AppTheme.cornerRadius)
     }
 }
 
 #Preview("Tab bar") {
     let userManager = UserManager()
     let roomManager = RoomManager(userManager: userManager)
-    return LocalLandingView(switchMode: {})
+    return LocalLandingView()
         .environmentObject(userManager)
         .environmentObject(FurnitureCatalogManager())
         .environmentObject(ScannedFurnitureManager(userManager: userManager))
@@ -208,8 +200,5 @@ struct LandingView: View {
 }
 
 #Preview("Legacy landing") {
-    NavigationView {
-        LandingView()
-            .environmentObject(UserManager())
-    }
+    NavigationView { LandingView().environmentObject(UserManager()) }
 }

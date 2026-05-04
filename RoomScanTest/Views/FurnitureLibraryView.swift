@@ -15,6 +15,7 @@ struct FurnitureLibraryView: View {
     @EnvironmentObject var catalogManager: FurnitureCatalogManager
     @EnvironmentObject var scannedFurnitureManager: ScannedFurnitureManager
     @State private var showObjectScan = false
+    @State private var showSHARPCapture = false
     @State private var showImportSplat = false
     @State private var importTargetItem: ScannedFurniture?
     @State private var selectedTab: LibraryTab = .scanned
@@ -30,32 +31,43 @@ struct FurnitureLibraryView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Segmented picker (same top padding as Rooms page content) ──
+                // ── Segmented picker ─────────────────────────────────────────
                 HStack(spacing: 6) {
                     ForEach(LibraryTab.allCases, id: \.self) { tab in
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
                         } label: {
                             Text(tab.rawValue)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.appCallout.weight(.semibold))
                                 .foregroundColor(selectedTab == tab ? .white : AppTheme.secondaryText)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
                                 .background(
                                     selectedTab == tab
-                                    ? AnyShapeStyle(AppTheme.accentGradientInline)
-                                    : AnyShapeStyle(Color.white.opacity(0.06))
+                                    ? AnyShapeStyle(AppTheme.accentGradient)
+                                    : AnyShapeStyle(AppTheme.surfaceTertiary)
                                 )
                                 .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().strokeBorder(
+                                        selectedTab == tab
+                                        ? Color.clear
+                                        : Color.white.opacity(0.08), lineWidth: 1)
+                                )
                         }
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
+                .background(AppTheme.background)
+                .overlay(alignment: .bottom) {
+                    Divider().background(Color.white.opacity(0.07))
+                }
 
                 switch selectedTab {
                 case .scanned: scannedSection
@@ -66,20 +78,36 @@ struct FurnitureLibraryView: View {
         .navigationTitle("My Furniture")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
+        .toolbarBackground(AppTheme.background, for: .navigationBar)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showObjectScan = true }) {
+                Menu {
+                    Button {
+                        showObjectScan = true
+                    } label: {
+                        Label("Object Capture scan", systemImage: "cube.transparent")
+                    }
+                    Button {
+                        showSHARPCapture = true
+                    } label: {
+                        Label("SHARP — one photo splat", systemImage: "sparkles")
+                    }
+                } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 22))
                         .foregroundStyle(AppTheme.accentGradientInline)
                 }
-                .accessibilityLabel("New scan")
+                .accessibilityLabel("New scan or SHARP capture")
             }
         }
         .fullScreenCover(isPresented: $showObjectScan) {
             ObjectScanView(onDismiss: { showObjectScan = false })
+        }
+        .fullScreenCover(isPresented: $showSHARPCapture) {
+            NavigationStack {
+                SHARPCaptureView()
+            }
         }
         .fileImporter(
             isPresented: $showImportSplat,
@@ -173,37 +201,13 @@ struct FurnitureLibraryView: View {
     }
 
     private var scannedEmptyState: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(AppTheme.glowCyan.opacity(0.10))
-                    .frame(width: 110, height: 110)
-                    .blur(radius: 28)
-                Image(systemName: "cube.transparent")
-                    .font(.system(size: 48))
-                    .foregroundStyle(AppTheme.accentGradientInline)
-            }
-
-            Text("No Scanned Objects")
-                .font(.title3.weight(.bold))
-                .foregroundColor(.white)
-
-            Text("Scan real-world furniture to create\n3D models you can place in any room.")
-                .font(.subheadline)
-                .foregroundColor(AppTheme.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Button(action: { showObjectScan = true }) {
-                Label("Scan Your First Object", systemImage: "camera.fill")
-            }
-            .buttonStyle(GradientButtonStyle())
-            .padding(.top, 8)
-
-            Spacer()
-        }
+        AppEmptyState(
+            icon: "cube.transparent",
+            title: "No Scanned Objects",
+            message: "Scan real-world furniture to create\n3D models you can place in any room.",
+            ctaLabel: "Scan Your First Object",
+            action: { showObjectScan = true }
+        )
     }
 
     // MARK: - Built-in models tab
@@ -233,122 +237,70 @@ struct ScannedFurnitureRow: View {
         HStack(spacing: 14) {
             // 3D thumbnail
             ZStack(alignment: .bottomTrailing) {
-                USDZThumbnailView(
-                    url: item.usdzURL,
-                    size: CGSize(width: 56, height: 56)
-                )
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(AppTheme.glowCyan.opacity(0.08))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                USDZThumbnailView(url: item.usdzURL, size: CGSize(width: 54, height: 54))
+                    .background(AppTheme.surfaceSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
 
-                // Splat indicator badge
                 if item.hasSplat {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
                         .padding(3)
                         .background(AppTheme.glowGreen)
                         .clipShape(Circle())
-                        .offset(x: 4, y: 4)
+                        .offset(x: 3, y: 3)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(item.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .font(.appHeadline)
+                    .foregroundColor(AppTheme.primaryText)
 
-                HStack(spacing: 6) {
-                    Text(item.category.capitalized)
-                        .font(.caption2.weight(.medium))
-                        .foregroundColor(AppTheme.glowCyan)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(AppTheme.glowCyan.opacity(0.12))
-                        .clipShape(Capsule())
-
-                    // Reconstruction method badges
-                    HStack(spacing: 3) {
-                        Image(systemName: "cube.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.blue)
-                        Text("OC")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.blue.opacity(0.12))
-                    .clipShape(Capsule())
-
+                HStack(spacing: 5) {
+                    StatusChip(label: item.category.capitalized, color: AppTheme.accentLight)
+                    StatusChip(label: "OC", color: AppTheme.accent)
                     if item.hasSplat {
-                        HStack(spacing: 3) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 8))
-                                .foregroundColor(AppTheme.glowGreen)
-                            Text("3DGS")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(AppTheme.glowGreen)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(AppTheme.glowGreen.opacity(0.12))
-                        .clipShape(Capsule())
+                        StatusChip(label: "3DGS", color: AppTheme.glowGreen)
                     }
                 }
 
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     Text(item.formattedSize)
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.tertiaryText)
-
-                    if item.hasSplat {
-                        Text("• \(item.formattedSplatSize) splat")
-                            .font(.caption2)
-                            .foregroundColor(AppTheme.tertiaryText)
-                    }
-
-                    Text("•")
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.tertiaryText)
-
-                    Text(item.createdAt, style: .date)
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.tertiaryText)
+                    if item.hasSplat { Text("· \(item.formattedSplatSize) splat") }
+                    Text("· \(item.createdAt.formatted(date: .abbreviated, time: .omitted))")
                 }
+                .font(.appCaption2)
+                .foregroundColor(AppTheme.tertiaryText)
             }
 
             Spacer()
 
             VStack(spacing: 8) {
-                // Import splat button (if no splat yet)
                 if !item.hasSplat, let onImportSplat {
                     Button(action: onImportSplat) {
                         Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundColor(AppTheme.glowGreen.opacity(0.7))
-                            .padding(8)
-                            .background(AppTheme.glowGreen.opacity(0.10))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.glowGreen)
+                            .frame(width: 32, height: 32)
+                            .background(AppTheme.glowGreen.opacity(0.12))
                             .clipShape(Circle())
                     }
                 }
-
                 if let onDelete {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundColor(AppTheme.glowRed.opacity(0.7))
-                            .padding(8)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.glowRed)
+                            .frame(width: 32, height: 32)
                             .background(AppTheme.glowRed.opacity(0.10))
                             .clipShape(Circle())
                     }
                 }
             }
         }
-        .padding(12)
-        .glassCard(cornerRadius: AppTheme.cardCornerRadius)
+        .padding(14)
+        .classicCard(cornerRadius: AppTheme.cardCornerRadius)
     }
 }
 
@@ -372,7 +324,7 @@ struct BuiltInModelCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .padding(.horizontal, 8)
-        .glassCard(cornerRadius: AppTheme.cardCornerRadius)
+        .classicCard(cornerRadius: AppTheme.cardCornerRadius)
     }
 }
 

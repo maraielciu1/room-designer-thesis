@@ -1,20 +1,23 @@
-% ═══════════════════════════════════════════════════════════════════════════
-%  CHAPTER 6 — CONCLUSIONS
-% ═══════════════════════════════════════════════════════════════════════════
+% \chapter{Concluzii}
+% %\chapter*{Concluzii}
+% \label{conclusions}
 
+% \par Concluzii ...
 \chapter{Conclusions}
 \label{ch:conclusions}
 
-This thesis presented an augmented reality-based interior design application that combines parametric room scanning (Room Plan), object-scale capture (Object Capture), and support for 3D Gaussian Splatting reconstructions. The theoretical foundations covered photogrammetry, Object Capture, Room Plan, and 3D Gaussian Splatting; the implementation integrated these technologies in a single iOS application with a persistent 3D room editor and furniture replacement workflow.
+This thesis investigated how a commodity iOS device can support \textbf{interior design preview} through \textbf{parametric room capture}, \textbf{mesh-based editing}, and optional \textbf{plenoptic visualisation}. The theoretical chapters argued that Apple's Object Capture instantiates a classical \textbf{photogrammetric} chain (features, SfM, MVS-class dense matching, Poisson-class surface reconstruction, texturing), whereas RoomPlan builds on \textbf{depth fusion} and learning to emit a structured \texttt{CapturedRoom}. The second theory chapter positioned \textbf{3D Gaussian Splatting} \cite{kerbl20233dgs} as a real-time differentiable alternative to meshes for \emph{viewing}, not for CAD-style furniture replacement.
 
-\section{Summary of Contributions}
+\section{Summary of Results}
 
-\begin{itemize}
-    \item Integration of Room Plan for semantically annotated, parametric room models and of Object Capture for textured USDZ object models.
-    \item A non-AR 3D room editor with gesture-based manipulation and persistence, allowing users to replace detected furniture with virtual models.
-    \item Support for viewing and comparing 3D Gaussian Splatting reconstructions (import of \texttt{.ply} and Metal-based rendering) alongside mesh-based Object Capture output.
-\end{itemize}
+The software artefact demonstrates a coherent pipeline: \textbf{RoomPlan} $\rightarrow$ serialised scan $\rightarrow$ \textbf{RealityKit} editor $\rightarrow$ USDZ replacements with gestures $\rightarrow$ persistence across sessions. \textbf{Object Capture} extends asset authoring; a \textbf{Metal} splat renderer implements R-7 for imported \texttt{.ply} data. Requirements R-1--R-7 (and associated non-functional goals) are addressed at the design level in Chapter~\ref{ch:requirements} and at the code level in Chapter~\ref{ch:implementation}.
 
-\section{Limitations and Future Work}
+\section{Limitations}
 
-Limitations include the dependency on Apple frameworks and LiDAR-capable devices for best room scanning results, and the fact that 3DGS training is performed off-device. Future work may address on-device 3DGS training, improved level-of-detail for large splat scenes, and extended semantic editing of the room model.
+Accuracy is bounded by RoomPlan detection quality, photogrammetry assumptions in Object Capture, and the lack of closed-loop feedback between splats and parametric room semantics. 3DGS training remains external; real-time splat \emph{training} on device is research-grade \cite{Guo26}. Usability has not been quantified with SUS/HARUS in this thesis text; Kandil et al.\ \cite{kandil2021ux} provide a methodology for a future study.
+
+\section{Future Work}
+
+Promising extensions include: formal user evaluation; tighter integration between exported scan images and external COLMAP/3DGS pipelines; level-of-detail for large splats; semantic suggestions informed by work such as K\'an et al.\ \cite{kan2021ar} Mithun et al. \cite{Geo2023} demonstrate that synthetic datasets with rich semantic labels can substantially improve indoor scene understanding for AR applications, a direction complementary to the real-scan approach taken here.
+
+The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware.

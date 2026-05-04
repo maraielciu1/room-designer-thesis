@@ -7,6 +7,17 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 
+% Optional figures: place PNG/PDF under ./figures/ (see THESIS_FIGURES.md).
+% Compile from the directory that contains the figures/ folder (project root).
+% If the file is missing, no \includegraphics runs (avoids pdftex.def ``not found'' errors).
+\newcommand{\thesisfig}[2]{%
+  \IfFileExists{#2}{%
+    \includegraphics[width=#1]{#2}%
+  }{%
+    \fbox{\parbox{#1}{\centering\vspace{1.1cm}\footnotesize\textit{Add file:} \texttt{\detokenize{#2}}\vspace{1.1cm}}}%
+  }%
+}
+
 %\geometry{a4paper,top=2.5cm,left=3cm,right=2.5cm,bottom=2.5cm}
 %in style
 %controlling the appearance of your headers and footers
@@ -41,7 +52,9 @@ ABSTRACT
 \vspace{0.5cm}	
 %\cleardoublepage
 
-Abstract: un rezumat în limba engleză cu prezentarea, pe scurt, a conținutului pe capitole, punând accent pe contribuțiile proprii și originalitate
+This bachelor thesis presents an iOS application for augmented reality--based interior design. Users scan a real room with Apple's RoomPlan API to obtain a parametric, semantically labelled model (\texttt{CapturedRoom}: walls, doors, windows, and detected furniture with metric dimensions). The scan is loaded into a non-AR three-dimensional editor built with RealityKit, where detected furniture can be replaced with USDZ models from a library or produced by Object Capture's on-device photogrammetry pipeline. Edits persist locally (JSON scan data under the app Documents directory, Codable room models). The project also supports importing pretrained 3D Gaussian Splatting assets (\texttt{.ply}) and viewing them with a custom Metal renderer, enabling visual comparison with mesh-based reconstruction.
+
+Chapter~2 reviews photogrammetry (structure from motion, multi-view stereo, Poisson surface reconstruction), depth fusion via truncated signed distance functions, and how Object Capture versus RoomPlan map onto image-based versus depth-assisted reconstruction. Chapter~3 summarises 3D Gaussian Splatting: Gaussian primitives, projection and splatting, differentiable optimisation, and why meshes remain preferable for interactive furniture replacement. Chapters~4 and~5 state requirements and describe the software architecture (SwiftUI, MVVM-oriented structure, major views and services), data flow, and testing. The main contribution is an integrated, on-device workflow from room scan to persistent, editable virtual staging, with an optional path to plenoptic visualisation via 3DGS imports.
 
 
 
@@ -71,6 +84,7 @@ User experience in mobile AR interior design applications has been studied to im
 \input{chapters/chapter2}
 \input{chapters/chapter3}
 \input{chapters/chapter4}
+\input{chapters/chapter5_implementation}
 
 \input{chapters/chapter6_conclusions}
 %\addcontentsline{toc}{chapter}{Concluzii}

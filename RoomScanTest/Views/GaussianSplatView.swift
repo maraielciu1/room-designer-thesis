@@ -49,18 +49,6 @@ struct GaussianSplatView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .glassCard(cornerRadius: 12)
-
-                        Spacer()
-
-                        Button {
-                            renderer.frameCenterRegion(zoomFactor: 0.4)
-                        } label: {
-                            Label("Focus on object", systemImage: "scope")
-                                .font(.caption.weight(.medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(AppTheme.glowGreen)
-                        .padding(.trailing, 16)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)

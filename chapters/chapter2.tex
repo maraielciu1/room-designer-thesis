@@ -1,82 +1,248 @@
-% ═══════════════════════════════════════════════════════════════════════════
-%  CHAPTER 2 — THEORETICAL FOUNDATIONS I: CAPTURE AND RECONSTRUCTION
-% ═══════════════════════════════════════════════════════════════════════════
+% % ═══════════════════════════════════════════════════════════════════════════
+% %  CHAPTER 2 — THEORETICAL FOUNDATIONS I: CAPTURE AND RECONSTRUCTION
+% % ═══════════════════════════════════════════════════════════════════════════
 
-\chapter{Theoretical Foundations I: Capture and Reconstruction}
+% \chapter{Theoretical Foundations I: Capture and Reconstruction}
+% \label{ch:theory1}
+
+% This chapter presents the motivation for the thesis and the theoretical background for the main capture and reconstruction technologies used in the application: photogrammetry, Object Capture, and Room Plan.
+
+% % ---------------------------------------------------------------------------
+% \section{Motivation for the Work}
+% \label{sec:motivation}
+
+% Interior design decisions benefit from seeing furniture and finishes in context. Traditional tools---floor plans, mood boards, physical samples---do not provide a spatially accurate, immersive preview. Augmented reality (AR) can overlay virtual content onto the real world, but many AR interior design applications require the user to remain in the space with the device pointed at the room. A \emph{persistent}, \emph{editable} 3D model of the room, obtained once by scanning, allows users to explore design options at any time and from anywhere.
+
+% Indoor scene understanding and 3D reconstruction have been central to computer vision research. ScanNet \cite{dai2017scannet} established the importance of combining geometric reconstruction with semantic labelling (walls, furniture, openings) for applications such as robotics and spatial reasoning. The present application aligns with this direction by leveraging Apple's Room Plan to produce a parametric, semantically annotated room model from a consumer device. The use of AR for interior design has been explored in both industry and academia: K\'an et al.\ \cite{kan2021ar} present an AR system for automatic interior design with a recommender component and report positive user feedback. This thesis extends that idea by allowing users not only to place virtual furniture but to \emph{replace} detected real furniture in a reconstructed 3D scene, supporting ``what-if'' redesign tied to the current room layout. User experience in mobile AR has been studied by Kandil et al.\ \cite{kandil2021ux}, who underline the need for clear onboarding, stable tracking, and intuitive manipulation---addressed in this application through Room Plan's guided scanning, RealityKit's rendering, and SwiftUI's declarative interface.
+
+% The application therefore combines \textbf{room-scale} capture (Room Plan) for a parametric room model and \textbf{object-scale} capture (Object Capture) for individual 3D assets, both rooted in the same underlying principles: recovering 3D structure from images and sensors (photogrammetry and depth fusion). The following sections introduce these foundations.
+
+% % ---------------------------------------------------------------------------
+% \section{Photogrammetry}
+% \label{sec:photogrammetry}
+
+% \subsection{Definition and Principle}
+
+% \textbf{Photogrammetry} is the science and technology of obtaining reliable information about physical objects and the environment through the process of recording, measuring, and interpreting photographic images \cite{luhmann2014photogrammetry}. In the context of 3D reconstruction, the goal is to recover the three-dimensional shape of a scene or object from multiple overlapping two-dimensional images.
+
+% The core idea is \textbf{triangulation}: if the same 3D point is visible in two or more images, and the camera poses (position and orientation) for each image are known, the 3D position of the point can be computed by intersecting the rays from each camera centre through the corresponding 2D image points. For this to work, images must have sufficient \textbf{overlap} and \textbf{parallax}---different viewpoints so that corresponding points are observed from different directions.
+
+% \subsection{Pipeline Overview}
+
+% A typical photogrammetric pipeline for 3D reconstruction includes the following stages:
+
+% \begin{enumerate}
+%     \item \textbf{Feature detection and matching}: Local, distinctive features (e.g.\ scale-invariant keypoints such as SIFT \cite{lowe2004sift}) are detected in each image. Correspondences are established between images by matching feature descriptors. This yields a set of 2D point correspondences across image pairs.
+
+%     \item \textbf{Structure from Motion (SfM)}: From the 2D correspondences, the pipeline estimates camera poses and a \emph{sparse} 3D point cloud. Triangulation gives initial 3D points; \textbf{bundle adjustment} (non-linear least squares) jointly refines camera parameters and 3D point positions to minimise reprojection error. The result is a sparse reconstruction with known camera poses.
+
+%     \item \textbf{Multi-View Stereo (MVS)}: The sparse point cloud is \emph{densified} by estimating depth at many more pixels. For each pixel in each image, depth is estimated by searching for photometric consistency across neighbouring views \cite{furukawa2010pmvs}. The result is a dense point cloud or set of depth maps.
+
+%     \item \textbf{Surface reconstruction}: The dense point cloud is converted into a continuous surface, typically a triangle mesh. Common methods include \textbf{Poisson surface reconstruction} \cite{kazhdan2006poisson}, which fits an implicit function to the oriented points and then extracts a mesh (e.g.\ via Marching Cubes).
+
+%     \item \textbf{Texture mapping}: The mesh is parameterised (UV unwrapped), and colours from the source images are projected onto the surface and blended to produce a textured 3D model.
+% \end{enumerate}
+
+% These stages form the conceptual backbone of both classical photogrammetry software and modern on-device pipelines such as Apple's Object Capture, which is discussed in Section~\ref{sec:object_capture_roomplan}.
+
+% % ---------------------------------------------------------------------------
+% \section{Object Capture and Room Plan}
+% \label{sec:object_capture_roomplan}
+
+% The application uses two Apple frameworks that build on photogrammetry and depth-based scene understanding: \textbf{Object Capture} for individual objects and \textbf{Room Plan} for entire rooms. Both run on-device and integrate with ARKit for tracking and, where available, LiDAR for depth.
+
+% \subsection{Object Capture}
+
+% \textbf{Object Capture} (Apple, iOS 17+) enables users to scan a single real-world object and obtain a textured 3D model in USDZ format. It exposes \texttt{ObjectCaptureSession} and \texttt{PhotogrammetrySession}.
+
+% \begin{itemize}
+%     \item \textbf{ObjectCaptureSession}: Guides the user to capture overlapping photographs of the object from multiple viewpoints. The session uses ARKit's tracking to estimate camera poses and provides real-time feedback on coverage (e.g.\ ``move to uncovered area''). Images are stored on the device for processing.
+
+%     \item \textbf{PhotogrammetrySession}: Implements the photogrammetry pipeline on-device. It takes the captured images (and optionally the poses from the session) and runs feature detection and matching, SfM, multi-view stereo, Poisson surface reconstruction, and texture mapping. The output is a textured mesh in USDZ format, suitable for use in RealityKit and the room editor.
+% \end{itemize}
+
+% Object Capture is thus an \emph{object-scale} application of the photogrammetry pipeline described in Section~\ref{sec:photogrammetry}, with a guided capture flow and on-device processing for privacy and portability.
+
+% \subsection{Room Plan}
+
+% \textbf{Room Plan} (Apple, iOS 16+) is a high-level framework for scanning and reconstructing \emph{indoor rooms} in a parametric, semantically annotated form. It builds on ARKit's world tracking, plane detection, and scene mesh (e.g.\ TSDF-based fusion on LiDAR devices).
+
+% Room Plan does not output a generic dense mesh; instead, it produces a \textbf{parametric room model}:
+
+% \begin{itemize}
+%     \item \textbf{Structural elements}: Walls (with position, orientation, dimensions), floors, ceilings, doors, and windows. Each is represented as a structured element with a transform and size (e.g.\ width and height).
+
+%     \item \textbf{Furniture and fixtures}: Detected objects are classified into categories (e.g.\ chair, sofa, table, bed, storage, television, sink) and represented with a 4$\times$4 transform (position, orientation, scale) and axis-aligned dimensions (width, height, depth) in metres.
+% \end{itemize}
+
+% The output is a \texttt{CapturedRoom} data structure containing lists of walls, floors, doors, windows, and objects. This representation is \emph{editable} and \emph{dimensionally accurate}: the application uses it to place virtual replacement furniture at the same locations and scales as the detected real furniture. Room Plan relies on on-device neural networks (e.g.\ for semantic segmentation and object detection) running on the Apple Neural Engine, and requires no cloud processing.
+
+% \subsection{Relation to Photogrammetry and Depth}
+
+% Room Plan combines \textbf{depth} (LiDAR and/or stereo) with \textbf{visual} information. The geometric reconstruction (planes, mesh) is driven by depth fusion (e.g.\ TSDF); the semantic labelling and parametric fitting (walls, doors, objects) use learned models. Object Capture is primarily \textbf{image-based} photogrammetry (SfM + MVS + Poisson), with ARKit poses optionally aiding the pipeline. Together, Object Capture and Room Plan cover object-scale and room-scale capture, which the application unifies in a single workflow: scan the room with Room Plan, optionally scan individual objects with Object Capture, and edit the room in the 3D editor with replacement models.
+\chapter{Photogrammetry, Depth Fusion, and Apple Capture APIs}
 \label{ch:theory1}
 
-This chapter presents the motivation for the thesis and the theoretical background for the main capture and reconstruction technologies used in the application: photogrammetry, Object Capture, and Room Plan.
+This chapter explains the geometric and algorithmic ideas behind the capture pipelines used in the thesis application. It first reviews \textbf{photogrammetry} and the classical chain \textbf{structure from motion (SfM) $\rightarrow$ multi-view stereo (MVS) $\rightarrow$ Poisson surface reconstruction} \cite{luhmann2014photogrammetry,lowe2004sift,furukawa2010pmvs,kazhdan2006poisson}. It then describes \textbf{depth fusion} with a \textbf{truncated signed distance function (TSDF)} as used in real-time RGB-D and LiDAR systems \cite{newcombe2011kinectfusion}, which underpins ARKit-style scene meshes that RoomPlan builds upon. A comparison between \textbf{image-only} object reconstruction and \textbf{depth-assisted} room understanding clarifies why Object Capture and RoomPlan behave differently. Finally, the chapter maps these ideas to Apple's \textbf{Object Capture} and \textbf{RoomPlan} APIs, documents the \texttt{CapturedRoom} data model, and summarises related work in AR interior design and usability evaluation.
 
-% ---------------------------------------------------------------------------
-\section{Motivation for the Work}
+\section{Motivation}
 \label{sec:motivation}
 
-Interior design decisions benefit from seeing furniture and finishes in context. Traditional tools---floor plans, mood boards, physical samples---do not provide a spatially accurate, immersive preview. Augmented reality (AR) can overlay virtual content onto the real world, but many AR interior design applications require the user to remain in the space with the device pointed at the room. A \emph{persistent}, \emph{editable} 3D model of the room, obtained once by scanning, allows users to explore design options at any time and from anywhere.
+Users redesign interiors more confidently when they can \textbf{see} alternatives in context. Traditional representations (2D plans, catalog photos, or material swatches) omit depth, occlusion, and the relation between existing objects and new ones. Augmented reality can composite virtual furniture into a live video stream, but that mode ties the experience to being physically present and holding the device. If the room is first captured as a structured 3D model, the user can reopen and edit that model later: the scan becomes a \textbf{persistent spatial substrate} for experimentation.
 
-Indoor scene understanding and 3D reconstruction have been central to computer vision research. ScanNet \cite{dai2017scannet} established the importance of combining geometric reconstruction with semantic labelling (walls, furniture, openings) for applications such as robotics and spatial reasoning. The present application aligns with this direction by leveraging Apple's Room Plan to produce a parametric, semantically annotated room model from a consumer device. The use of AR for interior design has been explored in both industry and academia: K\'an et al.\ \cite{kan2021ar} present an AR system for automatic interior design with a recommender component and report positive user feedback. This thesis extends that idea by allowing users not only to place virtual furniture but to \emph{replace} detected real furniture in a reconstructed 3D scene, supporting ``what-if'' redesign tied to the current room layout. User experience in mobile AR has been studied by Kandil et al.\ \cite{kandil2021ux}, who underline the need for clear onboarding, stable tracking, and intuitive manipulation---addressed in this application through Room Plan's guided scanning, RealityKit's rendering, and SwiftUI's declarative interface.
+Research datasets such as ScanNet \cite{dai2017scannet} demonstrated that indoor applications benefit from joint \textbf{geometry} and \textbf{semantics} (which surfaces are walls, which objects are chairs or tables). RoomPlan brings a consumer subset of that idea to supported iPhones and iPads: it outputs not only geometry but labelled entities with rough dimensions. This thesis uses that output as the basis for \textbf{furniture replacement}, substituting USDZ models for detected instances, which goes beyond merely placing a free-floating object on a manually identified floor plane.
 
-The application therefore combines \textbf{room-scale} capture (Room Plan) for a parametric room model and \textbf{object-scale} capture (Object Capture) for individual 3D assets, both rooted in the same underlying principles: recovering 3D structure from images and sensors (photogrammetry and depth fusion). The following sections introduce these foundations.
-
-% ---------------------------------------------------------------------------
-\section{Photogrammetry}
+\section{Photogrammetry and the Classical Reconstruction Pipeline}
 \label{sec:photogrammetry}
 
-\subsection{Definition and Principle}
+\subsection{Definition and triangulation}
 
-\textbf{Photogrammetry} is the science and technology of obtaining reliable information about physical objects and the environment through the process of recording, measuring, and interpreting photographic images \cite{luhmann2014photogrammetry}. In the context of 3D reconstruction, the goal is to recover the three-dimensional shape of a scene or object from multiple overlapping two-dimensional images.
+\textbf{Photogrammetry} is the discipline of extracting metric information from photographs \cite{luhmann2014photogrammetry}. In 3D reconstruction, the elementary geometric operation is \textbf{triangulation}: corresponding points in two or more calibrated images determine a 3D point by intersecting rays. Stable triangulation requires \textbf{baseline} between cameras and sufficient \textbf{overlap} so that the same surface points appear in multiple views.
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.82\textwidth}{figures/ch2_photogrammetry_concept.png}
+\caption{Conceptual photogrammetry model: multi-view image observations, camera parameters, and additional constraints used to estimate 3D coordinates.}
+\label{fig:ch2_photo_concept}
+\end{figure}
 
-The core idea is \textbf{triangulation}: if the same 3D point is visible in two or more images, and the camera poses (position and orientation) for each image are known, the 3D position of the point can be computed by intersecting the rays from each camera centre through the corresponding 2D image points. For this to work, images must have sufficient \textbf{overlap} and \textbf{parallax}---different viewpoints so that corresponding points are observed from different directions.
+\subsection{From features to textured mesh}
 
-\subsection{Pipeline Overview}
-
-A typical photogrammetric pipeline for 3D reconstruction includes the following stages:
+A widely used multi-view pipeline proceeds in stages \cite{luhmann2014photogrammetry,lowe2004sift,furukawa2010pmvs,kazhdan2006poisson}:
 
 \begin{enumerate}
-    \item \textbf{Feature detection and matching}: Local, distinctive features (e.g.\ scale-invariant keypoints such as SIFT \cite{lowe2004sift}) are detected in each image. Correspondences are established between images by matching feature descriptors. This yields a set of 2D point correspondences across image pairs.
+    \item \textbf{Feature detection and matching}: Distinctive keypoints (e.g.\ SIFT \cite{lowe2004sift}) are extracted and matched across images.
 
-    \item \textbf{Structure from Motion (SfM)}: From the 2D correspondences, the pipeline estimates camera poses and a \emph{sparse} 3D point cloud. Triangulation gives initial 3D points; \textbf{bundle adjustment} (non-linear least squares) jointly refines camera parameters and 3D point positions to minimise reprojection error. The result is a sparse reconstruction with known camera poses.
+    \item \textbf{Structure from Motion}: Camera intrinsics and extrinsics are estimated together with a \emph{sparse} 3D point cloud. \textbf{Bundle adjustment} refines parameters by minimising reprojection error across all observations. Symbolically, one minimises $\sum_{i,j} \|\mathbf{x}_{ij} - \pi(\mathbf{P}_j, \mathbf{X}_i)\|^2$ over projection matrices $\mathbf{P}_j$ and points $\mathbf{X}_i$, where $\mathbf{x}_{ij}$ are measured image points and $\pi$ is the projection function.
 
-    \item \textbf{Multi-View Stereo (MVS)}: The sparse point cloud is \emph{densified} by estimating depth at many more pixels. For each pixel in each image, depth is estimated by searching for photometric consistency across neighbouring views \cite{furukawa2010pmvs}. The result is a dense point cloud or set of depth maps.
+    \item \textbf{Multi-view stereo}: Dense correspondence and depth estimation across views yield a dense point cloud or per-view depth maps \cite{furukawa2010pmvs}.
 
-    \item \textbf{Surface reconstruction}: The dense point cloud is converted into a continuous surface, typically a triangle mesh. Common methods include \textbf{Poisson surface reconstruction} \cite{kazhdan2006poisson}, which fits an implicit function to the oriented points and then extracts a mesh (e.g.\ via Marching Cubes).
+    \item \textbf{Surface reconstruction}: The dense samples are converted to a watertight or oriented surface, commonly using \textbf{Poisson surface reconstruction} \cite{kazhdan2006poisson}, which solves for an indicator function whose gradient aligns with surface normals, then extracts a mesh (e.g.\ Marching Cubes).
 
-    \item \textbf{Texture mapping}: The mesh is parameterised (UV unwrapped), and colours from the source images are projected onto the surface and blended to produce a textured 3D model.
+    \item \textbf{Texture mapping}: The mesh is parameterised; colours are blended from source images onto the surface.
 \end{enumerate}
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.92\textwidth}{figures/fig2_2_sfm_mvs}
+\caption{SfM--MVS reconstruction pipeline: from multi-view image input 
+through feature detection, Structure from Motion (SfM), dense Multi-View 
+Stereo (MVS), to surface reconstruction and textured mesh output. (adapted from \cite{Kholil_2021}).}
+\label{fig:ch2_photo_pipeline}
+\end{figure}
 
-These stages form the conceptual backbone of both classical photogrammetry software and modern on-device pipelines such as Apple's Object Capture, which is discussed in Section~\ref{sec:object_capture_roomplan}.
+This end-to-end path is what Section~\ref{sec:on_device_pipeline} relates to \textbf{Object Capture}.
 
-% ---------------------------------------------------------------------------
-\section{Object Capture and Room Plan}
-\label{sec:object_capture_roomplan}
+\section{Depth Fusion and TSDF-Based Scene Meshing}
+\label{sec:depth_fusion}
 
-The application uses two Apple frameworks that build on photogrammetry and depth-based scene understanding: \textbf{Object Capture} for individual objects and \textbf{Room Plan} for entire rooms. Both run on-device and integrate with ARKit for tracking and, where available, LiDAR for depth.
+Room-scale tracking on mobile devices fuses \textbf{depth} (LiDAR or stereo) with \textbf{visual--inertial odometry}. A standard volumetric representation is the \textbf{TSDF}: for each voxel in a bounded volume, one stores a (truncated) signed distance to the nearest surface along with a weight; each new depth frame updates voxels along viewing rays \cite{newcombe2011kinectfusion}. Over time, noise averages down and a coherent surface emerges. The mesh shown in AR debugging views is typically an isosurface of that field.
+
+This reconstruction is \textbf{driven by measured depth}: textureless walls still contribute if the depth sensor returns reliable values. By contrast, MVS in photogrammetry relies on \textbf{photometric consistency} and can fail on untextured or specular surfaces. Semantic interpretation (which planar patch is a ``wall'' and which blob is a ``sofa'') is not solved by the TSDF alone; RoomPlan adds learning-based detection and classification on top of ARKit scene understanding.
+
+\section{Image-Only versus Depth-Assisted Reconstruction}
+\label{sec:depth_vs_photo}
+
+\textbf{Object Capture} is primarily an \textbf{image-driven} pipeline (with poses from ARKit): geometry is inferred from many RGB views through stages analogous to SfM, MVS, and Poisson (or similar) meshing, followed by texturing. \textbf{Room Plan} is \textbf{depth- and semantics-first}: it targets a structured, parametric room description (\texttt{CapturedRoom}) rather than a single closed mesh of the whole interior. Table~\ref{tab:depth_vs_photo} contrasts the two paradigms at the level relevant to this thesis.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of image-centric object reconstruction (Object Capture) and depth-assisted parametric room capture (Room Plan). The Room Plan branch builds on real-time depth integration in the TSDF family \cite{newcombe2011kinectfusion}, augmented by learned structure and semantics.}
+\label{tab:depth_vs_photo}
+\begin{tabular}{|p{0.28\textwidth}|p{0.30\textwidth}|p{0.30\textwidth}|}
+\hline
+\textbf{Aspect} & \textbf{Object Capture} & \textbf{Room Plan} \\
+\hline
+Primary sensing & Dense RGB coverage, parallax & LiDAR depth + RGB + IMU \\
+\hline
+Dominant geometry cue & Photo-consistency (MVS) & TSDF fusion + plane fitting \\
+\hline
+Typical output & Textured triangle mesh (USDZ) & Parametric walls, openings, objects \\
+\hline
+Semantics & Optional masking & Built-in categories (e.g.\ chair, table) \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{On-Device Capture Pipeline}
+\label{sec:on_device_pipeline}
+
+Figure~\ref{fig:capture_branches} compares two \textbf{parallel pipelines arranged vertically}.  
+The \textbf{top lane} is the photogrammetric/Object Capture path:
+multi-view RGB images and poses $\rightarrow$ feature matching $\rightarrow$ SfM
+(sparse structure) $\rightarrow$ MVS (dense geometry) $\rightarrow$ surface reconstruction
+and texturing $\rightarrow$ USDZ output.
+The \textbf{bottom lane} is the RoomPlan path:
+LiDAR/RGB/IMU input $\rightarrow$ VIO tracking $\rightarrow$ TSDF/depth fusion and mesh anchors
+$\rightarrow$ plane/structure inference $\rightarrow$ semantic object/opening detection
+$\rightarrow$ parametric fitting $\rightarrow$ \texttt{CapturedRoom} output.
+Apple’s internal implementations are proprietary; therefore, Table~\ref{tab:pipeline_to_api}
+is a conceptual mapping of stages to public APIs.
+
+\begin{table}[htbp]
+\centering
+\caption{Conceptual mapping from classical stages to Apple's on-device APIs.}
+\label{tab:pipeline_to_api}
+\begin{tabular}{|l|p{0.35\textwidth}|p{0.35\textwidth}|}
+\hline
+\textbf{Stage} & \textbf{Object Capture} & \textbf{Room Plan} \\
+\hline
+Camera trajectory & ARKit VIO; session stores images & ARKit world tracking during scan \\
+\hline
+Sparse / dense geometry & Photogrammetry engine (SfM/MVS class) & TSDF-class fusion + parametric fitting \\
+\hline
+Surface model & Textured mesh & Structural elements + object boxes \\
+\hline
+Semantics & Background masking (when enabled) & Wall / door / window / object classes \\
+\hline
+Serialised output & USDZ file & \texttt{CapturedRoom} (Codable) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\thesisfig{1\textwidth}{figures/fig2_3_dual_pipeline.pdf}
+\caption{Parallel capture pipelines: Object Capture follows an 
+image-based reconstruction chain (top lane); RoomPlan combines 
+LiDAR depth fusion with parametric and semantic inference to produce 
+a \texttt{CapturedRoom} (bottom lane).}
+\label{fig:capture_branches}
+\end{figure}
 
 \subsection{Object Capture}
 
-\textbf{Object Capture} (Apple, iOS 17+) enables users to scan a single real-world object and obtain a textured 3D model in USDZ format. It exposes \texttt{ObjectCaptureSession} and \texttt{PhotogrammetrySession}.
+\texttt{ObjectCaptureSession} guides the user around an object so that views overlap; \texttt{PhotogrammetrySession} reconstructs a mesh and materials, outputting \textbf{USDZ}. That format is well supported in RealityKit and matches the furniture assets used in the editor.
 
-\begin{itemize}
-    \item \textbf{ObjectCaptureSession}: Guides the user to capture overlapping photographs of the object from multiple viewpoints. The session uses ARKit's tracking to estimate camera poses and provides real-time feedback on coverage (e.g.\ ``move to uncovered area''). Images are stored on the device for processing.
+\subsection{Room Plan and \texttt{CapturedRoom}}
 
-    \item \textbf{PhotogrammetrySession}: Implements the photogrammetry pipeline on-device. It takes the captured images (and optionally the poses from the session) and runs feature detection and matching, SfM, multi-view stereo, Poisson surface reconstruction, and texture mapping. The output is a textured mesh in USDZ format, suitable for use in RealityKit and the room editor.
-\end{itemize}
+Room Plan exposes types such as walls, doors, windows, and \texttt{CapturedRoom.Object} instances with \texttt{category}, \texttt{dimensions}, and \texttt{transform}. Apple continues to extend taxonomy and behaviour \cite{apple2024roomplan2}. Because \texttt{CapturedRoom} conforms to \texttt{Codable}, applications can persist scans as JSON or similar, as done in the implementation (Chapter~\ref{ch:implementation}) under a per-room file in the Documents hierarchy.
 
-Object Capture is thus an \emph{object-scale} application of the photogrammetry pipeline described in Section~\ref{sec:photogrammetry}, with a guided capture flow and on-device processing for privacy and portability.
+\subsection{Feature-to-API mapping}
 
-\subsection{Room Plan}
+Table~\ref{tab:feature_api} ties user-visible capabilities to frameworks.
 
-\textbf{Room Plan} (Apple, iOS 16+) is a high-level framework for scanning and reconstructing \emph{indoor rooms} in a parametric, semantically annotated form. It builds on ARKit's world tracking, plane detection, and scene mesh (e.g.\ TSDF-based fusion on LiDAR devices).
+\begin{table}[h]
+\centering
+\caption{Major application features and the APIs or artefacts that implement them.}
+\label{tab:feature_api}
+\begin{tabular}{|l|l|p{0.42\textwidth}|}
+\hline
+\textbf{Feature} & \textbf{API / artefact} & \textbf{Role} \\
+\hline
+Room scanning & RoomPlan & Produce \texttt{CapturedRoom} \\
+\hline
+Room persistence & \texttt{Codable} + file I/O & Reload scans after app restart \\
+\hline
+3D editor & RealityKit (non-AR) & Visualise and edit room \\
+\hline
+Object scanning & Object Capture & Author USDZ furniture \\
+\hline
+Splat viewing & Metal + \texttt{.ply} & Compare with meshes \\
+\hline
+\end{tabular}
+\end{table}
 
-Room Plan does not output a generic dense mesh; instead, it produces a \textbf{parametric room model}:
+\section{Limitations}
+\label{sec:limitations_capture}
 
-\begin{itemize}
-    \item \textbf{Structural elements}: Walls (with position, orientation, dimensions), floors, ceilings, doors, and windows. Each is represented as a structured element with a transform and size (e.g.\ width and height).
+Photogrammetry remains sensitive to glass, mirrors, and uniform surfaces. Room Plan can miss small objects, merge adjacent pieces, or mislabel categories; coarse bounding boxes are not CAD precision. These issues motivate manual touch-up in the editor and, for research-oriented quality, export to external tools, including 3DGS training pipelines discussed in Chapter~\ref{ch:theory2}.
 
-    \item \textbf{Furniture and fixtures}: Detected objects are classified into categories (e.g.\ chair, sofa, table, bed, storage, television, sink) and represented with a 4$\times$4 transform (position, orientation, scale) and axis-aligned dimensions (width, height, depth) in metres.
-\end{itemize}
-
-The output is a \texttt{CapturedRoom} data structure containing lists of walls, floors, doors, windows, and objects. This representation is \emph{editable} and \emph{dimensionally accurate}: the application uses it to place virtual replacement furniture at the same locations and scales as the detected real furniture. Room Plan relies on on-device neural networks (e.g.\ for semantic segmentation and object detection) running on the Apple Neural Engine, and requires no cloud processing.
-
-\subsection{Relation to Photogrammetry and Depth}
-
-Room Plan combines \textbf{depth} (LiDAR and/or stereo) with \textbf{visual} information. The geometric reconstruction (planes, mesh) is driven by depth fusion (e.g.\ TSDF); the semantic labelling and parametric fitting (walls, doors, objects) use learned models. Object Capture is primarily \textbf{image-based} photogrammetry (SfM + MVS + Poisson), with ARKit poses optionally aiding the pipeline. Together, Object Capture and Room Plan cover object-scale and room-scale capture, which the application unifies in a single workflow: scan the room with Room Plan, optionally scan individual objects with Object Capture, and edit the room in the 3D editor with replacement models.

@@ -6,16 +6,23 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct RoomListView: View {
     @EnvironmentObject var userManager: UserManager
     @EnvironmentObject var roomManager: RoomManager
+    @EnvironmentObject var catalogManager: FurnitureCatalogManager
     @State private var showCreateRoom = false
 
     // Programmatic navigation after scanning
     @State private var pendingRoom: Room? = nil
     @State private var navigateToNewRoom = false
     @State private var showHistory = false
+    @State private var showBlenderExportShare = false
+    @State private var blenderExportURL: URL?
+    @State private var showBlenderExportError = false
+    @State private var blenderExportErrorMessage = ""
+    @State private var isBlenderExporting = false
 
     var userRooms: [Room] {
         roomManager.getRoomsForCurrentUser()
@@ -57,6 +64,14 @@ struct RoomListView: View {
                         ForEach(userRooms) { room in
                             NavigationLink(destination: RoomDesignerView(room: room)) {
                                 RoomRowView(room: room)
+                            }
+                            .contextMenu {
+                                Button {
+                                    exportRoomForBlender(room)
+                                } label: {
+                                    Label("Export for Blender…", systemImage: "square.and.arrow.up.on.square")
+                                }
+                                .disabled(!room.hasScanData)
                             }
                         }
                     }
@@ -123,6 +138,60 @@ struct RoomListView: View {
         }
         .onChange(of: navigateToNewRoom) { _, active in
             if !active { pendingRoom = nil }
+        }
+        .sheet(isPresented: $showBlenderExportShare, onDismiss: {
+            if let url = blenderExportURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+            blenderExportURL = nil
+        }) {
+            if let url = blenderExportURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
+        .alert("Could not export", isPresented: $showBlenderExportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(blenderExportErrorMessage)
+        }
+        .overlay {
+            if isBlenderExporting {
+                ZStack {
+                    Color.black.opacity(0.45).ignoresSafeArea()
+                    ProgressView("Preparing export…")
+                        .padding(24)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x1A1D2E)))
+                }
+            }
+        }
+    }
+
+    private func exportRoomForBlender(_ room: Room) {
+        guard let captured = room.getCapturedRoom() else {
+            blenderExportErrorMessage = "This room has no scan data to export."
+            showBlenderExportError = true
+            return
+        }
+        isBlenderExporting = true
+        Task { @MainActor in
+            defer { isBlenderExporting = false }
+            let mats = RoomBlenderExportService.materialsForListExport(room: room)
+            do {
+                let url = try RoomBlenderExportService.makeExportZip(
+                    room: room,
+                    capturedRoom: captured,
+                    wallColor: mats.wall,
+                    floorColor: mats.floor,
+                    wallPattern: mats.wallPattern,
+                    floorPattern: mats.floorPattern,
+                    catalog: catalogManager
+                )
+                blenderExportURL = url
+                showBlenderExportShare = true
+            } catch {
+                blenderExportErrorMessage = error.localizedDescription
+                showBlenderExportError = true
+            }
         }
     }
 }
@@ -194,6 +263,7 @@ struct RoomRowView: View {
         RoomListView()
             .environmentObject(UserManager())
             .environmentObject(RoomManager(userManager: UserManager()))
+            .environmentObject(FurnitureCatalogManager())
     }
     .preferredColorScheme(.dark)
 }

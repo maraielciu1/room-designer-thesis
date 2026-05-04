@@ -37,14 +37,11 @@ class FurnitureCatalogManager: ObservableObject {
     
     // MARK: - Model file URL resolution
 
-    /// Returns the on-disk file URL for any model — bundle, user-scanned, or marketplace.
+    /// Returns the on-disk file URL for any model — bundle or user-scanned.
     /// Used by `USDZThumbnailView` to generate preview images.
     func modelFileURL(for name: String) -> URL? {
         if isScannedModel(name) {
             return scannedModelURL(for: name)
-        }
-        if isMarketplaceModel(name) {
-            return marketplaceModelURL(for: name)
         }
         // Try bundle — USDZ first, then USDC
         if let url = Bundle.main.url(forResource: name, withExtension: "usdz") {
@@ -56,16 +53,11 @@ class FurnitureCatalogManager: ObservableObject {
         return nil
     }
 
-    // MARK: - Model loading (bundle + user-scanned + marketplace)
+    // MARK: - Model loading (bundle + user-scanned)
 
     /// Whether a model key refers to a user-scanned object (e.g. "scanned_<uuid>").
     func isScannedModel(_ name: String) -> Bool {
         name.hasPrefix("scanned_")
-    }
-
-    /// Whether a model key refers to a marketplace download (e.g. "marketplace_<id>").
-    func isMarketplaceModel(_ name: String) -> Bool {
-        name.hasPrefix("marketplace_")
     }
 
     /// Resolve a scanned-model catalog key to its USDZ file URL on disk.
@@ -78,21 +70,9 @@ class FurnitureCatalogManager: ObservableObject {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// Resolve a marketplace catalog key to its cached USDZ file URL.
-    func marketplaceModelURL(for name: String) -> URL? {
-        guard isMarketplaceModel(name) else { return nil }
-        let itemId = String(name.dropFirst("marketplace_".count))
-        let url = MarketplaceManager.downloadCacheDirectory
-            .appendingPathComponent("\(itemId).usdz")
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
-    }
-
-    /// Load a model entity — handles app-bundle, user-scanned, and marketplace models.
+    /// Load a model entity — app-bundle or user-scanned USDZ.
     func loadModel(named fileName: String) -> Entity? {
         if isScannedModel(fileName), let url = scannedModelURL(for: fileName) {
-            return try? Entity.load(contentsOf: url)
-        }
-        if isMarketplaceModel(fileName), let url = marketplaceModelURL(for: fileName) {
             return try? Entity.load(contentsOf: url)
         }
         return try? Entity.load(named: fileName)
@@ -184,11 +164,9 @@ class FurnitureCatalogManager: ObservableObject {
     /// Since we SET `model.scale`, we need the local-space extents so the math works:
     ///   newScale = target / localExtents → final = localExtents × newScale = target  ✓
     func loadAndScaleModel(named fileName: String, targetDimensions: SIMD3<Float>) -> Entity? {
-        // Load from disk for scanned / marketplace models, from bundle for built-in
+        // Load from disk for scanned models, from bundle for built-in
         let model: Entity?
         if isScannedModel(fileName), let url = scannedModelURL(for: fileName) {
-            model = try? Entity.load(contentsOf: url)
-        } else if isMarketplaceModel(fileName), let url = marketplaceModelURL(for: fileName) {
             model = try? Entity.load(contentsOf: url)
         } else {
             model = try? Entity.load(named: fileName)

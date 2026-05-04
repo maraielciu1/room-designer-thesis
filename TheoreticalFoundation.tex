@@ -379,6 +379,176 @@ If the goal is to ``implement the Gaussian splatting pipeline'' in the app, the 
 \end{enumerate}
 
 
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{Limitations of Classical 3DGS for Mobile and Real-Time Capture}
+\label{subsec:3dgs_limitations}
+
+Despite its visual quality and real-time rendering speed, the original 3DGS pipeline~\cite{kerbl20233dgs} carries significant practical constraints that limit its applicability in a mobile, user-facing scenario:
+
+\begin{itemize}
+    \item \textbf{Multi-view requirement.} Classical 3DGS requires a set of photographs taken from multiple, carefully distributed viewpoints around the subject — typically 50--200+ images. This makes it unsuitable for capturing a scene from a single photo or from a handheld device with limited movement.
+
+    \item \textbf{Dependency on SfM.} Before training can begin, camera poses must be estimated by running Structure-from-Motion (SfM) software such as COLMAP~\cite{schoenberger2016sfm}. This is a computationally expensive offline process (minutes to hours) and requires sufficient feature overlap between views.
+
+    \item \textbf{Per-scene optimisation.} Each new scene requires running the full training loop from scratch — hundreds of thousands of gradient-descent iterations on a GPU. There is no generalisation across scenes: a model trained on one room cannot directly reconstruct another without retraining.
+
+    \item \textbf{Adaptive densification overhead.} The original 3DGS algorithm dynamically splits and clones Gaussians in under-reconstructed regions and prunes near-transparent ones. While effective, this adaptive control makes training non-trivial to port to mobile hardware.
+
+    \item \textbf{Relative scale.} Classical 3DGS initialises from a COLMAP sparse point cloud which provides only relative (up-to-similarity) scale. Without an explicit depth sensor or known camera baseline, the metric scale of the scene is unknown.
+\end{itemize}
+
+These constraints collectively make the classical pipeline impractical for real-time, user-initiated mobile capture — precisely the scenario this application targets. The need for a \emph{generalised, feedforward} approach that works from a single image motivated the development of Apple's SHARP framework, described in the following subsection.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{SHARP: Feedforward Single-Image 3D Gaussian Splatting}
+\label{subsec:sharp}
+
+\textbf{SHARP} (\emph{Sharp Monocular View Synthesis}) \cite{mescheder2025sharp} is a method developed at Apple and presented at ICLR~2025 that addresses the limitations above. Given a \emph{single} RGB photograph, SHARP predicts the full set of 3D Gaussian parameters describing the depicted scene in a single forward pass through a neural network — with no iterative optimisation, no multi-view input, and no SfM preprocessing. The resulting scene can be rendered in real time using standard 3DGS rendering. Inference takes under one second on a modern GPU, making it compatible with interactive mobile workflows.
+
+\subsubsection{Problem Formulation and Key Properties}
+
+Formally, SHARP learns a function
+\[
+    f_\theta : \mathbf{I} \;\longmapsto\; \mathcal{G} = \{G_i\}_{i=1}^{N}
+\]
+that maps a single input image $\mathbf{I} \in \mathbb{R}^{H \times W \times 3}$ to a collection of $N \approx 1.2 \times 10^6$ Gaussian primitives $\mathcal{G}$, each with position, scale, rotation, colour, and opacity. The parameters $\theta$ are learned once on a large dataset; at inference time only the forward pass runs.
+
+Three properties distinguish SHARP from prior monocular 3D methods:
+\begin{enumerate}
+    \item \textbf{Real-time rendering.} The output is a standard 3DGS \texttt{.ply}, rendered via the same differentiable splatting rasteriser described in Section~\ref{sec:gaussian_splatting}. Novel views can be synthesised at interactive frame rates without any post-processing.
+    \item \textbf{Metric scale.} By building on the Depth Pro monocular depth estimator~\cite{bochkovskii2024depthpro}, SHARP produces Gaussians positioned at \emph{absolute} metric scale, enabling physically meaningful camera movements (e.g., 10\,cm forward) compatible with AR/VR sensor data.
+    \item \textbf{Zero-shot generalisation.} A single trained model generalises across indoor and outdoor scenes without scene-specific fine-tuning, reducing LPIPS by 25--34\% and DISTS by 21--43\% versus the best prior feedforward method on six benchmark datasets.
+\end{enumerate}
+
+\subsubsection{Architecture Overview}
+
+The SHARP network is a sequential pipeline of six modules (Figure~\ref{fig:sharp_architecture}), totalling approximately 702 million parameters (340 million trainable):
+
+\begin{enumerate}
+    \item \textbf{Depth Pro Backbone (Encoder).} The input image is resized to $1536 \times 1536$ and passed through a pretrained Depth Pro model consisting of two Vision Transformers (ViTs). This produces four intermediate feature maps capturing multi-scale spatial information. The low-resolution ViT is fine-tuned during SHARP training, while the patch encoder remains frozen; unfreezing the backbone yields approximately 24\% improvement in DISTS on the ScanNet++ benchmark.
+
+    \item \textbf{Depth Decoder.} A Dense Prediction Transformer (DPT) architecture takes the four encoder feature maps and produces a \textbf{two-channel depth map} $\hat{D}$ — one channel per Gaussian layer. The dual-channel design enables the network to model occluded or background geometry independently of the primary surface.
+
+    \item \textbf{Depth Adjustment Module.} A lightweight U-Net (${\approx}2$\,M parameters), inspired by Conditional Variational Autoencoders (C-VAE), predicts a per-pixel scale map $S$ that corrects the monocular depth estimate. The adjusted depth is $\bar{D} = S \odot \hat{D}$. At inference time, ground-truth depth is unavailable so $S$ is set to the identity; the module is primarily used during training to reduce depth ambiguity, particularly for transparent or reflective surfaces.
+
+    \item \textbf{Gaussian Initialiser.} The adjusted depth map $\bar{D}$ and the input RGB are used to initialise base Gaussians $G_0$ by unprojecting each pixel into 3D space. The network processes images at half resolution ($H' = H/2$, $W' = W/2$), resulting in two grids of $768 \times 768$ Gaussians. The unprojection is performed in \textbf{normalised device coordinates (NDC)} as described below.
+
+    \item \textbf{Gaussian Decoder.} Another DPT-based decoder (${\approx}7.8$\,M parameters) predicts per-Gaussian attribute refinements $\Delta G$ for all $K{=}14$ attributes per primitive.
+
+    \item \textbf{Gaussian Composer.} Combines the initialised Gaussians $G_0$ with the decoder refinements $\Delta G$ through attribute-specific activation functions, producing the final scene $\mathcal{G}$. Positions remain in NDC during composition and are subsequently projected back to world coordinates.
+\end{enumerate}
+
+\subsubsection{NDC-Space Gaussian Initialisation}
+
+A core design choice in SHARP is performing all Gaussian prediction in \emph{normalised device coordinates} rather than in camera or world space. This makes predictions intrinsic-agnostic: the network does not need to know the camera's focal length or sensor size, which would otherwise vary across capture devices.
+
+Given normalised pixel coordinates $(i, j) \in [-1, 1]^2$ and the per-pixel adjusted depth $\bar{D}'(i,j)$ (subsampled to $H' \times W'$), the mean position of the base Gaussian is defined as:
+\[
+    \boldsymbol{\mu}(i,j) = \begin{bmatrix} i \cdot \bar{D}'(i,j) \\ j \cdot \bar{D}'(i,j) \\ \bar{D}'(i,j) \end{bmatrix}
+\]
+This unprojection formula ensures that the Gaussian lies on the ray through pixel $(i,j)$ at depth $\bar{D}'(i,j)$. The initial scale is set proportional to depth:
+\[
+    \mathbf{s}(i,j) = s_0 \cdot \bar{D}'(i,j)
+\]
+so that more distant Gaussians are initialised larger, reflecting the reduced resolution with which far surfaces can be observed. The base colour is taken directly from the input RGB at the corresponding pixel.
+
+\subsubsection{Two-Layer Gaussian Grid and Attribute Composition}
+
+SHARP uses a \textbf{fixed two-layer grid} of Gaussians (total $\approx 1.2$\,M), rather than the adaptive densification and pruning of classical 3DGS. This fixed topology simplifies training and ensures a predictable memory footprint at inference time.
+
+Layer~1 represents the primary surface geometry (foreground objects). Layer~2 represents background regions or secondary depth layers (e.g., visible behind transparent objects, around object boundaries). Both layers receive independent depth predictions and refinements.
+
+The Gaussian Composer updates each attribute through:
+\[
+    G_{\text{attr}} = \gamma_{\text{attr}}\!\left(\gamma_{\text{attr}}^{-1}(G_{0,\text{attr}}) + \eta_{\text{attr}} \cdot \Delta G_{\text{attr}}\right)
+\]
+where $\gamma_{\text{attr}}$ is an attribute-specific activation function (softplus for depth, sigmoid for colour/opacity/scale, identity for position and quaternion) that constrains outputs to valid ranges.
+
+\subsubsection{Colour Representation: Omitting Spherical Harmonics}
+
+In contrast to the original 3DGS~\cite{kerbl20233dgs}, which uses degree-3 spherical harmonics (SH) coefficients to model view-dependent colour (48 colour values per Gaussian), SHARP deliberately omits spherical harmonics and represents colour as \textbf{plain per-Gaussian RGB} (3 values). The rationale is that at SH degree $d$, the number of coefficients grows as $3(d+1)^2$; at $d=3$ this is 48 channels per Gaussian. For 1.2\,M Gaussians, storing full SH coefficients would be prohibitively expensive both in memory and in decoder output dimensionality. Instead, view-dependent appearance is captured implicitly through the two-layer structure and learned decoder residuals, which provide sufficient quality for nearby-view synthesis.
+
+\subsubsection{Training Regime}
+
+SHARP is trained in two stages on large-scale data:
+
+\paragraph{Stage~1 — Synthetic training (100k iterations).} Approximately 700k procedurally generated synthetic scenes (each with 11 views at resolutions up to $2048^2$) provide perfect image and depth ground truth. The network is trained on 128 NVIDIA A100 GPUs with a multi-objective loss combining:
+\begin{itemize}
+    \item $\mathcal{L}_{\text{color}}$: L1 photometric loss on input and novel views.
+    \item $\mathcal{L}_{\text{percep}}$: Multi-layer perceptual loss (ResNet-50 features and Gram matrices) on novel views only, with weight $\lambda_{\text{percep}} = 3.0$. This is the single most impactful loss term, providing a 62\% DISTS improvement over colour-only training.
+    \item $\mathcal{L}_{\text{depth}}$: L1 loss on inverse depth (disparity) for Layer~1.
+    \item $\mathcal{L}_{\text{reg}}$: Regularisers penalising floaters at depth discontinuities, large Gaussian offsets, out-of-range splatted sizes, and total variation on the second depth layer.
+\end{itemize}
+
+\paragraph{Stage~2 — Self-supervised fine-tuning (60k iterations).} To bridge the synthetic-to-real gap without requiring stereo pairs or multi-view ground truth, 2.65\,M real images (OpenScene, Shutterstock, Getty, Flickr) are used with a self-supervision strategy: SHARP reconstructs a 3DGS from the real image, renders a pseudo-novel view, then swaps roles — the pseudo-view becomes the network input and the original real image becomes the novel-view target. This stage runs on 32 A100 GPUs and substantially improves generalisation to complex real-world textures, lighting, and view-dependent effects.
+
+\subsubsection{Benchmark Results}
+
+Table~\ref{tab:sharp_benchmark} reports zero-shot novel-view synthesis quality (DISTS$\downarrow$ / LPIPS$\downarrow$, lower is better) across six datasets against representative prior methods. PSNR and SSIM are deliberately avoided as primary metrics because even a 1\% camera translation causes PSNR to degrade to 11.2\,dB — nearly as poor as a mean-image baseline (10.7\,dB) — making them unreliable for evaluating view synthesis under pose uncertainty. DISTS and LPIPS are structure-sensitive metrics that tolerate sub-pixel misalignments.
+
+\begin{table}[htbp]
+\centering
+\caption{Zero-shot novel-view synthesis. DISTS$\downarrow$ / LPIPS$\downarrow$ on six benchmarks. SHARP outperforms all prior methods on every dataset. Adapted from~\cite{mescheder2025sharp}.}
+\label{tab:sharp_benchmark}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Method} & \textbf{Middlebury} & \textbf{Booster} & \textbf{ScanNet++} & \textbf{WildRGBD} & \textbf{Tanks\&T.} & \textbf{ETH3D} \\
+\midrule
+Flash3D     & .359/.581 & .409/.370 & .374/.572 & .159/.345 & .382/.683 & .535/.651 \\
+TMPI        & .158/.436 & .232/.409 & .128/.309 & .114/.327 & .309/.693 & .396/.720 \\
+Gen3C       & .164/.545 & .207/.384 & .090/.227 & .106/.285 & .177/.566 & .408/.734 \\
+\midrule
+\textbf{SHARP} & \textbf{.097/.358} & \textbf{.119/.270} & \textbf{.071/.154} & \textbf{.069/.190} & \textbf{.122/.421} & \textbf{.258/.554} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Inference time is 0.91\,s on a standard GPU (versus 830+\,s for the best diffusion-based prior method Gen3C), a reduction of three orders of magnitude. After the initial Metal shader compilation on Apple Silicon (approximately 90\,s on first run), subsequent inferences take approximately 10\,s on an M-series Mac.
+
+\subsubsection{Comparison: Classical 3DGS versus SHARP}
+
+Table~\ref{tab:3dgs_vs_sharp} summarises the key differences between the original 3DGS optimisation pipeline~\cite{kerbl20233dgs} and the SHARP feedforward approach~\cite{mescheder2025sharp}.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of classical 3DGS~\cite{kerbl20233dgs} and SHARP~\cite{mescheder2025sharp}.}
+\label{tab:3dgs_vs_sharp}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lll}
+\toprule
+\textbf{Aspect} & \textbf{Classical 3DGS} & \textbf{SHARP} \\
+\midrule
+Input               & Multi-view images + known poses & Single monocular image \\
+Pose estimation     & COLMAP SfM (offline)            & Not required \\
+Inference mode      & Per-scene optimisation          & Feedforward (one pass) \\
+Inference time      & Minutes to hours                & $<$1\,s (GPU), ${\approx}$10\,s (Apple Silicon) \\
+Gaussian count      & Adaptive ($10^4$--$10^6$)       & Fixed: $2 \times 768^2 \approx 1.2$\,M \\
+Initialisation      & SfM sparse point cloud          & NDC unprojection from predicted depth \\
+Depth source        & SfM triangulation (relative)    & Depth Pro (metric, absolute) \\
+Colour model        & Spherical harmonics (degree~3)  & Plain RGB per Gaussian \\
+Generalisation      & Per-scene only                  & Zero-shot across datasets \\
+Scale               & Relative (up to similarity)     & Metric absolute scale \\
+Mobile suitability  & Impractical (COLMAP + GPU loop) & Suitable (single server call) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Integration in This Application}
+\label{subsubsec:sharp_integration}
+
+The application integrates SHARP as a supplementary 3D capture mode alongside RoomPlan and Object Capture. The integration follows a client--server architecture:
+
+\begin{itemize}
+    \item \textbf{Server side (Python/PyTorch).} A lightweight Flask server (\texttt{sharp\_server.py}) runs on a Mac on the local network. It loads the pretrained SHARP weights once at startup and exposes a \texttt{/sharp/infer} HTTP endpoint. When a JPEG image is posted, the server calls \texttt{predict\_image()} from the \texttt{sharp} Python package, optionally applies an opacity-based Gaussian pruning step to reduce the output from $\approx$1.2\,M to $\approx$300\,k Gaussians for mobile rendering performance, and returns the resulting \texttt{.ply} file.
+
+    \item \textbf{Client side (SwiftUI/iOS).} The \texttt{SHARPCaptureView} presents a camera interface (via \texttt{UIImagePickerController}) that lets the user capture a single frame. \texttt{SHARPService.infer(image:)} encodes the image as JPEG, POSTs it to the configured server URL using a custom \texttt{URLSession} with a 360-second request timeout (replacing \texttt{URLSession.shared} whose effective cap is 60\,s), and saves the returned \texttt{.ply} to the app's Documents directory. The resulting file is then displayed in the existing \texttt{GaussianSplatView} Metal renderer for interactive orbit viewing.
+
+    \item \textbf{Pruning for mobile rendering.} The full SHARP output of $\approx$1.2\,M Gaussians produces a \texttt{.ply} of approximately 66\,MB. On iPhone, the Metal depth-sort that runs every frame over 1.2\,M elements is too expensive for interactive frame rates. The server therefore prunes Gaussians by opacity score, retaining the top 300\,k, reducing the file to $\approx$18\,MB and enabling smooth real-time orbit viewing on device.
+\end{itemize}
+
+This integration allows the application to demonstrate the full spectrum of 3D scene reconstruction approaches in a single workflow: \textbf{RoomPlan} (parametric, semantic, real-time) $\rightarrow$ \textbf{Object Capture} (photogrammetric mesh, on-device) $\rightarrow$ \textbf{classical 3DGS} (optimisation-based, external GPU) $\rightarrow$ \textbf{SHARP} (feedforward neural, single image, near real-time).
+
 % ═══════════════════════════════════════════════════════════════════════════
 \section{3D Model Representation: USDZ Format}
 \label{sec:usdz}
@@ -769,5 +939,14 @@ A.~Kandil, B.~Al-Jumaah, and I.~Doush, ``Enhancing user experience of interior d
 
 \bibitem{kerbl20233dgs}
 B.~Kerbl, G.~Kopanas, T.~Leimk\"uhler, and G.~Drettakis, ``3D Gaussian splatting for real-time radiance field rendering,'' \textit{ACM Trans.~Graphics (SIGGRAPH)}, vol.~42, no.~4, 2023.
+
+\bibitem{mescheder2025sharp}
+L.~Mescheder, W.~Dong, S.~Li, X.~Bai, M.~Santos, P.~Hu, B.~Lecouat, M.~Zhen, A.~Delaunoy, T.~Fang, Y.~Tsin, S.~R.~Richter, and V.~Koltun, ``SHARP: Sharp monocular view synthesis in less than a second,'' in \textit{Proc.~Int.~Conf.~Learning Representations (ICLR)}, 2025. arXiv:2512.10685.
+
+\bibitem{bochkovskii2024depthpro}
+A.~Bochkovskii, A.~Delaunoy, H.~Germain, M.~Santos, Y.~Zhou, S.~R.~Richter, and V.~Koltun, ``Depth Pro: Sharp monocular metric depth estimation,'' in \textit{Proc.~Int.~Conf.~Learning Representations (ICLR)}, 2025. arXiv:2410.02073.
+
+\bibitem{schoenberger2016sfm}
+J.~L.~Sch{\"o}nberger and J.-M.~Frahm, ``Structure-from-motion revisited,'' in \textit{Proc.~IEEE/CVF CVPR}, pp.~4104--4113, 2016.
 
 \end{thebibliography}
