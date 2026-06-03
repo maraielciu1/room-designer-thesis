@@ -23,7 +23,7 @@ struct LightingPickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -66,7 +66,7 @@ struct LightingPickerView: View {
                                                 Circle()
                                                     .stroke(lightColor == preset.color
                                                             ? AppTheme.glowCyan
-                                                            : Color.white.opacity(0.15),
+                                                            : AppTheme.warmAccent.opacity(0.3),
                                                             lineWidth: 2))
                                     }
                                 }
@@ -125,14 +125,16 @@ struct LightingPickerView: View {
             }
             .navigationTitle("Lighting")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 
     // ── Fixture card ──
@@ -149,7 +151,7 @@ struct LightingPickerView: View {
 
             Text(fixture.label)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
@@ -172,7 +174,7 @@ struct LightingPickerView: View {
             Circle()
                 .fill(isSelected
                       ? AppTheme.glowCyan.opacity(0.15)
-                      : Color.white.opacity(0.06))
+                      : AppTheme.secondaryTint.opacity(0.35))
                 .frame(width: 50, height: 50)
 
             Image(systemName: fixture.icon)
@@ -185,14 +187,14 @@ struct LightingPickerView: View {
         RoundedRectangle(cornerRadius: 12)
             .fill(isSelected
                   ? AppTheme.glowCyan.opacity(0.10)
-                  : Color.white.opacity(0.04))
+                  : AppTheme.lightNeutral.opacity(0.06))
     }
 
     private func fixtureCardBorder(isSelected: Bool) -> some View {
         RoundedRectangle(cornerRadius: 12)
             .stroke(isSelected
                     ? AppTheme.glowCyan.opacity(0.4)
-                    : Color.white.opacity(0.08), lineWidth: 1)
+                    : AppTheme.warmAccent.opacity(0.2), lineWidth: 1)
     }
 
     // ── Visual preview ──
@@ -203,7 +205,7 @@ struct LightingPickerView: View {
 
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.white.opacity(0.04))
+                    .fill(AppTheme.lightNeutral.opacity(0.06))
                     .frame(height: 130)
 
                 VStack(spacing: 4) {
@@ -214,7 +216,7 @@ struct LightingPickerView: View {
 
                     Text(selectedType.label)
                         .font(.caption.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
 
                     Text("\(Int(intensity)) lm • \(selectedType.placement.rawValue)")
                         .font(.caption2)

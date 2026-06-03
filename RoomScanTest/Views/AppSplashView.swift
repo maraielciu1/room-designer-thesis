@@ -77,7 +77,7 @@ struct AppSplashView: View {
                         .overlay(
                             Circle().strokeBorder(
                                 LinearGradient(
-                                    colors: [Color.white.opacity(0.25), Color.white.opacity(0.04)],
+                                    colors: [Color.white.opacity(0.25), AppTheme.lightNeutral.opacity(0.06)],
                                     startPoint: .topLeading, endPoint: .bottomTrailing),
                                 lineWidth: 1)
                         )
@@ -93,7 +93,7 @@ struct AppSplashView: View {
                 VStack(spacing: 10) {
                     Text("Room Designer")
                         .font(.system(size: 38, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
 
                     Text("Design your space, from anywhere")
                         .font(.system(size: 16, weight: .regular, design: .rounded))

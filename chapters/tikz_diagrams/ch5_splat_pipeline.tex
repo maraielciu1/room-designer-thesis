@@ -1,0 +1,68 @@
+% ch5_splat_pipeline.tex
+% fig:splat_pipeline — Metal per-frame Gaussian splat rendering pipeline (vertical)
+
+\begin{tikzpicture}[
+  box/.style={rectangle, rounded corners=3pt, draw=black, fill=white,
+              minimum width=14cm, font=\scriptsize, align=center,
+              line width=0.6pt, inner sep=4pt},
+  sec/.style={box, fill=gray!18, font=\scriptsize\bfseries},
+  arrow/.style={-{Stealth[length=3.5pt]}, semithick}
+]
+
+\node[box] (render)
+  {{\bfseries\texttt{render()} called (MTKView delegate)}};
+
+\node[box, below=0.18cm of render] (cam)
+  {{\bfseries Orbit camera $\to$ \texttt{viewMatrix}, \texttt{projMatrix}}\\[1pt]
+   {\tiny\itshape\color{gray} $fovY{=}\pi/3,\; near{=}0.01,\; far{=}200$}};
+
+\node[box, below=0.18cm of cam] (sort)
+  {{\bfseries\texttt{sortGaussians(viewMatrix:)}}\\[1pt]
+   {\tiny\itshape\color{gray} $depth = \mathrm{dot}(viewRow2, position)\ \to\ \text{sort back-to-front}\ O(n\log n)$}};
+
+\node[box, below=0.18cm of sort] (upload)
+  {{\bfseries Upload \texttt{sortedIndices} $\to$ \texttt{MTLBuffer}}\\[1pt]
+   {\tiny\itshape\color{gray} \texttt{indexBuffer.contents()} $\leftarrow$ \texttt{[UInt32]}}};
+
+\node[box, below=0.18cm of upload] (encode)
+  {{\bfseries Encode: \texttt{triangleStrip} $\times$ 4 verts $\times$ $N$ instances}};
+
+\node[sec, below=0.18cm of encode] (vsh)
+  {VERTEX SHADER: \texttt{gaussianVertex()}};
+
+\node[box, below=0.18cm of vsh] (sigma)
+  {{\bfseries $\boldsymbol{\Sigma} = \mathbf{M}\mathbf{M}^{\top}$ \quad where $\mathbf{M} = \mathbf{R}\cdot\mathrm{diag}(\mathbf{s})$}\\[1pt]
+   {\tiny\itshape\color{gray} $\mathbf{R}$ from quaternion (\texttt{quatToRotMat}),\quad $\mathbf{s}$ = per-Gaussian scale}};
+
+\node[box, below=0.18cm of sigma] (proj)
+  {{\bfseries $\boldsymbol{\Sigma}' = \mathbf{T}\boldsymbol{\Sigma}\mathbf{T}^{\top}$ \quad where $\mathbf{T} = \mathbf{J}\cdot\mathbf{W}$}\\[1pt]
+   {\tiny\itshape\color{gray} $\mathbf{J}$ = Jacobian of perspective at Gaussian centre,\quad $\mathbf{W}$ = view rotation}};
+
+\node[box, below=0.18cm of proj] (quad)
+  {{\bfseries Quad radius $= 3\cdot\sqrt{\lambda_{\max}}$ \quad (from trace/det of $\boldsymbol{\Sigma}'$)}\\[1pt]
+   {\tiny\itshape\color{gray} $\lambda_{\max} = \tfrac{tr}{2} + \sqrt{\tfrac{tr^2}{4} - det}$\quad clamped to $[1,\,2048]$ px}};
+
+\node[sec, below=0.18cm of quad] (fsh)
+  {FRAGMENT SHADER: \texttt{gaussianFragment()}};
+
+\node[box, below=0.18cm of fsh] (alpha)
+  {{\bfseries $\alpha = \mathit{opacity}\cdot\exp\!\bigl(-\tfrac{1}{2}\,\mathbf{d}^{\top}\boldsymbol{\Sigma}'^{-1}\mathbf{d}\bigr)$}\\[1pt]
+   {\tiny\itshape\color{gray} $\boldsymbol{\Sigma}'^{-1}$ from $(a,b,c)$ in \texttt{cov2D}\quad discard if $\alpha < 1/255$}};
+
+\node[box, below=0.18cm of alpha] (blend)
+  {{\bfseries Premultiplied alpha blend: $(1,\ 1-\mathit{srcA})$}\\[1pt]
+   {\tiny\itshape\color{gray} Output: \texttt{float4(color$\cdot\alpha$,\ $\alpha$)}}};
+
+\draw[arrow] (render) -- (cam);
+\draw[arrow] (cam)    -- (sort);
+\draw[arrow] (sort)   -- (upload);
+\draw[arrow] (upload) -- (encode);
+\draw[arrow] (encode) -- (vsh);
+\draw[arrow] (vsh)    -- (sigma);
+\draw[arrow] (sigma)  -- (proj);
+\draw[arrow] (proj)   -- (quad);
+\draw[arrow] (quad)   -- (fsh);
+\draw[arrow] (fsh)    -- (alpha);
+\draw[arrow] (alpha)  -- (blend);
+
+\end{tikzpicture}

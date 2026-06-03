@@ -209,59 +209,67 @@ struct RoomDesignerView: View {
 
                 if isBlenderExporting {
                     ZStack {
-                        Color.black.opacity(0.45).ignoresSafeArea()
+                        DesignerPalette.primaryDark.opacity(0.55).ignoresSafeArea()
                         ProgressView("Preparing export…")
+                            .tint(DesignerPalette.warmAccent)
+                            .foregroundStyle(DesignerPalette.lightNeutral)
                             .padding(24)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x1A1D2E)))
+                            .background {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .fill(DesignerPalette.primaryDark.opacity(0.9))
+                                    )
+                            }
                     }
                 }
 
                 // ── Overlay UI ──
                 VStack(spacing: 0) {
-                    topBar
-                        .padding(.horizontal)
-                        .padding(.top, 50)
-
                     Spacer()
 
                     bottomPanel(capturedRoom: capturedRoom)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 12)
 
                     if showDebugView {
                         DebugObjectsView(room: room, capturedRoom: capturedRoom)
                             .padding()
-                            .background(Color.black.opacity(0.8))
-                            .cornerRadius(15)
-                            .padding(.bottom, 10)
+                            .designerPanel(cornerRadius: 15)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 8)
                     }
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    topBar
                 }
             } else {
                 // No captured room data
                 ZStack {
-                    Color(hex: 0x0B0D17).ignoresSafeArea()
+                    DesignerPalette.primaryDark.ignoresSafeArea()
 
                     VStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(AppTheme.glowOrange.opacity(0.12))
+                                .fill(DesignerPalette.warmAccent.opacity(0.18))
                                 .frame(width: 110, height: 110)
                                 .blur(radius: 25)
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(AppTheme.glowOrange)
+                                .foregroundStyle(DesignerPalette.warmAccent)
                         }
                         Text("Room Data Not Available")
                             .font(.title3.weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(DesignerPalette.lightNeutral)
                         Text("This room hasn't been scanned yet.\nGo back and scan it to get started.")
                             .font(.subheadline)
-                            .foregroundColor(AppTheme.secondaryText)
+                            .foregroundStyle(DesignerPalette.secondaryText)
                             .multilineTextAlignment(.center)
 
                         Button(action: { dismiss() }) {
                             Label("Go Back", systemImage: "chevron.left")
                         }
-                        .buttonStyle(GradientButtonStyle())
+                        .buttonStyle(DesignerPrimaryButtonStyle())
                         .padding(.top, 6)
                     }
                     .padding(32)
@@ -317,6 +325,7 @@ struct RoomDesignerView: View {
         }
         .sheet(isPresented: $showStatistics) {
             RoomStatisticsView(room: room)
+                .appSheetBackground()
         }
         .onChange(of: room.id) { _, _ in roomManager.updateRoom(room) }
         .onChange(of: room.furnitureReplacements.count) { _, _ in roomManager.updateRoom(room) }
@@ -341,61 +350,85 @@ struct RoomDesignerView: View {
     // MARK: Top Bar
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
-                    .tintedIcon()
             }
+            .designerIconButton()
+            .accessibilityLabel("Back")
 
-            Spacer()
+            Spacer(minLength: 8)
 
             HStack(spacing: 8) {
                 Image(systemName: "view.3d")
-                    .foregroundStyle(AppTheme.accentGradientInline)
-                    .font(.system(size: 14))
+                    .foregroundStyle(DesignerPalette.accentGradient)
+                    .font(.system(size: 14, weight: .semibold))
                 Text(room.name)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(DesignerPalette.lightNeutral)
+                    .lineLimit(1)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .glassCard(cornerRadius: 12)
-
-            Spacer()
-
-            Button(action: {
-                isFirstPersonCamera.toggle()
-                switchCameraMode(firstPerson: isFirstPersonCamera)
-            }) {
-                Image(systemName: isFirstPersonCamera
-                      ? "eye.fill" : "eye")
-                    .tintedIcon(isFirstPersonCamera
-                                ? AppTheme.glowGreen : AppTheme.glowCyan)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .fill(DesignerPalette.secondaryTint.opacity(0.88))
+                    )
             }
-            .help(isFirstPersonCamera ? "Orbit View" : "Room View")
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(DesignerPalette.warmAccent.opacity(0.35), lineWidth: 1)
+            )
 
-            Button(action: { showStatistics = true }) {
-                Image(systemName: "ruler")
-                    .tintedIcon(AppTheme.glowOrange)
-            }
-            .help("Room Statistics")
+            Spacer(minLength: 8)
 
-            Button(action: takeScreenshot) {
-                Image(systemName: "camera.fill")
-                    .tintedIcon()
-            }
+            Menu {
+                Button {
+                    isFirstPersonCamera.toggle()
+                    switchCameraMode(firstPerson: isFirstPersonCamera)
+                } label: {
+                    Label(
+                        isFirstPersonCamera ? "Switch to Orbit View" : "Switch to Room View",
+                        systemImage: isFirstPersonCamera ? "eye" : "eye.fill"
+                    )
+                }
 
-            Button(action: exportRoomSceneForBlender) {
-                Image(systemName: "square.and.arrow.up.on.square")
-                    .tintedIcon(AppTheme.glowCyan)
-            }
-            .disabled(isBlenderExporting)
-            .help("Export room for Blender (ZIP)")
+                Button { showStatistics = true } label: {
+                    Label("Room Statistics", systemImage: "ruler")
+                }
 
-            Button(action: { showDebugView.toggle() }) {
-                Image(systemName: "info.circle")
-                    .tintedIcon(AppTheme.glowViolet)
+                Button(action: takeScreenshot) {
+                    Label("Capture Screenshot", systemImage: "camera.fill")
+                }
+
+                Button(action: exportRoomSceneForBlender) {
+                    Label("Export for Blender", systemImage: "square.and.arrow.up.on.square")
+                }
+                .disabled(isBlenderExporting)
+
+                Divider()
+
+                Button { showDebugView.toggle() } label: {
+                    Label(
+                        showDebugView ? "Hide Debug Info" : "Show Debug Info",
+                        systemImage: "info.circle"
+                    )
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
+            .designerIconButton(prominent: true)
+            .accessibilityLabel("Editor tools")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background {
+            DesignerTopBarBackground()
+                .ignoresSafeArea(edges: .top)
         }
     }
 
@@ -416,7 +449,7 @@ struct RoomDesignerView: View {
                     onBrowseAll: { showFullCatalog = true }
                 )
             }
-            .glassCard(cornerRadius: AppTheme.cornerRadius)
+            .designerPanel(cornerRadius: DesignerPalette.cornerRadius)
             .padding(.horizontal, 12)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.easeInOut(duration: 0.25), value: selectedObject?.stableId)
@@ -430,19 +463,19 @@ struct RoomDesignerView: View {
                 } label: {
                     VStack(spacing: 8) {
                         Capsule()
-                            .fill(Color.white.opacity(0.25))
+                            .fill(DesignerPalette.warmAccent.opacity(0.45))
                             .frame(width: 36, height: 4)
 
                         HStack(spacing: 8) {
                             Image(systemName: "cube.transparent.fill")
-                                .foregroundStyle(AppTheme.accentGradientInline)
+                                .foregroundStyle(DesignerPalette.accentGradient)
                             Text("3D Room Editor")
                                 .font(.subheadline.weight(.bold))
-                                .foregroundColor(.white)
+                                .foregroundStyle(DesignerPalette.lightNeutral)
                             Spacer()
                             Image(systemName: "chevron.down")
                                 .font(.caption.weight(.bold))
-                                .foregroundColor(AppTheme.secondaryText)
+                                .foregroundStyle(DesignerPalette.tertiaryText)
                                 .rotationEffect(.degrees(editorHintsExpanded ? 0 : -180))
                         }
                     }
@@ -465,16 +498,16 @@ struct RoomDesignerView: View {
 
                         // ── Room Materials ──
                         VStack(spacing: 0) {
-                            Divider().background(Color.white.opacity(0.1))
+                            Divider().background(DesignerPalette.warmAccent.opacity(0.25))
                                 .padding(.bottom, 10)
 
                             HStack(spacing: 6) {
                                 Image(systemName: "paintpalette.fill")
-                                    .foregroundStyle(AppTheme.accentGradientInline)
+                                    .foregroundStyle(DesignerPalette.accentGradient)
                                     .font(.system(size: 12))
                                 Text("Room Materials")
                                     .font(.caption.weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(DesignerPalette.lightNeutral)
                                 Spacer()
                             }
                             .padding(.bottom, 8)
@@ -487,11 +520,11 @@ struct RoomDesignerView: View {
                                         .frame(width: 26, height: 26)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 5)
-                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                                .stroke(DesignerPalette.warmAccent.opacity(0.5), lineWidth: 1)
                                         )
                                     Text("Walls")
                                         .font(.caption.weight(.medium))
-                                        .foregroundColor(AppTheme.secondaryText)
+                                        .foregroundStyle(DesignerPalette.secondaryText)
                                     ColorPicker("", selection: $wallColor, supportsOpacity: false)
                                         .labelsHidden()
                                         .scaleEffect(0.85)
@@ -509,11 +542,11 @@ struct RoomDesignerView: View {
                                         .frame(width: 26, height: 26)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 5)
-                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                                .stroke(DesignerPalette.warmAccent.opacity(0.5), lineWidth: 1)
                                         )
                                     Text("Floor")
                                         .font(.caption.weight(.medium))
-                                        .foregroundColor(AppTheme.secondaryText)
+                                        .foregroundStyle(DesignerPalette.secondaryText)
                                     ColorPicker("", selection: $floorColor, supportsOpacity: false)
                                         .labelsHidden()
                                         .scaleEffect(0.85)
@@ -528,56 +561,23 @@ struct RoomDesignerView: View {
                             Button(action: { showAddFurnitureCatalog = true }) {
                                 Label("Add Furniture", systemImage: "plus.circle.fill")
                             }
-                            .buttonStyle(GradientButtonStyle())
+                            .buttonStyle(DesignerPrimaryButtonStyle())
 
                             HStack(spacing: 8) {
                                 Button(action: { showWallArtPicker = true }) {
                                     Label("Wall Art", systemImage: "photo.artframe")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                .fill(Color.white.opacity(0.10))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                        .stroke(AppTheme.glowCyan.opacity(0.3), lineWidth: 1)
-                                                )
-                                        )
                                 }
+                                .buttonStyle(DesignerSecondaryChipButton())
 
                                 Button(action: { showLightingPicker = true }) {
                                     Label("Lighting", systemImage: "lightbulb.fill")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                .fill(Color.white.opacity(0.10))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                        .stroke(AppTheme.glowOrange.opacity(0.3), lineWidth: 1)
-                                                )
-                                        )
                                 }
+                                .buttonStyle(DesignerSecondaryChipButton())
 
                                 Button(action: { showCarpetPicker = true }) {
                                     Label("Carpet", systemImage: "square.fill")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                .fill(Color.white.opacity(0.10))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
-                                                        .stroke(AppTheme.glowGreen.opacity(0.3), lineWidth: 1)
-                                                )
-                                        )
                                 }
+                                .buttonStyle(DesignerSecondaryChipButton())
                             }
                         }
                         .padding(.top, 2)
@@ -587,7 +587,7 @@ struct RoomDesignerView: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .glassCard(cornerRadius: AppTheme.cornerRadius)
+            .designerPanel(cornerRadius: DesignerPalette.cornerRadius)
             .padding(.horizontal, 12)
             .gesture(
                 DragGesture(minimumDistance: 20)
@@ -607,7 +607,7 @@ struct RoomDesignerView: View {
     private func hintRow(icon: String, text: String) -> some View {
         Label(text, systemImage: icon)
             .font(.caption)
-            .foregroundColor(AppTheme.secondaryText)
+            .foregroundStyle(DesignerPalette.secondaryText)
     }
 
     // MARK: Object Info Bar (unreplaced)
@@ -616,20 +616,25 @@ struct RoomDesignerView: View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
                 Text(object.categoryDescription)
-                    .font(.subheadline.weight(.bold)).foregroundColor(.white)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(DesignerPalette.lightNeutral)
                 Text("Select a replacement below or drag to reposition")
-                    .font(.caption2).foregroundColor(AppTheme.secondaryText)
+                    .font(.caption2)
+                    .foregroundStyle(DesignerPalette.secondaryText)
             }
             Spacer()
             if isManipulating {
                 Text("Moving…")
-                    .font(.caption2.weight(.semibold)).foregroundColor(AppTheme.glowCyan)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(DesignerPalette.warmAccent)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(AppTheme.glowCyan.opacity(0.15)).cornerRadius(8)
+                    .background(DesignerPalette.secondaryTint.opacity(0.55))
+                    .clipShape(Capsule())
             }
             Button { selectedObject = nil } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(AppTheme.tertiaryText).font(.title3)
+                    .foregroundStyle(DesignerPalette.tertiaryText)
+                    .font(.title3)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -642,20 +647,25 @@ struct RoomDesignerView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(friendlyModelName(selectedReplacement?.replacedWithUSDZ ?? "Furniture"))
-                        .font(.subheadline.weight(.bold)).foregroundColor(.white)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(DesignerPalette.lightNeutral)
                     Text("Drag an axis arrow to move / Twist to rotate")
-                        .font(.caption2).foregroundColor(AppTheme.secondaryText)
+                        .font(.caption2)
+                        .foregroundStyle(DesignerPalette.secondaryText)
                 }
                 Spacer()
                 if isManipulating {
                     Text("Adjusting…")
-                        .font(.caption2.weight(.semibold)).foregroundColor(AppTheme.glowGreen)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(DesignerPalette.warmAccent)
                         .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(AppTheme.glowGreen.opacity(0.15)).cornerRadius(8)
+                        .background(DesignerPalette.secondaryTint.opacity(0.55))
+                        .clipShape(Capsule())
                 }
                 Button { selectedObject = nil } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.tertiaryText).font(.title3)
+                        .foregroundStyle(DesignerPalette.tertiaryText)
+                        .font(.title3)
                 }
             }
 
@@ -665,10 +675,10 @@ struct RoomDesignerView: View {
             HStack(spacing: 12) {
                 Image(systemName: "ruler")
                     .font(.caption2)
-                    .foregroundStyle(AppTheme.accentGradientInline)
+                    .foregroundStyle(DesignerPalette.warmAccent)
                 Text(objDims.formattedDimensions)
                     .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundColor(AppTheme.secondaryText)
+                    .foregroundStyle(DesignerPalette.secondaryText)
                 Spacer()
             }
 
@@ -685,16 +695,18 @@ struct RoomDesignerView: View {
 
                 Button(action: resetPosition) {
                     Label("Reset", systemImage: "arrow.counterclockwise")
-                        .font(.caption.weight(.semibold)).foregroundColor(.white)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignerPalette.primaryDark)
                         .padding(.horizontal, 12).padding(.vertical, 7)
-                        .background(AppTheme.glowOrange.opacity(0.85))
+                        .background(DesignerPalette.warmAccent)
                         .clipShape(Capsule())
                 }
                 Button(action: removeReplacement) {
                     Label("Remove", systemImage: "trash")
-                        .font(.caption.weight(.semibold)).foregroundColor(.white)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignerPalette.lightNeutral)
                         .padding(.horizontal, 12).padding(.vertical, 7)
-                        .background(AppTheme.glowRed.opacity(0.85))
+                        .background(DesignerPalette.secondaryTint)
                         .clipShape(Capsule())
                 }
             }
@@ -706,7 +718,7 @@ struct RoomDesignerView: View {
     private func axisLabel(color: Color, text: String) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(text).font(.caption2.weight(.semibold)).foregroundColor(.white.opacity(0.8))
+            Text(text).font(.caption2.weight(.semibold)).foregroundStyle(DesignerPalette.secondaryText)
         }
     }
 
@@ -762,16 +774,18 @@ struct RoomDesignerView: View {
                                 RoundedRectangle(cornerRadius: 5)
                                     .stroke(
                                         selection.wrappedValue == pattern
-                                            ? Color.cyan : Color.white.opacity(0.15),
+                                            ? DesignerPalette.warmAccent
+                                            : DesignerPalette.lightNeutral.opacity(0.2),
                                         lineWidth: selection.wrappedValue == pattern ? 2 : 1
                                     )
                             )
 
                             Text(pattern.displayName)
                                 .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(
+                                .foregroundStyle(
                                     selection.wrappedValue == pattern
-                                        ? .white : .white.opacity(0.55)
+                                        ? DesignerPalette.lightNeutral
+                                        : DesignerPalette.secondaryText
                                 )
                         }
                     }
@@ -2851,7 +2865,7 @@ struct FurnitureCatalogTray: View {
     var body: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(DesignerPalette.warmAccent.opacity(0.22))
                 .frame(height: 1)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -2866,16 +2880,16 @@ struct FurnitureCatalogTray: View {
                                 )
                                 Text(model.replacingOccurrences(of: "_", with: " ").capitalized)
                                     .font(.caption2.weight(.medium))
-                                    .foregroundColor(.white.opacity(0.85))
+                                    .foregroundStyle(DesignerPalette.lightNeutral.opacity(0.9))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
                             }
                             .frame(width: 76, height: 76)
-                            .background(Color.white.opacity(0.06))
+                            .background(DesignerPalette.secondaryTint.opacity(0.35))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                    .stroke(DesignerPalette.warmAccent.opacity(0.25), lineWidth: 1)
                             )
                         }
                     }
@@ -2890,16 +2904,16 @@ struct FurnitureCatalogTray: View {
                                 )
                                 Text(scan.name)
                                     .font(.caption2.weight(.medium))
-                                    .foregroundColor(.white.opacity(0.85))
+                                    .foregroundStyle(DesignerPalette.lightNeutral.opacity(0.9))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
                             }
                             .frame(width: 76, height: 76)
-                            .background(AppTheme.glowGreen.opacity(0.08))
+                            .background(DesignerPalette.warmAccent.opacity(0.12))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(AppTheme.glowGreen.opacity(0.15), lineWidth: 1)
+                                    .stroke(DesignerPalette.warmAccent.opacity(0.4), lineWidth: 1)
                             )
                         }
                     }
@@ -2908,17 +2922,17 @@ struct FurnitureCatalogTray: View {
                         VStack(spacing: 6) {
                             Image(systemName: "square.grid.2x2")
                                 .font(.system(size: 22))
-                                .foregroundStyle(AppTheme.accentGradientInline)
+                                .foregroundStyle(DesignerPalette.accentGradient)
                             Text("All")
                                 .font(.caption2.weight(.semibold))
-                                .foregroundColor(AppTheme.secondaryText)
+                                .foregroundStyle(DesignerPalette.secondaryText)
                         }
                         .frame(width: 76, height: 76)
-                        .background(Color.white.opacity(0.06))
+                        .background(DesignerPalette.secondaryTint.opacity(0.35))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                .stroke(DesignerPalette.warmAccent.opacity(0.25), lineWidth: 1)
                         )
                     }
                 }
@@ -2960,7 +2974,7 @@ struct FurniturePickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     // Built-in models
@@ -2999,14 +3013,15 @@ struct FurniturePickerView: View {
             }
             .navigationTitle("Select Furniture")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
+        .appSheetBackground()
     }
 
     /// Resolves a display-friendly name for a model key.
@@ -3074,7 +3089,7 @@ struct AddFurniturePickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     if !builtInModels.isEmpty {
@@ -3115,14 +3130,15 @@ struct AddFurniturePickerView: View {
             }
             .navigationTitle("Add Furniture to Room")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
+        .appSheetBackground()
     }
 }
 
@@ -3184,7 +3200,7 @@ struct DebugObjectsView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Debug: \(furnitureObjects.count) Objects")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                     .padding(.bottom, 5)
 
                 HStack(spacing: 15) {
@@ -3206,7 +3222,7 @@ struct DebugObjectsView: View {
                                     .fill(Color(RoomModelSceneView.wireframeColor(for: item.category)))
                                     .frame(width: 10, height: 10)
                                 Text("\(item.index): \(item.category)")
-                                    .font(.subheadline).foregroundColor(.white)
+                                    .font(.subheadline).foregroundStyle(AppTheme.primaryText)
                                 Spacer()
                                 Text(item.hasReplacement ? "REPLACED" : "SELECTABLE")
                                     .font(.caption)
@@ -3235,7 +3251,7 @@ struct DebugObjectsView: View {
                             }
                         }
                         .padding(8)
-                        .background(Color.white.opacity(0.1))
+                        .background(AppTheme.warmAccent.opacity(0.25))
                         .cornerRadius(8)
                     }
                 }

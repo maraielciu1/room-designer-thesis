@@ -31,7 +31,7 @@ struct SHARPCaptureView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             switch phase {
             case .ready:      readyView
@@ -44,9 +44,7 @@ struct SHARPCaptureView: View {
         }
         .navigationTitle("SHARP Capture")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+            .appNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Done") { dismiss() }
@@ -93,7 +91,7 @@ struct SHARPCaptureView: View {
                 VStack(spacing: 8) {
                     Text("SHARP Monocular Capture")
                         .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Text("Take one photo — SHARP reconstructs a full 3D Gaussian Splatting scene in seconds using a single feedforward pass.")
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
@@ -169,7 +167,7 @@ struct SHARPCaptureView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(statusTitle)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(statusSubtitle)
                     .font(.caption)
                     .foregroundColor(AppTheme.secondaryText)
@@ -228,7 +226,7 @@ struct SHARPCaptureView: View {
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1))
+                .stroke(AppTheme.warmAccent.opacity(0.25), lineWidth: 1))
             .padding(.horizontal, 24)
     }
 
@@ -248,7 +246,7 @@ struct SHARPCaptureView: View {
             VStack(spacing: 10) {
                 Text("Generating Splat…")
                     .font(.title3.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text("SHARP is building a 3D Gaussian Splatting scene from your single image.")
                     .font(.subheadline)
                     .foregroundColor(AppTheme.secondaryText)
@@ -268,12 +266,12 @@ struct SHARPCaptureView: View {
     private var serverURLSheet: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("SHARP Server URL")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                         Text("Enter the base URL of your Mac running sharp_server.py. Use your Mac's local WiFi IP address.")
                             .font(.caption)
                             .foregroundColor(AppTheme.secondaryText)
@@ -282,7 +280,7 @@ struct SHARPCaptureView: View {
                             .keyboardType(.URL)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .padding(12)
                             .glassCard(cornerRadius: 12)
                     }
@@ -301,8 +299,7 @@ struct SHARPCaptureView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(hex: 0x0B0D17), for: .navigationBar)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { showURLEditor = false }

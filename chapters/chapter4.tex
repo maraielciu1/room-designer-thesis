@@ -12,7 +12,7 @@ This chapter specifies the intended behaviour of the application from a \textbf{
 \textbf{Core use cases} include: (UC-1) capture a room with RoomPlan and save it; (UC-2) open the saved room in the 3D editor; (UC-3) select a detected furniture instance and assign a replacement USDZ model; (UC-4) adjust position, orientation, and scale with gestures; (UC-5) leave the app and return later with edits intact; (UC-6) capture a standalone object with Object Capture and add it to the furniture library; (UC-7) optionally import a 3DGS \texttt{.ply} and view it alongside or
 instead of a mesh for comparison; (UC-8) capture a single photograph with
 the in-app camera and receive an interactive 3DGS scene reconstructed by
-SHARP on a local server within approximately 2-10 seconds.
+SHARP on a local server within approximately 2-10 seconds. (UC-9) Export staged room as Blender ZIP from list or editor.
 
 
 \section{Functional Requirements}
@@ -38,6 +38,8 @@ SHARP on a local server within approximately 2-10 seconds.
     \item [R-9 SHARP single-image inference.] The system shall provide a capture interface that sends a single JPEG image from the device camera to a user-configured SHARP inference server over the local network, receives a 3DGS \texttt{.ply} file in response, and stores it in the app's Documents directory. The HTTP client shall use a request timeout of at least 360\,s to accommodate first-run Metal shader compilation on the server.
 
     \item [R-10 Server reachability and configuration.] The system shall perform a health-check ping to the configured SHARP server URL before each inference session and display the server's reachability status (reachable, unreachable, or unknown) with a visual indicator. The user shall be able to configure the server base URL within the app at any time.
+
+    \item [R-11 Blender export] The system shall export a saved room with scan data as a shareable ZIP containing: (a) glTF scene in metres with placement markers; (b) USDZ furniture and wall-art copies; (c) JSON manifests;\\ (d) \texttt{blender\_apply\_furniture.py} and README.
 
 \end{description}
 
@@ -70,7 +72,7 @@ SHARP on a local server within approximately 2-10 seconds.
 
 \textbf{Graphics and AR.} RealityKit for the room editor; ARKit and RoomPlan for capture; Metal for the optional Gaussian splat renderer (\texttt{MTKView} bridge from SwiftUI).
 
-\textbf{Data formats.} The system utilizes local data formats for the core scan contract, ensuring structural persistence without commercial cloud dependencies. Concretely, \texttt{CapturedRoom} is encoded via JSON through \texttt{Codable}; USDZ serves meshes; PLY serves splats.
+\textbf{Data formats.} \texttt{CapturedRoom} encoded via JSON through \texttt{Codable}; USDZ for meshes; PLY for splats; optional Firebase or marketplace features do not change the on-device scan contract.
 
 \textbf{Storage layout (conceptual).} Room scan files reside under a subdirectory of Documents (e.g.\ \texttt{RoomScans/}), with one file per room identifier; in-memory caches may mirror loaded \texttt{CapturedRoom} instances for performance.
 
@@ -120,14 +122,15 @@ N-8 & Error handling: no crash on PLY corruption, server error, or timeout \\
 
 \begin{figure}[H]
 \centering
-\thesisfig{0.85\textwidth}{figures/ch4_context_diagram.pdf}
+\input{tikz_diagrams/ch4_context_diagram}
+% \thesisfig{0.85\textwidth}{figures/ch4_context_diagram.pdf}
 \caption{System context: user, application, and main persistent artefacts (USDZ, PLY, room JSON).}
 \label{fig:context_req}
 \end{figure}
 
 \section{Constraints and Dependencies}
 
-The application depends on Apple's RoomPlan and Object Capture frameworks and on device capabilities documented by Apple \cite{apple2024roomplan2}. 3DGS viewing depends on compatible \texttt{.ply} exports from external training code or from the SHARP inference path (R-9), which is a \emph{computational} service on the user's network, distinct from third-party content hosting. No requirement in this chapter mandates a specific commercial marketplace; the core thesis pipeline focuses on spatial reconstruction and local editing.
+The application depends on Apple's RoomPlan and Object Capture frameworks and on device capabilities documented by Apple \cite{apple2024roomplan2}. 3DGS viewing depends on compatible \texttt{.ply} exports from external training code. No requirement in this chapter mandates a specific cloud backend; any online marketplace is an extension beyond the core thesis pipeline.
 
 \section{Risk Analysis}
 

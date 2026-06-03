@@ -72,9 +72,11 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
     /// manager knows to load this model from disk rather than the app bundle.
     var catalogKey: String { "scanned_\(id.uuidString)" }
 
-    /// Absolute URL of the USDZ file on disk.
+    /// Absolute URL of the USDZ file on disk (per-user storage, with legacy fallback).
     var usdzURL: URL {
-        ScannedFurnitureManager.modelDirectory.appendingPathComponent(usdzFileName)
+        let primary = UserStoragePaths.scannedFurniture(userId: userId).appendingPathComponent(usdzFileName)
+        if FileManager.default.fileExists(atPath: primary.path) { return primary }
+        return UserStoragePaths.legacyScannedFurniture.appendingPathComponent(usdzFileName)
     }
 
     /// Human-readable file size.
@@ -93,7 +95,9 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
     /// Absolute URL of the .ply splat file on disk.
     var splatURL: URL? {
         guard let name = splatFileName else { return nil }
-        return ScannedFurnitureManager.modelDirectory.appendingPathComponent(name)
+        let primary = UserStoragePaths.scannedFurniture(userId: userId).appendingPathComponent(name)
+        if FileManager.default.fileExists(atPath: primary.path) { return primary }
+        return UserStoragePaths.legacyScannedFurniture.appendingPathComponent(name)
     }
 
     /// Human-readable file size for the splat.

@@ -21,6 +21,10 @@ class ProjectManager: ObservableObject {
     init(userManager: UserManager, roomManager: RoomManager) {
         self.userManager = userManager
         self.roomManager = roomManager
+        reloadForCurrentUser()
+    }
+
+    func reloadForCurrentUser() {
         loadProjects()
     }
 
@@ -99,6 +103,20 @@ class ProjectManager: ObservableObject {
         roomManager.updateRoom(updatedRoom)
     }
 
+    /// Drop a deleted room from every project that references it.
+    func removeRoomReferences(for roomId: UUID) {
+        var changed = false
+        for idx in projects.indices {
+            let before = projects[idx].roomIds.count
+            projects[idx].roomIds.removeAll { $0 == roomId }
+            if projects[idx].roomIds.count != before {
+                projects[idx].updatedAt = Date()
+                changed = true
+            }
+        }
+        if changed { save() }
+    }
+
     /// Resolve Room objects for a project.
     func rooms(for project: Project) -> [Room] {
         project.roomIds.compactMap { roomId in
@@ -136,15 +154,15 @@ class ProjectManager: ObservableObject {
     // MARK: - Persistence
 
     private func loadProjects() {
-        if let data = UserDefaults.standard.data(forKey: storageKey),
-           let decoded = try? JSONDecoder().decode([Project].self, from: data) {
-            projects = decoded
+        guard let userId = userManager.currentUser?.id else {
+            projects = []
+            return
         }
+        projects = UserScopedStorage.load([Project].self, baseKey: storageKey, userId: userId) ?? []
     }
 
     private func save() {
-        if let encoded = try? JSONEncoder().encode(projects) {
-            UserDefaults.standard.set(encoded, forKey: storageKey)
-        }
+        guard let userId = userManager.currentUser?.id else { return }
+        UserScopedStorage.save(projects, baseKey: storageKey, userId: userId)
     }
 }

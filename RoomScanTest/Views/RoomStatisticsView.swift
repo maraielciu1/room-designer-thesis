@@ -73,7 +73,7 @@ struct RoomStatisticsView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 if measurements != nil {
                     VStack(spacing: 0) {
@@ -101,14 +101,16 @@ struct RoomStatisticsView: View {
             }
             .navigationTitle("Room Statistics")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 
     // MARK: - Tab Bar
@@ -136,18 +138,18 @@ struct RoomStatisticsView: View {
                 Text(tab.rawValue)
                     .font(.caption.weight(.semibold))
             }
-            .foregroundColor(isSelected ? .white : AppTheme.secondaryText)
+            .foregroundColor(isSelected ? AppTheme.primaryDark : AppTheme.secondaryText)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 isSelected
                     ? AnyShapeStyle(AppTheme.accentGradientInline)
-                    : AnyShapeStyle(Color.white.opacity(0.06))
+                    : AnyShapeStyle(AppTheme.secondaryTint.opacity(0.35))
             )
             .clipShape(Capsule())
             .overlay(
                 Capsule().stroke(
-                    isSelected ? Color.clear : Color.white.opacity(0.1),
+                    isSelected ? Color.clear : AppTheme.warmAccent.opacity(0.25),
                     lineWidth: 1
                 )
             )
@@ -241,7 +243,7 @@ struct RoomStatisticsView: View {
                         value: est.formattedPaint,
                         detail: "Based on ~10 m²/L coverage"
                     )
-                    Divider().background(Color.white.opacity(0.1))
+                    Divider().background(AppTheme.warmAccent.opacity(0.25))
 
                     materialRow(
                         icon: "square.grid.3x3.fill",
@@ -249,7 +251,7 @@ struct RoomStatisticsView: View {
                         value: est.formattedFlooring,
                         detail: "Includes 10% waste allowance"
                     )
-                    Divider().background(Color.white.opacity(0.1))
+                    Divider().background(AppTheme.warmAccent.opacity(0.25))
 
                     materialRow(
                         icon: "ruler",
@@ -293,7 +295,7 @@ struct RoomStatisticsView: View {
                         .foregroundStyle(AppTheme.glowGreen)
                     Text("Looking Good!")
                         .font(.title3.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Text("No suggestions at this time. Your room design looks well balanced.")
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
@@ -320,7 +322,7 @@ struct RoomStatisticsView: View {
 
             Text(title)
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
 
             if !value.isEmpty {
                 Text(value)
@@ -346,7 +348,7 @@ struct RoomStatisticsView: View {
 
             Text(value)
                 .font(.title3.weight(.bold).monospacedDigit())
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
 
             Text(label)
                 .font(.caption2)
@@ -372,7 +374,7 @@ struct RoomStatisticsView: View {
 
             Text(value)
                 .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
         }
     }
 
@@ -386,7 +388,7 @@ struct RoomStatisticsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(detail)
                     .font(.caption2)
                     .foregroundColor(AppTheme.tertiaryText)
@@ -413,14 +415,14 @@ struct RoomStatisticsView: View {
                 HStack {
                     Text(suggestion.title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Spacer()
                     Text(suggestion.category.rawValue)
                         .font(.caption2)
                         .foregroundColor(AppTheme.secondaryText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color.white.opacity(0.06))
+                        .background(AppTheme.secondaryTint.opacity(0.35))
                         .clipShape(Capsule())
                 }
 
@@ -441,7 +443,7 @@ struct RoomStatisticsView: View {
                 .foregroundStyle(AppTheme.accentGradientInline)
             Text("No Scan Data")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
             Text("Scan the room first to see measurements and statistics.")
                 .font(.subheadline)
                 .foregroundColor(AppTheme.secondaryText)

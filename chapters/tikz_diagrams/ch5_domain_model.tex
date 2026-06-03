@@ -1,0 +1,111 @@
+% ch5_domain_model.tex
+% fig:domain_model — domain model
+
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  hdr/.style={rectangle, draw=gray!70, fill=gray!25, line width=0.8pt,
+              minimum width=5.0cm, minimum height=0.55cm,
+              font=\small\bfseries, align=center,
+              text height=0.35cm, text depth=0.10cm},
+  row/.style={rectangle, draw=gray!60, fill=white, line width=0.5pt,
+              minimum width=5.0cm, minimum height=0.55cm,
+              font=\footnotesize, align=center,
+              text height=0.35cm, text depth=0.10cm, inner sep=3pt},
+  ehdr/.style={hdr, draw=gray!45, fill=gray!10, dashed, minimum width=3.8cm},
+  erow/.style={row,  draw=gray!40, fill=white,  dashed, minimum width=3.8cm},
+  rel/.style={-{Stealth[length=5pt]}, thick, draw=gray!65},
+  drel/.style={rel, dashed, draw=gray!50},
+  lbl/.style={font=\footnotesize\itshape, text=gray!70, fill=white, inner sep=2pt}
+]
+
+%%══════════════ LEFT COLUMN  x=0 ══════════════
+
+\node[hdr]                 (uH) at (0,  0)   {\texttt{User}};
+\node[row, below=0pt of uH] (u1)             {id: UUID};
+\node[row, below=0pt of u1] (u2)             {name: String};
+\node[row, below=0pt of u2] (u3)             {email: String};
+\node[row, below=0pt of u3] (u4)             {authProvider: enum};
+
+\node[hdr]                 (rH) at (0, -5.0) {\texttt{Room}};
+\node[row, below=0pt of rH] (r1)             {id: UUID};
+\node[row, below=0pt of r1] (r2)             {name: String};
+\node[row, below=0pt of r2] (r3)             {userID: UUID};
+\node[row, below=0pt of r3] (r4)             {capturedRoomURL: URL?};
+\node[row, below=0pt of r4] (r5)             {materials: RoomMaterials?};
+\node[row, minimum height=1.0cm, below=0pt of r5] (r6)
+                                             {\parbox[c]{4.2cm}{\centering\footnotesize replacements: [FurnitureReplacement]}};
+
+\node[hdr]                 (pH) at (0,-11.0) {\texttt{Project}};
+\node[row, below=0pt of pH] (p1)             {id: UUID};
+\node[row, below=0pt of p1] (p2)             {name: String};
+\node[row, below=0pt of p2] (p3)             {roomIDs: [UUID]};
+
+%%══════════════ RIGHT COLUMN  x=7.0 ══════════════
+
+\node[hdr]                 (aH) at (7.0,  0)   {\texttt{AuthCredential}};
+\node[row, below=0pt of aH] (a1)               {userID: UUID};
+\node[row, below=0pt of a1] (a2)               {provider: .email / .google};
+\node[row, below=0pt of a2] (a3)               {token / hash: String};
+
+\node[hdr]                 (fH) at (7.0, -5.0) {\texttt{FurnitureReplacement}};
+\node[row, below=0pt of fH] (f1)               {objectID: UUID};
+\node[row, below=0pt of f1] (f2)               {usdzURL: URL?};
+\node[row, below=0pt of f2] (f3)               {category: DecorCategory?};
+\node[row, below=0pt of f3] (f4)               {customScale: Float};
+\node[row, below=0pt of f4] (f5)               {transform: simd\_float4x4};
+
+\node[hdr]                 (sH) at (7.0,-11.0) {\texttt{ScannedFurniture}};
+\node[row, below=0pt of sH] (s1)               {id: UUID};
+\node[row, below=0pt of s1] (s2)               {name: String};
+\node[row, below=0pt of s2] (s3)               {usdzURL: URL};
+
+%%══════════════ FAR RIGHT  x=12.5 ══════════════
+
+\node[ehdr]                 (cH) at (12.5,-5.0) {\texttt{CapturedRoom}};
+\node[erow, below=0pt of cH] (c1)              {walls, floors, doors};
+\node[erow, below=0pt of c1] (c2)              {objects: [Object]};
+\node[erow, below=0pt of c2] (c3)              {JSON on disk};
+
+%%══════════════ RELATIONSHIPS ══════════════
+
+%% 1) AuthCredential ──1..1──> User
+\draw[rel] (aH.west) -- (uH.east);
+\node[lbl] at (3.5, 0.40) {1..1};
+
+%% 2) User ──1..*──> Room
+%%    Exit from u4.south (bottom of User table) straight down to rH.north (top of Room table)
+\draw[rel] (u4.south) -- (rH.north);
+\node[lbl] at (-0.9, -4.3) {1..*};
+
+%% 3) Room ──1..*──> FurnitureReplacement
+%%    Header-to-header horizontal — both at y=-5.0
+\draw[rel] (rH.east) -- (fH.west);
+\node[lbl] at (3.5, -5.35) {1..*};
+
+%% 4) Room.capturedRoomURL ──> CapturedRoom  (stored on disk)
+%%    Exit r4.east (capturedRoomURL row, y≈-7.2), step right outside Room (x=2.8),
+%%    drop below FurnitureReplacement bottom (y≈-8.3) to y=-8.5,
+%%    travel right through the gap between FurnitureReplacement (right edge x=9.5)
+%%    and CapturedRoom (left edge x=10.6) at x=10.1,
+%%    rise to CapturedRoom centre level, then enter cH.west.
+\draw[drel]
+  (r4.east)
+  -- ++(0.3, 0)
+  -- ++(0, -1.3)
+  -- (10.1, -8.5)
+  -- (10.1, -5.0)
+  -- (cH.west);
+\node[lbl] at (6.3, -8.8) {stored on disk};
+
+%% 5) Room ──0..1──> Project
+%%    Exit from r6.south (bottom of Room table), go straight down to Project top
+\draw[drel] (r6.south) -- (pH.north);
+\node[lbl] at (-0.9, -10.3) {0..1};
+
+%% 6) FurnitureReplacement ──0..1──> ScannedFurniture
+%%    Exit from f5.south (bottom of FurnitureReplacement table), go down to ScannedFurniture top
+\draw[drel] (f5.south) -- (sH.north);
+\node[lbl] at (8.0, -10.3) {0..1};
+
+\end{tikzpicture}%
+}

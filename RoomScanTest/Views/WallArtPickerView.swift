@@ -28,7 +28,7 @@ struct WallArtPickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -46,10 +46,10 @@ struct WallArtPickerView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.15), lineWidth: 1))
+                                            .stroke(AppTheme.warmAccent.opacity(0.3), lineWidth: 1))
                             } else {
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.06))
+                                    .fill(AppTheme.secondaryTint.opacity(0.35))
                                     .frame(height: 160)
                                     .overlay(
                                         VStack(spacing: 8) {
@@ -94,7 +94,7 @@ struct WallArtPickerView: View {
 
                                             Text(size.label)
                                                 .font(.caption2.weight(.medium))
-                                                .foregroundColor(.white)
+                                                .foregroundStyle(AppTheme.primaryText)
                                                 .lineLimit(1)
                                                 .minimumScaleFactor(0.7)
                                         }
@@ -105,7 +105,7 @@ struct WallArtPickerView: View {
                                             RoundedRectangle(cornerRadius: 10)
                                                 .fill(frameSize == size
                                                       ? AppTheme.glowCyan.opacity(0.18)
-                                                      : Color.white.opacity(0.06))
+                                                      : AppTheme.secondaryTint.opacity(0.35))
                                         )
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 10)
@@ -136,7 +136,7 @@ struct WallArtPickerView: View {
                                                 ZStack {
                                                     RoundedRectangle(cornerRadius: 6)
                                                         .fill(style == .noFrame
-                                                              ? Color.white.opacity(0.1)
+                                                              ? AppTheme.warmAccent.opacity(0.25)
                                                               : style.previewColor)
                                                         .frame(width: 38, height: 38)
 
@@ -147,13 +147,13 @@ struct WallArtPickerView: View {
                                                     } else {
                                                         Image(systemName: "xmark")
                                                             .font(.caption2)
-                                                            .foregroundColor(.white)
+                                                            .foregroundStyle(AppTheme.primaryText)
                                                     }
                                                 }
 
                                                 Text(style.rawValue)
                                                     .font(.system(size: 9, weight: .medium))
-                                                    .foregroundColor(.white)
+                                                    .foregroundStyle(AppTheme.primaryText)
                                                     .lineLimit(1)
                                             }
                                             .padding(6)
@@ -207,10 +207,11 @@ struct WallArtPickerView: View {
             }
             .navigationTitle("Wall Art")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
             .onChange(of: pickerItem) { _, newItem in
@@ -223,6 +224,7 @@ struct WallArtPickerView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 
     // ── Preview card with frame + image ──

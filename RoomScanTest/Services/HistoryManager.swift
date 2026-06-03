@@ -16,6 +16,10 @@ class HistoryManager: ObservableObject {
     
     init(userManager: UserManager) {
         self.userManager = userManager
+        reloadForCurrentUser()
+    }
+
+    func reloadForCurrentUser() {
         loadHistory()
     }
     
@@ -51,15 +55,15 @@ class HistoryManager: ObservableObject {
     }
     
     private func loadHistory() {
-        if let data = UserDefaults.standard.data(forKey: historyKey),
-           let decoded = try? JSONDecoder().decode([ReplacementHistory].self, from: data) {
-            history = decoded
+        guard let userId = userManager.currentUser?.id else {
+            history = []
+            return
         }
+        history = UserScopedStorage.load([ReplacementHistory].self, baseKey: historyKey, userId: userId) ?? []
     }
-    
+
     private func saveHistory() {
-        if let encoded = try? JSONEncoder().encode(history) {
-            UserDefaults.standard.set(encoded, forKey: historyKey)
-        }
+        guard let userId = userManager.currentUser?.id else { return }
+        UserScopedStorage.save(history, baseKey: historyKey, userId: userId)
     }
 }

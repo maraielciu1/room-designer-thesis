@@ -48,7 +48,7 @@ struct GaussianSplattingGuideView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
@@ -125,11 +125,11 @@ struct GaussianSplattingGuideView: View {
             }
             .navigationTitle("3DGS Training Guide")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
@@ -157,7 +157,7 @@ struct GaussianSplattingGuideView: View {
 
             Text("How to Train a Gaussian Splat")
                 .font(.title2.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
                 .multilineTextAlignment(.center)
 
             Text("Gaussian Splatting creates photorealistic 3D models using a different approach than Apple's Object Capture. Training happens on a computer, then you import the result.")
@@ -226,7 +226,7 @@ struct GaussianSplattingGuideView: View {
             HStack(spacing: 10) {
                 Text("\(number)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                     .frame(width: 28, height: 28)
                     .background(color)
                     .clipShape(Circle())
@@ -237,7 +237,7 @@ struct GaussianSplattingGuideView: View {
 
                 Text(title)
                     .font(.subheadline.weight(.bold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
 
                 Spacer()
             }
@@ -277,12 +277,12 @@ struct GaussianSplattingGuideView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13))
-                .foregroundColor(AppTheme.glowCyan)
+                .foregroundStyle(AppTheme.warmAccent)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(detail)
                     .font(.caption2)
                     .foregroundColor(AppTheme.tertiaryText)
@@ -319,7 +319,7 @@ struct GaussianSplattingGuideView: View {
                         .background(
                             selectedMethod == method
                             ? AnyShapeStyle(method.difficultyColor.opacity(0.2))
-                            : AnyShapeStyle(Color.white.opacity(0.04))
+                            : AnyShapeStyle(AppTheme.lightNeutral.opacity(0.06))
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
@@ -436,7 +436,7 @@ struct GaussianSplattingGuideView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(detail)
                     .font(.caption2)
                     .foregroundColor(AppTheme.tertiaryText)
@@ -488,7 +488,7 @@ struct GaussianSplattingGuideView: View {
     private func guideSubtitle(_ text: String) -> some View {
         Text(text)
             .font(.caption.weight(.bold))
-            .foregroundColor(.white)
+            .foregroundStyle(AppTheme.primaryText)
     }
 
     private func guideTip(_ text: String) -> some View {
@@ -505,7 +505,7 @@ struct GaussianSplattingGuideView: View {
         HStack(alignment: .top, spacing: 8) {
             Text("\(number).")
                 .font(.caption.weight(.bold))
-                .foregroundColor(AppTheme.glowCyan)
+                .foregroundStyle(AppTheme.warmAccent)
                 .frame(width: 16, alignment: .trailing)
             Text(.init(text))
                 .font(.caption)
@@ -535,4 +535,5 @@ struct GaussianSplattingGuideView: View {
 #Preview {
     GaussianSplattingGuideView()
         .preferredColorScheme(.dark)
+        .appSheetBackground()
 }

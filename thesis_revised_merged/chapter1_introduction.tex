@@ -1,0 +1,149 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Motivation and Objectives}
+\label{sec:intro:motivation}
+
+The problem addressed by this thesis arises at the intersection of two
+well-documented shortcomings in current practice. On one side, conventional
+interior design tools, whether two-dimensional floor plans, printed catalogues,
+or digital product configurators, present furniture and spatial layouts as
+abstractions that strip away the perceptual properties that ultimately determine
+whether a redesign succeeds: how an object occludes a window, whether a sofa
+visually dominates a narrow corridor, or how a chosen material interacts with
+the room's natural light. On the other side, consumer augmented reality
+applications that \emph{do} allow virtual objects to be previewed in a live
+camera feed share a structural limitation identified empirically by
+Kandil~et~al.~\cite{kandil2021ux}: they treat the room as a transiently
+detected floor plane, provide no persistent room model, and require the user
+to be physically present in the space for every design iteration. The result
+is a tool that is useful for a single in-store moment but not for the extended,
+iterative process that characterises real interior redesign decisions.
+
+A more principled approach is to treat the room scan itself as the primary
+artefact of the workflow. If the real room is captured once as a metric,
+semantically annotated three-dimensional model, a \emph{digital twin}, subsequent
+design iterations can be performed at any time and from any location without
+requiring the user to return to the physical space. Indoor scene understanding
+research has demonstrated that this level of structure is achievable at scale
+on consumer hardware: ScanNet~\cite{dai2017scannet} showed that richly annotated
+RGB-D reconstructions with per-instance semantic labels support a wide range of
+downstream tasks, and Matterport3D~\cite{CAS+17} extended that work to
+building-scale scenes with 40-category instance labels. Apple's RoomPlan
+API~\cite{apple2024roomplan2} brings a real-time, on-device subset of this
+capability to supported iPhones and iPads, outputting a parametric
+\texttt{CapturedRoom} whose typed structural surfaces and classified furniture
+instances reflect the same conceptual taxonomy that these research datasets
+made trainable.
+
+A second motivation concerns the asset authoring bottleneck. Replacing a
+detected furniture item with a virtual equivalent requires a three-dimensional
+model of that item. Static libraries cover a limited catalogue and exclude
+bespoke or non-commercial pieces. Object Capture~\cite{apple2024roomplan2}
+enables the user to scan a physical object with the same device and obtain a
+USDZ mesh through an on-device photogrammetric pipeline, closing the loop
+between room capture and asset creation without external tooling during the
+core staging workflow.
+
+A third motivation concerns representation choice and workflow completeness.
+3D Gaussian Splatting~\cite{kerbl20233dgs} achieves real-time rendering quality
+competitive with neural radiance fields while remaining differentiable for
+offline training. In this application, explicit meshes remain the medium for
+interactive furniture replacement in RealityKit, whereas imported splats and
+feedforward SHARP reconstructions serve as \emph{visual benchmarks}. Users who
+require desktop refinement can export staged rooms to Blender as glTF-based ZIP
+archives; users who need rapid radiance-field previews can invoke a local SHARP
+inference server. Chapter~\ref{ch:theory2} formalises the three object-level
+reconstruction paths (Assets~A, B, and~C); Chapter~\ref{ch:implementation}
+documents their implementation.
+
+The work pursues the following objectives, each directly justified by the
+gaps identified above:
+
+\begin{enumerate}
+  \item \textbf{Room-scale semantic capture.}
+    Integrate RoomPlan so that a scan yields a \texttt{CapturedRoom} containing
+    typed structural elements (walls, floors, ceilings, doors, windows) and
+    classified furniture instances with metric transforms and bounding dimensions.
+    \emph{Justification:} without a persistent, semantically structured room
+    model, furniture replacement cannot be grounded to real geometry.
+
+  \item \textbf{Persistent virtual staging.}
+    Provide a non-AR three-dimensional editor with orbit-style navigation and
+    gesture-based manipulation (translation, rotation, scale), with state
+    persisted across application launches.
+    \emph{Justification:} Kandil~et~al.~\cite{kandil2021ux} found that
+    requiring physical presence and absence of session persistence were primary
+    usability barriers in existing AR interior apps.
+
+  \item \textbf{Object-scale asset authoring (Asset~A).}
+    Integrate Object Capture for guided multi-view photogrammetric
+    reconstruction into USDZ, extending the furniture library beyond static
+    catalogue content.
+
+  \item \textbf{Radiance-field benchmarks (Assets~B and~C).}
+    Import offline-trained 3DGS \texttt{.ply} files (Asset~B) and invoke Apple's
+    SHARP feedforward model on a LAN server from a single photograph (Asset~C);
+    render both through a shared Metal splat viewer for qualitative comparison
+    with meshes---not for furniture editing.
+
+  \item \textbf{Room analytics and planning aids.}
+    Compute metric dimensions and renovation estimates from scan geometry;
+    provide rule-based interior-design suggestions (including lighting density
+    heuristics) in a dedicated statistics interface.
+
+  \item \textbf{DCC hand-off.}
+    Export completed rooms as glTF-based ZIP archives with USDZ furniture,
+    manifests, and a Blender helper script for further editing outside the device.
+\end{enumerate}
+
+
+\section{Contributions and Scope}
+\label{sec:intro:contributions}
+
+The contributions of this thesis are primarily integrative and
+engineering-oriented, consistent with the scope of a bachelor project:
+
+\begin{itemize}
+  \item \textbf{A unified scan-to-edit pipeline.}
+    A complete iOS application connecting RoomPlan capture to a serialised
+    room data model, to a RealityKit scene graph, and to furniture replacement
+    with persistence across application launches.
+
+  \item \textbf{Theoretical framing of Apple's capture APIs within the
+    academic literature.}
+    A structured account of how Object Capture instantiates the classical
+    photogrammetric chain and how RoomPlan builds on depth fusion in the TSDF
+    family~\cite{newcombe2011kinectfusion}, augmented by learned structure and
+    semantics, with a principled comparison to the 3D Gaussian Splatting
+    rendering path~\cite{kerbl20233dgs}.
+
+  \item \textbf{A three-way comparative analysis} of mesh (Asset~A),
+    offline 3DGS (Asset~B), and SHARP splats (Asset~C), clarifying roles:
+    interactive staging versus visual benchmarking.
+
+  \item \textbf{A Metal-based Gaussian splat renderer for iOS.}
+    Loading standard binary PLY files from common training frameworks at
+    interactive frame rates, bridged into SwiftUI via \texttt{MTKView}.
+
+  \item \textbf{Supporting services.}
+    Two-level \texttt{CapturedRoom} caching, rule-based
+    \texttt{SmartSuggestionsService}, scan-time colour sampling, Blender export,
+    and local-network SHARP integration without third-party cloud upload for
+    Apple capture paths.
+\end{itemize}
+
+The thesis focuses on software architecture, core algorithms at a conceptual
+level, and the iOS platform. It does not contribute novel learning
+architectures for room understanding: RoomPlan's neural models are Apple's
+proprietary intellectual property. 3DGS training is assumed to run off-device
+in the current system; on-device splat training remains
+research-grade~\cite{Guo26}. Full LiDAR-quality RoomPlan output requires
+iPhone~12~Pro or later, or a LiDAR-equipped iPad~Pro; the application
+degrades gracefully on non-LiDAR devices where Apple's API permits.
+
+\section{Document Structure}
+
+Chapter~\ref{ch:theory1} presents photogrammetry, depth fusion, and the mapping to Object Capture and RoomPlan, followed by related work. Chapter~\ref{ch:theory2} introduces 3D Gaussian Splatting, feedforward SHARP inference, the mesh-versus-splat design choice, and the three-asset comparison. Chapter~\ref{ch:requirements} formalises functional and non-functional requirements and system constraints. Chapter~\ref{ch:implementation} describes architecture, data flow, implementation details, analytics, Blender export, the user interface, and testing. Chapter~\ref{ch:conclusions} summarises results, limitations, and future work.
+
+The opening \textit{Context and Related Work} section situates the project against ScanNet-style indoor semantics~\cite{dai2017scannet}, AR interior design systems~\cite{kan2021ar}, and mobile AR usability evaluation~\cite{kandil2021ux}.

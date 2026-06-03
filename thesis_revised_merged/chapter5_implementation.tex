@@ -1,0 +1,191 @@
+\chapter{Design, Implementation, and Testing}
+\label{ch:implementation}
+
+This chapter describes how the requirements of Chapter~\ref{ch:requirements} are realised in software. It presents the \textbf{architectural decomposition}, the \textbf{data path} from RoomPlan scan to persisted room and RealityKit entities, the roles of major Swift types and services, the \textbf{user interface} structure (including room analytics and Blender export), and a \textbf{testing} approach suitable for a bachelor project.
+
+\section{Architectural Overview}
+
+The application entry point is a SwiftUI \texttt{App} type that configures core services and hosts a root view responsible for the local interior-design workflow, including room scanning, editing, and object capture.
+
+Architecturally, the code follows patterns compatible with \textbf{SwiftUI and MVVM}: views observe reference-type \texttt{ObservableObject} managers (\texttt{RoomManager}, \texttt{FurnitureCatalogManager}, \texttt{ScannedFurnitureManager}, \texttt{ProjectManager}) injected through the environment. Long-running capture sessions (RoomPlan, Object Capture) live in dedicated views that bridge UIKit where needed. Rendering uses \textbf{RealityKit} (\texttt{ARView} in non-AR camera mode) for the room editor and \textbf{Metal} via \texttt{MTKView} for Gaussian splats.
+
+The architecture comprises four layers (Figure~\ref{fig:architecture}):
+
+\begin{enumerate}
+    \item \textbf{SwiftUI Views} --- \texttt{MainTabBar}, \texttt{RoomListView}, \texttt{RoomDesignerView}, \texttt{RoomScanView}, \texttt{ObjectScanView}, \texttt{GaussianSplatView}, \texttt{SHARPCaptureView}, \texttt{RoomStatisticsView}, and related screens.
+    \item \textbf{Observable Managers} --- domain state and persistence triggers.
+    \item \textbf{Services} --- \texttt{SHARPService}, \texttt{GaussianSplatRenderer}, \texttt{MeasurementService}, \texttt{SmartSuggestionsService}, \texttt{RoomColorCaptureService}, \texttt{RoomBlenderExportService}, and others.
+    \item \textbf{Apple Frameworks and Storage} --- RoomPlan, Object Capture, RealityKit, Metal; artefacts in the Documents directory.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.95\textwidth}{figures/ch5_arch_layers.png}
+\caption{Layered application architecture: SwiftUI views observe injectable managers, which delegate to services and Apple frameworks. Storage artefacts include room JSON, USDZ, PLY, and Blender export ZIPs.}
+\label{fig:architecture}
+\end{figure}
+
+\section{Data Model and Persistence}
+\label{sec:ch5_data_model}
+
+The domain type \texttt{Room} (\texttt{Codable}) aggregates identity, timestamps, \texttt{FurnitureReplacement} records, optional \texttt{RoomMaterials}, and optional \texttt{projectId}. It does \textbf{not} embed the full \texttt{CapturedRoom} in the room-list JSON; scan data is stored separately under \texttt{Documents/RoomScans/\{uuid\}.json} with a static in-memory cache and atomic writes. \texttt{RoomManager} owns the saved-rooms index; \texttt{cleanOrphanedScanFiles} removes JSON after room deletion (R-8).
+
+\texttt{FurnitureReplacement} supports USDZ swaps and virtual decor (wall art, carpet, lighting), discriminated by \texttt{originalCategory}, persisted on the same path as furniture replacements. Figures~\ref{fig:domain_model} and~\ref{fig:storage_layout} summarise the model and on-disk layout.
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.97\textwidth}{figures/ch5_domain_model.png}
+\caption{Domain model: \texttt{Room} aggregates replacements; \texttt{CapturedRoom} is a sidecar JSON file.}
+\label{fig:domain_model}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.88\textwidth}{figures/ch5_storage_layout.png}
+\caption{On-device storage layout under the app sandbox.}
+\label{fig:storage_layout}
+\end{figure}
+
+\section{Data Flow: Scan to Editor}
+
+Figure~\ref{fig:dataflow} illustrates capture $\rightarrow$ persistence $\rightarrow$ editor $\rightarrow$ relaunch. \texttt{RoomScanView} finalises \texttt{RoomCaptureSession.stop(pauseARSession: true)}; \texttt{RoomManager} writes metadata and scan JSON; \texttt{RoomDesignerView} loads the scan, builds RealityKit entities, and writes back gesture and replacement state on save.
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.97\textwidth}{figures/ch5_dataflow.png}
+\caption{Data flow from RoomPlan capture through persistence to the RealityKit editor.}
+\label{fig:dataflow}
+\end{figure}
+
+\section{Key Modules and Views}
+
+\texttt{MainTabBar} separates \textbf{Furniture} (library, Object Capture, splat tools), \textbf{Rooms} (list, scan, editor, Blender export from context menu), and \textbf{Projects} (multi-room grouping). \texttt{RoomDesignerView} hosts the non-AR \texttt{ARView}, furniture picking, materials, statistics sheet, and toolbar export for Blender (R-12). \texttt{ObjectScanView} registers completed USDZ in \texttt{ScannedFurnitureManager}. The splat pipeline (\texttt{GaussianSplatData}, \texttt{GaussianSplatRenderer}, \texttt{GaussianSplatView}) implements R-7.
+
+\subsection{SHARP single-image inference (R-9, R-10)}
+\label{sec:sharp}
+
+\texttt{SHARPService} POSTs JPEG data to \texttt{/sharp/infer} using a dedicated \texttt{URLSession} (360\,s request, 600\,s resource timeout). The server (\texttt{sharp\_server.py}) prunes Gaussians by opacity to $\leq 300\,000$ before returning the \texttt{.ply}. A \texttt{GET /health} ping with 4\,s timeout precedes capture (R-10). Figure~\ref{fig:sharp_pipeline} summarises the path.
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.97\textwidth}{figures/ch5_sharp_pipeline.png}
+\caption{SHARP inference pipeline: device $\rightarrow$ LAN server $\rightarrow$ \texttt{.ply} $\rightarrow$ Metal viewer.}
+\label{fig:sharp_pipeline}
+\end{figure}
+
+\section{USDZ Alignment Heuristics}
+\label{sec:alignment}
+
+When a replacement is first bound, uniform scale $s = \min(d_x^{\mathrm{room}}/d_x^{\mathrm{usdz}}, d_y^{\mathrm{room}}/d_y^{\mathrm{usdz}}, d_z^{\mathrm{room}}/d_z^{\mathrm{usdz}})$ fits the model within the detected bounds, followed by floor grounding from the \texttt{CapturedRoom.Object} transform. \texttt{customScale} stores user pinch adjustments.
+
+\section{Metal Gaussian Splatting}
+\label{sec:splat_rendering}
+
+The splat renderer follows Kerbl et al.\ \cite{kerbl20233dgs}: 3D covariance from quaternion and scale, projection to $2\times2$ screen-space covariance via Jacobian $\mathbf{J}$, per-frame depth sort, and alpha compositing in fragment shaders. A low-pass filter on the 2D covariance prevents sub-pixel flicker. Budgets up to 300\,k Gaussians target interactive frame rates (N-1). Figure~\ref{fig:splat_pipeline} shows the per-frame pipeline.
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.55\textwidth}{figures/ch5_splat_pipeline.png}
+\caption{Per-frame Metal Gaussian splatting pipeline.}
+\label{fig:splat_pipeline}
+\end{figure}
+
+\section{Room Analytics (R-11)}
+\label{sec:analytics}
+
+\texttt{RoomStatisticsView} presents four tabs driven by services on the stored \texttt{CapturedRoom}:
+
+\begin{itemize}
+    \item \textbf{Measurements.} \texttt{MeasurementService} sums floor and wall areas, computes an axis-aligned bounding extent, perimeter, and approximate volume.
+    \item \textbf{Objects.} Counts detections versus replacements and decor.
+    \item \textbf{Materials.} Heuristic paint litres (assuming $10\,\mathrm{m}^2/\mathrm{L}$ and two coats after subtracting nominal opening areas), flooring area with waste factor, and skirting length.
+    \item \textbf{Smart Tips.} \texttt{SmartSuggestionsService.generateSuggestions} applies rule-based checks: lighting fixture count compared to $N_{\mathrm{rec}} = \max(1, \lfloor A_{\mathrm{floor}} / 4\,\mathrm{m}^2 \rfloor)$; bare-wall and carpet coverage heuristics; furniture density thresholds. No luminance simulation is performed---only placed fixture count versus floor area.
+\end{itemize}
+
+\section{Blender Export (R-12)}
+\label{sec:blender_export}
+
+\texttt{RoomBlenderExportService.makeExportZip} assembles a temporary ZIP archive for import into Blender or other DCC tools. Export requires persisted scan data (\texttt{CapturedRoom}); otherwise the UI shows an error.
+
+The archive typically contains:
+
+\begin{itemize}
+    \item \texttt{room\_scene.gltf} and \texttt{room\_scene.bin} --- structural boxes and green placement markers in metres (\texttt{GltfMiniBuilder}).
+    \item \texttt{furniture/*.usdz} --- copies of staged assets.
+    \item \texttt{wall\_art/*.jpg} --- exported wall-art textures where applicable.
+    \item \texttt{furniture\_manifest.json}, \texttt{scene\_manifest.json} --- transforms, categories, lighting entries.
+    \item \texttt{blender\_apply\_furniture.py} --- post-import script: import USDZ onto markers, create lights from manifest, remove guide geometry.
+    \item \texttt{README.txt} --- import and script execution steps.
+\end{itemize}
+
+Export is exposed from \texttt{RoomDesignerView} (toolbar \emph{Export for Blender}) and \texttt{RoomListView} (context menu). \texttt{materialsForListExport} resolves materials when export is initiated from the list without an open designer session. The share sheet hands the ZIP to Files or macOS. Splats (\texttt{.ply}) are \textbf{not} included; they remain in-app benchmarks unless the user imports them separately in Blender.
+
+\section{On-Device versus Off-Device Processing}
+
+RoomPlan, Object Capture, editor persistence, analytics, and Blender ZIP creation run \textbf{on-device}. Asset~B training runs \textbf{off-device}; SHARP inference runs on a \textbf{user-controlled Mac} on the LAN (N-2).
+
+\section{User Interface Walkthrough}
+
+\textbf{Scanning.} The user starts RoomPlan from the rooms list; structural elements and furniture appear incrementally. On \emph{Done}, \texttt{RoomCaptureSession.stop} yields \texttt{CapturedRoom}; \texttt{RoomColorCaptureService} may sample dominant wall and floor colours during the walk-through for \texttt{RoomMaterials}.
+
+\textbf{Editor.} \texttt{RoomDesignerView} uses non-AR orbit navigation. The user selects detections, binds USDZ, adjusts via gestures and axis gizmo, and may open \texttt{RoomStatisticsView}. Decor pickers add wall art, carpet, and lighting.
+
+\textbf{Benchmarks (optional).} Object Capture (Asset~A), imported \texttt{.ply} (Asset~B), or SHARP capture (Asset~C) open in the splat viewer or library flows for comparison with the mesh editor.
+
+\textbf{Export (optional).} Blender export packages the staged semantic scene for desktop refinement (R-12).
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.72\textwidth}{figures/ch5_ui_03_room_scan.png}\\[0.6em]
+\thesisfig{0.72\textwidth}{figures/ch5_ui_04_editor.png}
+\caption{Example screenshots: RoomPlan capture (top) and non-AR room editor (bottom).}
+\label{fig:ui_scan_editor}
+\end{figure}
+
+\subsection{Demonstration checklist}
+
+\begin{enumerate}
+    \item Launch; verify saved rooms and new scan entry.
+    \item Complete RoomPlan; confirm scan JSON under \texttt{RoomScans/} (R-1, R-2).
+    \item Editor: replace furniture; gesture persistence after relaunch (R-3--R-5).
+    \item Decor and statistics tabs; add lighting; observe Smart Tips update (R-11).
+    \item Object Capture (optional) (R-6).
+    \item SHARP or PLY import (optional) (R-7, R-9, R-10).
+    \item Blender export; import \texttt{room\_scene.gltf} in Blender; run helper script (R-12).
+    \item Delete room with confirmation (R-8).
+\end{enumerate}
+
+\section{Testing}
+
+Manual test cases map requirements to outcomes (Table~\ref{tab:test_map}). Performance is assessed informally; splat scenes target 60\,fps at $\leq 300\,k$ Gaussians (N-1). Edge cases include corrupt JSON, oversized PLY, SHARP timeout, export without scan data, and delete-while-open (N-8).
+
+\begin{table}[htbp]
+\centering
+\caption{Requirement-to-test mapping.}
+\label{tab:test_map}
+\begin{tabular}{|c|p{0.68\textwidth}|}
+\hline
+\textbf{Req.} & \textbf{Test procedure} \\
+\hline
+R-1, R-2 & Scan room; verify JSON in \texttt{RoomScans/}; relaunch. \\
+\hline
+R-3--R-5 & Editor; bind USDZ; transform; kill app; reopen. \\
+\hline
+R-6 & Complete object scan; USDZ in picker. \\
+\hline
+R-7 & Import known-good \texttt{.ply}; orbit smoothly. \\
+\hline
+R-8 & Delete room; confirm; scan file removed. \\
+\hline
+R-9, R-10 & SHARP URL; health indicator; capture; view splat. \\
+\hline
+R-11 & Statistics tabs; lighting tips respond to fixture count. \\
+\hline
+R-12 & Export ZIP; Blender import glTF; run \texttt{blender\_apply\_furniture.py}. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Summary}
+
+The implementation binds Apple's capture APIs to a persistent, editable RealityKit scene graph through explicit \texttt{CapturedRoom} storage and replacement metadata. Optional Metal splatting and SHARP provide radiance-field benchmarks without replacing the mesh-based staging model. Room analytics and Blender export extend the workflow toward planning aids and professional DCC refinement. Requirements R-1--R-12 and non-functional goals N-1--N-8 are addressed in the design decisions documented above.

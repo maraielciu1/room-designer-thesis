@@ -4,8 +4,7 @@
 //
 //  Created by Mara Ielciu on 20.02.2026.
 //
-//  "My Furniture" — shows both built-in USDZ models and user-scanned objects.
-//  The user can scan new objects (Object Capture) or browse/delete scanned ones.
+//  "My Furniture" — built-in USDZ models and user-scanned objects (Object Capture only).
 //
 
 import SwiftUI
@@ -14,8 +13,9 @@ import UniformTypeIdentifiers
 struct FurnitureLibraryView: View {
     @EnvironmentObject var catalogManager: FurnitureCatalogManager
     @EnvironmentObject var scannedFurnitureManager: ScannedFurnitureManager
+    @EnvironmentObject var userManager: UserManager
+    @Environment(\.presentAccount) private var presentAccount
     @State private var showObjectScan = false
-    @State private var showSHARPCapture = false
     @State private var showImportSplat = false
     @State private var importTargetItem: ScannedFurniture?
     @State private var selectedTab: LibraryTab = .scanned
@@ -34,40 +34,7 @@ struct FurnitureLibraryView: View {
             AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Segmented picker ─────────────────────────────────────────
-                HStack(spacing: 6) {
-                    ForEach(LibraryTab.allCases, id: \.self) { tab in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
-                        } label: {
-                            Text(tab.rawValue)
-                                .font(.appCallout.weight(.semibold))
-                                .foregroundColor(selectedTab == tab ? .white : AppTheme.secondaryText)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(
-                                    selectedTab == tab
-                                    ? AnyShapeStyle(AppTheme.accentGradient)
-                                    : AnyShapeStyle(AppTheme.surfaceTertiary)
-                                )
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule().strokeBorder(
-                                        selectedTab == tab
-                                        ? Color.clear
-                                        : Color.white.opacity(0.08), lineWidth: 1)
-                                )
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
-                .frame(maxWidth: .infinity)
-                .background(AppTheme.background)
-                .overlay(alignment: .bottom) {
-                    Divider().background(Color.white.opacity(0.07))
-                }
+                libraryTabPicker
 
                 switch selectedTab {
                 case .scanned: scannedSection
@@ -75,39 +42,20 @@ struct FurnitureLibraryView: View {
                 }
             }
         }
-        .navigationTitle("My Furniture")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.background, for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button {
-                        showObjectScan = true
-                    } label: {
-                        Label("Object Capture scan", systemImage: "cube.transparent")
-                    }
-                    Button {
-                        showSHARPCapture = true
-                    } label: {
-                        Label("SHARP — one photo splat", systemImage: "sparkles")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(AppTheme.accentGradientInline)
-                }
-                .accessibilityLabel("New scan or SHARP capture")
-            }
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            AppScreenHeader(
+                title: "My Furniture",
+                trailing: .add(accessibilityLabel: "Object Capture scan") {
+                    showObjectScan = true
+                },
+                profileInitial: userManager.currentUser.map { String($0.name.prefix(1)).uppercased() },
+                onProfileTap: presentAccount
+            )
         }
         .fullScreenCover(isPresented: $showObjectScan) {
             ObjectScanView(onDismiss: { showObjectScan = false })
-        }
-        .fullScreenCover(isPresented: $showSHARPCapture) {
-            NavigationStack {
-                SHARPCaptureView()
-            }
+                .appSheetBackground()
         }
         .fileImporter(
             isPresented: $showImportSplat,
@@ -115,6 +63,42 @@ struct FurnitureLibraryView: View {
             allowsMultipleSelection: false
         ) { result in
             handleSplatImport(result)
+        }
+    }
+
+    private var libraryTabPicker: some View {
+        HStack(spacing: 6) {
+            ForEach(LibraryTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.appCallout.weight(.semibold))
+                        .foregroundColor(selectedTab == tab ? AppTheme.primaryDark : AppTheme.secondaryText)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            selectedTab == tab
+                            ? AnyShapeStyle(AppTheme.accentGradient)
+                            : AnyShapeStyle(AppTheme.surfaceTertiary)
+                        )
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().strokeBorder(
+                                selectedTab == tab
+                                ? Color.clear
+                                : AppTheme.warmAccent.opacity(0.2), lineWidth: 1)
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background(AppTheme.background)
+        .overlay(alignment: .bottom) {
+            Divider().background(AppTheme.warmAccent.opacity(0.2))
         }
     }
 
@@ -132,7 +116,7 @@ struct FurnitureLibraryView: View {
             defer { if accessing { sourceURL.stopAccessingSecurityScopedResource() } }
 
             let splatName = "\(targetItem.id.uuidString)_splat.ply"
-            let destURL = ScannedFurnitureManager.modelDirectory
+            let destURL = scannedFurnitureManager.modelDirectory()
                 .appendingPathComponent(splatName)
 
             do {
@@ -168,11 +152,11 @@ struct FurnitureLibraryView: View {
     // MARK: - Scanned objects tab
 
     private var scannedSection: some View {
-        Group {
-            if userScans.isEmpty {
-                scannedEmptyState
-            } else {
-                ScrollView {
+        ScrollView {
+            Group {
+                if userScans.isEmpty {
+                    scannedEmptyState
+                } else {
                     LazyVStack(spacing: 10) {
                         ForEach(userScans) { item in
                             NavigationLink(destination:
@@ -193,10 +177,11 @@ struct FurnitureLibraryView: View {
                             .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .top)
+            .padding(.top, 4)
+            .padding(.bottom, 24)
         }
     }
 
@@ -206,7 +191,8 @@ struct FurnitureLibraryView: View {
             title: "No Scanned Objects",
             message: "Scan real-world furniture to create\n3D models you can place in any room.",
             ctaLabel: "Scan Your First Object",
-            action: { showObjectScan = true }
+            action: { showObjectScan = true },
+            compact: true
         )
     }
 
@@ -219,6 +205,7 @@ struct FurnitureLibraryView: View {
                     BuiltInModelCard(name: name)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .top)
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 24)
@@ -244,7 +231,7 @@ struct ScannedFurnitureRow: View {
                 if item.hasSplat {
                     Image(systemName: "sparkles")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                         .padding(3)
                         .background(AppTheme.glowGreen)
                         .clipShape(Circle())
@@ -318,7 +305,7 @@ struct BuiltInModelCard: View {
             Text(name.replacingOccurrences(of: "_", with: " ").capitalized)
                 .font(.caption.weight(.medium))
                 .multilineTextAlignment(.center)
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundStyle(AppTheme.primaryText.opacity(0.9))
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity)

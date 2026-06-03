@@ -1,0 +1,66 @@
+% fig3_1_nerf_overview.tex
+% fig:ch3_nerf_pipeline — NeRF overview (two rows, fits page width)
+
+\begin{tikzpicture}[
+  node distance=0.5cm and 0.6cm,
+  box/.style={rectangle, rounded corners=5pt, draw=gray!60, fill=gray!8,
+              line width=0.8pt, minimum width=2.6cm, minimum height=1.1cm,
+              font=\small, align=center},
+  terminal/.style={box, draw=gray!80, fill=gray!22, font=\small\bfseries},
+  arr/.style={-{Stealth[length=5pt]}, thick, draw=gray!60},
+  back/.style={-{Stealth[length=5pt]}, thick, draw=gray!50, dashed},
+  ann/.style={font=\scriptsize\itshape, text=gray!70, align=center}
+]
+
+%% ── ROW 1: forward pass (left → right) ──
+\node[box, fill=red!6, draw=red!40] (ray)
+  {Camera Ray\\$\mathbf{r}(t)=\mathbf{o}+t\mathbf{d}$};
+
+\node[box, right=0.6cm of ray] (samp)
+  {Sample Points\\$\{(x_i,\,d_i)\}$};
+
+\node[box, right=0.6cm of samp] (mlp)
+  {Neural MLP\\$F_\Theta(x,d)\!\to\!(c,\sigma)$};
+
+\node[box, right=0.6cm of mlp] (vol)
+  {Volume Rendering\\$\hat{C}=\sum_i T_i\alpha_i c_i$};
+
+\node[terminal, right=0.6cm of vol] (pix)
+  {Rendered\\Pixel $\hat{C}$};
+
+%% ── Row 1 annotations above ──
+\node[ann, above=0.15cm of mlp] {colour $c$ + density $\sigma$};
+\node[ann, above=0.15cm of vol] {$T_i=\exp(-\sum_{j<i}\sigma_j\delta_j)$};
+
+%% ── ROW 2: backward pass (right → left) ──
+\node[terminal, below=1.1cm of pix] (gt)
+  {Ground-truth\\Pixel $C$};
+
+\node[box, left=0.6cm of gt] (loss)
+  {Photometric Loss\\$\mathcal{L}=\|\hat{C}-C\|^2$};
+
+\node[box, left=0.6cm of loss] (bp)
+  {Backprop\\$\nabla_\Theta\mathcal{L}$};
+
+\node[box, left=0.6cm of bp] (upd)
+  {Update Weights\\$\Theta\!\leftarrow\!\Theta-\eta\nabla$};
+
+%% ── Forward arrows ──
+\draw[arr] (ray)  -- (samp);
+\draw[arr] (samp) -- (mlp);
+\draw[arr] (mlp)  -- (vol);
+\draw[arr] (vol)  -- (pix);
+
+%% ── Down from rendered pixel to ground-truth ──
+\draw[arr] (pix.south) -- node[ann, right=2pt]{compare} (gt.north);
+
+%% ── Backward arrows ──
+\draw[back] (gt)   -- (loss);
+\draw[back] (loss) -- (bp);
+\draw[back] (bp)   -- (upd);
+
+%% ── Loop: update weights back to MLP ──
+\draw[back] (upd.west) -- ++(-0.4,0)
+            |- node[ann, left=2pt, pos=0.25]{update $\Theta$} (mlp.west);
+
+\end{tikzpicture}

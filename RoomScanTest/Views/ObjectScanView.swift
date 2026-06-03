@@ -93,7 +93,7 @@ struct ObjectScanView: View {
                                 Text("Cancel")
                             }
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
                             .background(.ultraThinMaterial)
@@ -110,7 +110,7 @@ struct ObjectScanView: View {
                                     .frame(width: 8, height: 8)
                                 Text(sessionState)
                                     .font(.caption.weight(.medium))
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(AppTheme.primaryText)
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -138,7 +138,7 @@ struct ObjectScanView: View {
                     // ── Instructions — pinned just below the top bar ──
                     Text(currentInstructions)
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -155,11 +155,15 @@ struct ObjectScanView: View {
                         Button(action: { handlePrimaryAction(session) }) {
                             Text(primaryButtonTitle)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundStyle(
+                                    sessionState.contains("Capturing")
+                                    ? AppTheme.primaryText
+                                    : AppTheme.primaryDark
+                                )
                                 .frame(width: 220, height: 52)
                                 .background(primaryButtonColor)
                                 .clipShape(Capsule())
-                                .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                                .shadow(color: AppTheme.primaryDark.opacity(0.35), radius: 4, y: 2)
                         }
                         .padding(.bottom, 50)
                     } else {
@@ -245,9 +249,9 @@ struct ObjectScanView: View {
     /// Colour of the primary action button.
     private var primaryButtonColor: Color {
         if sessionState.contains("Capturing") {
-            return .green
+            return AppTheme.glowGreen
         } else {
-            return .blue
+            return AppTheme.warmAccent
         }
     }
 
@@ -282,19 +286,24 @@ struct ObjectScanView: View {
             namingView
         default:
             NavigationView {
-                Group {
-                    switch phase {
-                    case .unsupported:     unsupportedView
-                    case .intro:           introView
-                    case .reconstructing:  reconstructingView
-                    case .done:            doneView
-                    default:               EmptyView()
+                ZStack {
+                    AppTheme.background.ignoresSafeArea()
+                    Group {
+                        switch phase {
+                        case .unsupported:     unsupportedView
+                        case .intro:           introView
+                        case .reconstructing:  reconstructingView
+                        case .done:            doneView
+                        default:               EmptyView()
+                        }
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)
+                .appNavigationChrome()
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Cancel") { onDismiss() }
+                            .foregroundStyle(AppTheme.warmAccent)
                     }
                 }
             }
@@ -307,16 +316,17 @@ struct ObjectScanView: View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.orange)
+                .foregroundStyle(AppTheme.glowOrange)
             Text("Object Scanning Not Available")
                 .font(.title2).fontWeight(.bold)
+                .foregroundStyle(AppTheme.primaryText)
             Text("This feature requires an iPhone or iPad with a LiDAR scanner (iPhone 12 Pro or newer).")
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Button("Go Back") { onDismiss() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GradientButtonStyle())
         }
     }
 
@@ -326,14 +336,15 @@ struct ObjectScanView: View {
 
             Image(systemName: "cube.transparent")
                 .font(.system(size: 70))
-                .foregroundColor(.blue)
+                .foregroundStyle(AppTheme.accentGradientInline)
 
             Text("Scan an Object")
                 .font(.title).fontWeight(.bold)
+                .foregroundStyle(AppTheme.primaryText)
 
             Text("Walk around the object to create a 3D model you can place in any room.")
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
@@ -350,34 +361,30 @@ struct ObjectScanView: View {
                                text: "Tap 'Finish Scan' when done")
             }
             .padding()
+            .appPanel(cornerRadius: AppTheme.cardCornerRadius)
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("Good lighting helps a lot",
                       systemImage: "sun.max.fill")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryText)
                 Label("Textured / patterned objects scan best",
                       systemImage: "paintpalette.fill")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryText)
                 Label("Avoid shiny, reflective, or transparent objects",
                       systemImage: "eye.slash")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryText)
             }
             .padding(.horizontal)
 
             Spacer()
 
             Button(action: startCapture) {
-                HStack {
-                    Image(systemName: "camera.fill")
-                    Text("Start Scanning")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.blue)
-                .cornerRadius(15)
+                Label("Start Scanning", systemImage: "camera.fill")
             }
+            .buttonStyle(GradientButtonStyle())
             .padding(.horizontal, 40)
             .padding(.bottom, 50)
         }
@@ -390,23 +397,25 @@ struct ObjectScanView: View {
 
             Image(systemName: "gearshape.2.fill")
                 .font(.system(size: 50))
-                .foregroundColor(.blue)
+                .foregroundStyle(AppTheme.warmAccent)
                 .symbolEffect(.rotate)
 
             Text("Building 3D Model…")
                 .font(.title2).fontWeight(.bold)
+                .foregroundStyle(AppTheme.primaryText)
 
             ProgressView(value: reconstructionProgress)
                 .progressViewStyle(.linear)
+                .tint(AppTheme.warmAccent)
                 .frame(width: 220)
 
             Text("\(Int(reconstructionProgress * 100))%")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
 
             Text("This may take a few minutes.\nPlease keep the app open.")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AppTheme.tertiaryText)
                 .multilineTextAlignment(.center)
 
             Spacer()
@@ -416,7 +425,9 @@ struct ObjectScanView: View {
 
     private var namingView: some View {
         NavigationView {
-            Form {
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                Form {
                 Section {
                     TextField("Object Name", text: $furnitureName)
                         .textInputAutocapitalization(.words)
@@ -449,15 +460,19 @@ struct ObjectScanView: View {
                     }
                     .disabled(furnitureName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Name Your Object")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Discard") {
                         cleanupAndReset()
                         onDismiss()
                     }
+                    .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
@@ -469,104 +484,103 @@ struct ObjectScanView: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 70))
-                .foregroundColor(.green)
+                .foregroundStyle(AppTheme.glowGreen)
 
             Text("Object Saved!")
                 .font(.title).fontWeight(.bold)
+                .foregroundStyle(AppTheme.primaryText)
 
             Text("\"\(furnitureName)\" has been added to your furniture library.")
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
             // ── Gaussian Splatting export option ──
             VStack(spacing: 12) {
-                Divider().padding(.horizontal, 40)
+                Divider()
+                    .background(AppTheme.warmAccent.opacity(0.25))
+                    .padding(.horizontal, 40)
 
                 Text("Gaussian Splatting")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(AppTheme.primaryText)
 
                 Text("Export the captured images to train a Gaussian Splat model for comparison with Object Capture.")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(AppTheme.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
 
                 if isExporting {
                     ProgressView("Packaging images…")
                         .font(.caption)
+                        .tint(AppTheme.warmAccent)
                 } else {
                     Button(action: exportImagesForGS) {
-                        HStack {
-                            Image(systemName: "photo.stack")
-                            Text("Export Images for 3DGS Training")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.purple)
-                        .cornerRadius(12)
+                        Label("Export Images for 3DGS Training", systemImage: "photo.stack")
                     }
+                    .buttonStyle(SecondaryChipButtonStyle())
+                    .padding(.horizontal, 24)
                 }
 
                 // ── Train in Cloud (server runs 3DGS, then app downloads .ply) ──
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Server URL (your backend that runs 3DGS)")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(AppTheme.secondaryText)
                     TextField("https://your-server.com/gs", text: $cloudServerBaseURL)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .font(.caption)
+                        .foregroundStyle(AppTheme.primaryText)
+                        .padding(12)
+                        .background(AppTheme.secondaryTint.opacity(0.35))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
+                        )
                 }
                 .padding(.horizontal, 24)
 
                 if isCloudTraining {
                     VStack(spacing: 4) {
                         ProgressView()
+                            .tint(AppTheme.warmAccent)
                         Text(cloudStatusMessage ?? "Training…")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(AppTheme.secondaryText)
                     }
                 } else {
                     if let err = cloudError {
                         Text(err)
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundStyle(AppTheme.glowRed)
                             .multilineTextAlignment(.center)
                         Text("Tap below to try again.")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(AppTheme.tertiaryText)
                     }
                     Button(action: startCloudTraining) {
-                        HStack {
-                            Image(systemName: "cloud.fill")
-                            Text("Train in Cloud")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue)
-                        .cornerRadius(12)
+                        Label("Train in Cloud", systemImage: "cloud.fill")
                     }
+                    .buttonStyle(SecondaryChipButtonStyle())
+                    .padding(.horizontal, 24)
                     .disabled(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || lastAddedFurniture == nil)
+                    .opacity(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
                 }
 
                 Button(action: { showGSGuide = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "questionmark.circle")
-                        Text("How to Train a Gaussian Splat")
-                    }
-                    .font(.caption.weight(.medium))
-                    .foregroundColor(.secondary)
+                    Label("How to Train a Gaussian Splat", systemImage: "questionmark.circle")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppTheme.tertiaryText)
                 }
             }
             .padding(.top, 8)
+            .appPanel(cornerRadius: AppTheme.cardCornerRadius)
+            .padding(.horizontal, 16)
 
             Spacer()
 
@@ -574,11 +588,13 @@ struct ObjectScanView: View {
                 scannedFurnitureManager.cleanupSessionFiles()
                 onDismiss()
             }
-                .buttonStyle(.borderedProminent)
-                .padding(.bottom, 50)
+            .buttonStyle(GradientButtonStyle())
+            .padding(.horizontal, 40)
+            .padding(.bottom, 50)
         }
         .sheet(isPresented: $showGSGuide) {
             GaussianSplattingGuideView()
+                .appSheetBackground()
         }
     }
 
@@ -587,9 +603,11 @@ struct ObjectScanView: View {
     private func instructionRow(icon: String, text: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(.blue)
+                .foregroundStyle(AppTheme.warmAccent)
                 .font(.title3)
-            Text(text).font(.body)
+            Text(text)
+                .font(.body)
+                .foregroundStyle(AppTheme.primaryText)
         }
     }
 
@@ -726,7 +744,7 @@ struct ObjectScanView: View {
         }
 
         let outputFileName = UUID().uuidString + ".usdz"
-        let outputURL = ScannedFurnitureManager.modelDirectory
+        let outputURL = scannedFurnitureManager.modelDirectory()
             .appendingPathComponent(outputFileName)
         await MainActor.run { generatedModelURL = outputURL }
 
@@ -930,7 +948,7 @@ struct ObjectScanView: View {
 
                 await MainActor.run {
                     let splatName = "\(item.id.uuidString)_splat.ply"
-                    let splatURL = ScannedFurnitureManager.modelDirectory.appendingPathComponent(splatName)
+                    let splatURL = scannedFurnitureManager.modelDirectory().appendingPathComponent(splatName)
                     do {
                         try plyData.write(to: splatURL)
                         let fileSize = Int64(plyData.count)

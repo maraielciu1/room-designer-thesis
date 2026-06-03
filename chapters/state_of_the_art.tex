@@ -1,4 +1,4 @@
-\chapter{State of the Art}
+\chapter{Related Work in Mobile Room Capture and 3D Scene Representation}
 \label{ch:soa}
 
 This chapter surveys the work that motivates, contextualises, and positions
@@ -13,6 +13,14 @@ systems that form the technological lineage of depth-based room capture
 from neural radiance fields to 3D Gaussian Splatting
 (Section~\ref{sec:soa:nvs}). Section~\ref{sec:soa:gap} synthesises the
 research gap that this thesis addresses.
+
+\paragraph{Chapter roadmap.}
+Each section builds toward the gap table in Section~\ref{sec:soa:gap}:
+Sections~\ref{sec:soa:commercial}--\ref{sec:soa:slam} establish what
+existing systems can and cannot do; Section~\ref{sec:soa:usability} grounds
+the non-AR design choice in empirical evidence; Section~\ref{sec:soa:nvs}
+positions Gaussian Splatting as the novel representation integrated in this
+work.
 
 % ------------------------------------------------------------------
 \section{Commercial AR Interior Design Applications}
@@ -175,16 +183,11 @@ by empirical findings on how users interact with mobile AR interior
 applications.
 
 Kandil~et~al.~\cite{kandil2021ux} conducted a comparative evaluation of
-five commercial AR interior design applications using two complementary
-instruments: the System Usability Scale (SUS) and the Handheld Augmented
-Reality Usability Scale (HARUS). SUS is a widely used 10-item Likert
-questionnaire for measuring overall perceived usability; a score above 70 is
-conventionally considered acceptable and above 85 is
-excellent~\cite{kandil2021ux}. HARUS extends SUS with items specific to
-handheld AR, addressing factors such as physical fatigue from sustained
-device holding, accuracy of virtual object placement relative to real
-geometry, and the cognitive load of simultaneously navigating real and
-virtual spaces.
+five commercial AR interior design applications using standardised usability
+questionnaires targeting both general perceived usability and factors
+specific to handheld AR, such as physical fatigue from sustained device
+holding, accuracy of virtual object placement relative to real geometry,
+and the cognitive load of simultaneously navigating real and virtual spaces.
 
 Kandil~et~al.\ found that across the five tested applications, the
 lowest-scoring dimensions were \emph{manipulation precision}, how
@@ -201,12 +204,10 @@ save a staging session and return to it later, was mentioned by participants
 as a desired feature absent from all evaluated applications, motivating
 Requirement~R-2 of this thesis directly.
 
-Although this thesis does not itself conduct a formal SUS/HARUS evaluation,
-the usability criteria identified by Kandil~et~al.~\cite{kandil2021ux}
-inform the non-functional requirements specified in
-Chapter~\ref{ch:requirements}, and the methodology described
-in~\cite{kandil2021ux} provides a ready-made framework for a future user
-study.
+Although this thesis does not itself conduct a formal usability evaluation,
+the criteria identified by Kandil~et~al.~\cite{kandil2021ux} directly
+inform the non-functional requirements in Chapter~\ref{ch:requirements},
+and their methodology provides a ready-made framework for a future study.
 
 % ------------------------------------------------------------------
 \section{Novel View Synthesis: From NeRF to 3D Gaussian Splatting}
@@ -292,7 +293,10 @@ directly relevant to practical interior design support on mobile hardware.
 \small
 \caption{Positioning of this thesis relative to representative related
 systems. \checkmark~=~supported; $\circ$~=~partial or session-only;
-$\times$~=~not supported.}
+$\times$~=~not supported. Note: ScanNet and the standalone 3DGS pipeline are
+research-grade offline tools rather than deployable end-user applications;
+they are included to characterise the capability gap this thesis addresses,
+not as direct competitors.}
 \label{tab:soa:comparison}
 \begin{tabular}{lcccc}
 \toprule
@@ -330,4 +334,8 @@ provides on-device photogrammetric asset authoring; and a Metal-based splat
 renderer provides a forward-looking viewing path for the Gaussian
 representation. The usability evaluation methodology of
 Kandil~et~al.~\cite{kandil2021ux} provides the framework for validating
-the result in a future formal study.
+the result in a future formal study. This gap directly motivates the five
+objectives stated in Chapter~\ref{ch:introduction}: semantic capture
+(Objective~1), persistent off-site editing (Objective~2), on-device asset
+authoring (Objective~3), Gaussian splat viewing (Objective~4), and DCC
+export (Objective~5).

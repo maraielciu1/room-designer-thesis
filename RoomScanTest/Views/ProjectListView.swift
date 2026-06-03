@@ -13,6 +13,8 @@ import SwiftUI
 struct ProjectListView: View {
     @EnvironmentObject var projectManager: ProjectManager
     @EnvironmentObject var roomManager: RoomManager
+    @EnvironmentObject var userManager: UserManager
+    @Environment(\.presentAccount) private var presentAccount
 
     @State private var showCreateSheet = false
     @State private var newProjectName = ""
@@ -20,7 +22,7 @@ struct ProjectListView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             if projects.isEmpty {
                 emptyState
@@ -28,22 +30,16 @@ struct ProjectListView: View {
                 projectList
             }
         }
-        .navigationTitle("Projects")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            AppScreenHeader(
+                title: "Projects",
+                trailing: .add(accessibilityLabel: "New project") {
                     showCreateSheet = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(AppTheme.accentGradientInline)
-                }
-                .accessibilityLabel("New project")
-            }
+                },
+                profileInitial: userManager.currentUser.map { String($0.name.prefix(1)).uppercased() },
+                onProfileTap: presentAccount
+            )
         }
         .sheet(isPresented: $showCreateSheet) {
             createProjectSheet
@@ -82,7 +78,7 @@ struct ProjectListView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(project.name)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     if !project.description.isEmpty {
                         Text(project.description)
                             .font(.caption)
@@ -122,7 +118,7 @@ struct ProjectListView: View {
                 .foregroundStyle(AppTheme.accentGradientInline)
             Text(value)
                 .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
             Text(label)
                 .font(.caption2)
                 .foregroundColor(AppTheme.secondaryText)
@@ -139,7 +135,7 @@ struct ProjectListView: View {
 
             Text("No Projects Yet")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
 
             Text("Create a project to group multiple room scans together — perfect for planning an entire home or workspace.")
                 .font(.subheadline)
@@ -162,7 +158,7 @@ struct ProjectListView: View {
     private var createProjectSheet: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -172,13 +168,13 @@ struct ProjectListView: View {
                         TextField("e.g. My Apartment", text: $newProjectName)
                             .textFieldStyle(.plain)
                             .font(.body)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .padding(14)
-                            .background(Color.white.opacity(0.06))
+                            .background(AppTheme.secondaryTint.opacity(0.35))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    .stroke(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
                             )
                     }
 
@@ -189,14 +185,14 @@ struct ProjectListView: View {
                         TextField("Brief description…", text: $newProjectDescription, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.body)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .lineLimit(3...5)
                             .padding(14)
-                            .background(Color.white.opacity(0.06))
+                            .background(AppTheme.secondaryTint.opacity(0.35))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    .stroke(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
                             )
                     }
 
@@ -222,6 +218,7 @@ struct ProjectListView: View {
             }
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -229,10 +226,11 @@ struct ProjectListView: View {
                         newProjectDescription = ""
                         showCreateSheet = false
                     }
-                    .foregroundColor(AppTheme.glowCyan)
+                    .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 }

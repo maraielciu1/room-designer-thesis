@@ -1,0 +1,146 @@
+\chapter{Requirements and System Specification}
+\label{ch:requirements}
+
+This chapter specifies the intended behaviour of the application from a \textbf{requirements engineering} perspective: who uses the system, which scenarios must succeed, which quality attributes matter, and on which platform the software runs. Requirements are labelled for traceability to design and tests in Chapter~\ref{ch:implementation}. The specification follows the workflow \emph{capture once} $\rightarrow$ \emph{edit persistently} $\rightarrow$ \emph{optionally benchmark radiance fields} $\rightarrow$ \emph{optionally export to Blender}.
+
+\section{Target Users and Interaction Scenarios}
+
+\textbf{Primary user.} The end user is a person redesigning a home or office room who owns a compatible iPhone or iPad and wants to preview furniture changes without permanent purchases.
+
+\textbf{Secondary participants.} A developer extending the codebase benefits from a clean architecture.
+
+\textbf{Core use cases} include: (UC-1) capture a room with RoomPlan and save it; (UC-2) open the saved room in the 3D editor; (UC-3) select a detected furniture instance and assign a replacement USDZ model; (UC-4) adjust position, orientation, and scale with gestures; (UC-5) add decor (wall art, carpet, lighting) and leave the app with edits intact on return; (UC-6) view room measurements, material estimates, and rule-based Smart Tips; (UC-7a) capture a standalone object with Object Capture and add it to the furniture library (Asset~A); (UC-7b) import an offline-trained 3DGS \texttt{.ply} (Asset~B) and view it for comparison; (UC-7c) capture a single photograph and receive a SHARP \texttt{.ply} from a local server (Asset~C); (UC-8) export a staged room as a Blender-oriented ZIP (glTF, USDZ copies, manifests, helper script); (UC-9) delete a room with confirmation and artefact cleanup.
+
+\section{Functional Requirements}
+\label{sec:func_req}
+
+\begin{description}
+    \item[R-1 Room capture.] The system shall run a RoomPlan-based capture session and produce a \texttt{CapturedRoom} containing walls, floors, ceilings where detected, doors, windows, and classified objects with transforms and dimensions.
+
+    \item[R-2 Persistence of scan data.] The system shall serialise each room's \texttt{CapturedRoom} to application-accessible storage (JSON under \texttt{Documents/RoomScans/}) keyed by room identifier, and reload it on demand.
+
+    \item[R-3 Editor scene.] The system shall construct a three-dimensional scene in RealityKit representing the captured geometry and furniture placeholders or replacements, without requiring a live AR session for editing.
+
+    \item[R-4 Furniture replacement.] For each detected object selected by the user, the system shall allow binding a USDZ asset (catalog or user-captured) and shall scale and position it to approximate the detected bounding volume.
+
+    \item[R-5 Manipulation.] The user shall translate, rotate, and scale replacement models using on-screen gestures or equivalent controls; overrides shall persist in \texttt{FurnitureReplacement} records.
+
+    \item[R-6 Object Capture.] The system shall expose a guided object-scanning flow using Object Capture APIs and shall write resulting USDZ files to a location usable by the furniture library.
+
+    \item[R-7 Gaussian splat viewing.] The system shall parse a standard 3DGS \texttt{.ply} with expected attribute layout and render it with GPU splatting for interactive orbit viewing (Assets~B and~C).
+
+    \item[R-8 Room deletion.] The system shall allow the user to delete any saved room from the room list, with confirmation, removing associated persistent artefacts (room index entry, scan JSON, replacement records, cached PLY files where applicable).
+
+    \item[R-9 SHARP single-image inference.] The system shall provide a capture interface that sends a single JPEG to a user-configured SHARP inference server over the local network, receives a 3DGS \texttt{.ply}, and stores it under Documents. The HTTP client shall use a request timeout of at least 360\,s.
+
+    \item[R-10 Server reachability and configuration.] The system shall perform a health-check ping to the configured SHARP server URL before each inference session and display reachability status. The user shall be able to configure the server base URL within the app.
+
+    \item[R-11 Room analytics.] From a stored \texttt{CapturedRoom}, the system shall compute metric dimensions, renovation material estimates (paint, flooring, skirting heuristics), and rule-based Smart Tips including lighting density guidance derived from placed fixture count versus floor area.
+
+    \item[R-12 Blender export.] The system shall export a saved room that has scan data as a shareable ZIP containing: (a)~a glTF scene with structural geometry and placement markers in metres; (b)~copies of USDZ furniture and wall-art images referenced by manifests; (c)~\texttt{scene\_manifest.json} for furniture and lighting placement; (d)~a Blender Python script (\texttt{blender\_apply\_furniture.py}) and README with import instructions. Export shall be available from the room list and the room designer.
+\end{description}
+
+\section{Non-Functional Requirements}
+\label{sec:nfr_req}
+
+\begin{description}
+    \item[N-1 Performance.] On supported hardware, room editing shall remain interactive; splat scenes shall target $\leq 300\,000$ Gaussians at comfortable frame rates.
+
+    \item[N-2 Privacy.] Room scanning and object reconstruction shall not require uploading scan data to a third-party server for Apple API paths; Blender export remains on-device; SHARP traffic is limited to a user-controlled LAN server.
+
+    \item[N-3 Usability.] The user shall receive guidance during RoomPlan and Object Capture sessions. Terminology in the UI shall remain consistent with RoomPlan semantics where applicable.
+
+    \item[N-4 Maintainability.] Application logic shall be partitioned into models, services, and SwiftUI views, following observable patterns suitable for SwiftUI.
+
+    \item[N-5 Portability within iOS.] The project shall target a documented minimum iOS version matching RoomPlan and Object Capture availability; features degrade gracefully when optional hardware (LiDAR) is absent where Apple allows.
+
+    \item[N-6 Network resilience.] The SHARP inference client shall use a dedicated \texttt{URLSession} with 360\,s request timeout and 600\,s resource timeout. Failures shall display descriptive errors without requiring an app restart.
+
+    \item[N-7 Responsiveness.] Operations taking more than 0.5\,s shall display a progress indicator. The SHARP capture UI shall warn that the first inference may take approximately two minutes due to Metal shader compilation on the server.
+
+    \item[N-8 Error handling.] The system shall handle without crashing: corrupt \texttt{.ply} import; SHARP non-200 responses; network timeout; Object Capture cancelled with insufficient coverage; delete of a room currently open in the editor; Blender export when scan data is missing.
+\end{description}
+
+\section{System Specification}
+\label{sec:system_spec}
+
+\textbf{Programming language and UI.} Swift~5, SwiftUI, observation for reactive updates.
+
+\textbf{Graphics and AR.} RealityKit for the room editor; ARKit and RoomPlan for capture; Metal for the Gaussian splat renderer (\texttt{MTKView} bridge from SwiftUI).
+
+\textbf{Data formats.} \texttt{CapturedRoom} via JSON (\texttt{Codable}); USDZ for meshes; PLY for splats; ZIP for Blender export (glTF, manifests, script).
+
+\textbf{Storage layout (conceptual).} Room scan files under \texttt{Documents/RoomScans/}; USDZ, wall art, and SHARP outputs in typed subdirectories; lightweight room metadata in UserDefaults.
+
+\begin{table}[htbp]
+\centering
+\caption{Requirement identifiers and short descriptions (traceability).}
+\label{tab:req_trace}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lp{0.68\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Summary} \\
+\midrule
+\rowcolor{gray!8}
+R-1 & RoomPlan capture session $\rightarrow$ \texttt{CapturedRoom} \\
+R-2 & Serialise / reload room scan JSON per room identifier \\
+\rowcolor{gray!8}
+R-3 & RealityKit non-AR editor scene with orbit camera \\
+R-4 & USDZ asset binding, scaling, and placement per detected object \\
+\rowcolor{gray!8}
+R-5 & Gesture-based translate / rotate / scale with persistence \\
+R-6 & Object Capture $\rightarrow$ USDZ (Asset~A) \\
+\rowcolor{gray!8}
+R-7 & Binary PLY import and Metal GPU splatting (Assets B/C) \\
+R-8 & Room deletion with confirmation and artefact cleanup \\
+\rowcolor{gray!8}
+R-9 & SHARP single-image inference via local server \\
+R-10 & Server health-check; URL configuration \\
+\rowcolor{gray!8}
+R-11 & Measurements, material estimates, Smart Tips \\
+R-12 & Blender export ZIP (glTF + USDZ + script) \\
+\midrule
+\rowcolor{gray!8}
+N-1--N-8 & Performance, privacy, usability, maintainability, portability, network, responsiveness, errors \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\thesisfig{0.85\textwidth}{figures/ch4_context_diagram.pdf}
+\caption{System context: user, application, and main persistent artefacts (room JSON, USDZ, PLY, Blender export ZIP). SHARP runs on a user-controlled Mac on the local network.}
+\label{fig:context_req}
+\end{figure}
+
+\section{Constraints and Dependencies}
+
+The application depends on Apple's RoomPlan and Object Capture frameworks \cite{apple2024roomplan2}. 3DGS quality for Asset~B depends on external training discipline. SHARP requires a user-maintained server. Blender export requires persisted \texttt{CapturedRoom} data. No requirement mandates a specific commercial furniture marketplace.
+
+\section{Risk Analysis}
+
+Table~\ref{tab:risks} identifies principal technical risks and mitigations.
+
+\begin{table}[h]
+\centering
+\caption{Risk analysis: risks, likelihood, impact, and mitigation.}
+\label{tab:risks}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{3.0cm} c c p{5.2cm}}
+\toprule
+\textbf{Risk} & \textbf{Likelihood} & \textbf{Impact} & \textbf{Mitigation} \\
+\midrule
+\rowcolor{gray!8}
+SHARP server unavailable & Medium & Medium & Health-check; graceful error; other features independent \\
+SHARP first-run timeout & High & Medium & 360\,s timeout; UI warning \\
+\rowcolor{gray!8}
+Large \texttt{.ply} & High & High & Server opacity prune $\leq 300\,k$ Gaussians \\
+RoomPlan incomplete on non-LiDAR & Medium & High & Feature gating where applicable \\
+\rowcolor{gray!8}
+Blender export without scan & Medium & Medium & Disable export; alert user \\
+Accidental room deletion & Low & High & Confirmation alert; cancel default \\
+\bottomrule
+\end{tabular}
+\end{table}

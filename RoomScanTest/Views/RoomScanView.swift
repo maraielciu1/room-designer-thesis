@@ -34,7 +34,7 @@ struct RoomScanView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             if createdRoom != nil {
                 // ── Scan complete — brief success state ──
@@ -50,7 +50,7 @@ struct RoomScanView: View {
                     }
                     Text("Room Scanned!")
                         .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Text(roomName)
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
@@ -130,7 +130,7 @@ struct RoomScanView: View {
                                 .tint(.white)
                             Text("Building 3D Model…")
                                 .font(.subheadline.weight(.medium))
-                                .foregroundColor(.white)
+                                .foregroundStyle(AppTheme.primaryText)
                         }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 14)
@@ -146,7 +146,7 @@ struct RoomScanView: View {
                                 Text("Done Scanning")
                             }
                             .font(.headline.weight(.semibold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(AppTheme.glowGreen)
@@ -179,7 +179,7 @@ struct RoomScanView: View {
 
                     Text("Ready to Scan")
                         .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
 
                     // Collapsible instructions card
                     VStack(spacing: 0) {
@@ -199,7 +199,7 @@ struct RoomScanView: View {
                                         .foregroundStyle(AppTheme.accentGradientInline)
                                     Text("Scanning Tips")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(AppTheme.primaryText)
                                     Spacer()
                                     Image(systemName: "chevron.down")
                                         .font(.caption.weight(.bold))
@@ -313,7 +313,7 @@ struct InstructionRow: View {
                 .font(.title3)
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundStyle(AppTheme.primaryText.opacity(0.9))
         }
     }
 }

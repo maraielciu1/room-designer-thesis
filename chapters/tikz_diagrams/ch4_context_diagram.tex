@@ -1,0 +1,62 @@
+% ch4_context_diagram.tex
+% fig:context_req — system context diagram
+
+\begin{tikzpicture}[
+  app/.style={rectangle, rounded corners=6pt, draw=red!40, fill=red!5,
+              line width=1.2pt, minimum width=3.8cm, minimum height=1.2cm,
+              font=\small\bfseries, align=center},
+  ext/.style={rectangle, rounded corners=5pt, draw=gray!55, fill=gray!8,
+              line width=0.8pt, minimum width=3.0cm, minimum height=0.85cm,
+              font=\small, align=center},
+  store/.style={ext, fill=gray!14},
+  arr/.style={-{Stealth[length=5pt]}, thick, draw=gray!55},
+  darr/.style={arr, dashed},
+  lbl/.style={font=\scriptsize\itshape, text=gray!65, fill=white,
+              inner sep=1pt, align=center}
+]
+
+%% ── Central app ──
+\node[app] (app) at (0, 0) {iOS Application\\(RoomScanTest)};
+
+%% ── User — far left ──
+\node[ext] (user) at (-6.5, 0) {User\\(homeowner)};
+\draw[arr] (user.east) -- node[lbl, above]{interacts} (app.west);
+
+%% ── Auth providers — top, well separated ──
+\node[ext] (email)  at (-2.5, 4.5) {Email / Password};
+\node[ext] (google) at ( 2.5, 4.5) {Google OAuth};
+
+\draw[darr] (app.north) -- ++(0, 1.0) -| (email.south);
+\draw[darr] (app.north) -- ++(0, 1.0) -| (google.south);
+\node[lbl] at (0, 2.2) {register / login};
+
+%% ── On-device frameworks — right column, evenly spaced ──
+\node[store]  (swiftdata) at (6.5,  3.0) {SwiftData DB\\user accounts};
+\node[ext]    (rp)        at (6.5,  1.0) {RoomPlan};
+\node[ext]    (oc)        at (6.5, -1.0) {Object Capture};
+\node[ext]    (rk)        at (6.5, -3.0) {RealityKit / ARKit};
+
+\draw[darr] (app.east) -- ++(1.2, 0) |- node[lbl, above]{users}    (swiftdata.west);
+\draw[darr] (app.east) -- ++(1.2, 0) |- node[lbl, above]{scan}     (rp.west);
+\draw[darr] (app.east) -- ++(1.2, 0) |- node[lbl, above]{capture}  (oc.west);
+\draw[darr] (app.east) -- ++(1.2, 0) |- node[lbl, above]{render}   (rk.west);
+
+%% ── File storage — bottom centre ──
+\node[store, minimum width=8.0cm, minimum height=1.1cm] (fs) at (0, -4.8)
+  {App Sandbox \texttt{Documents/users/<id>/}\\
+   {\scriptsize RoomScans\enspace·\enspace USDZ\enspace·\enspace
+   .ply\enspace·\enspace wall-art\enspace·\enspace ZIP}};
+
+\draw[darr] (app.south) -- node[lbl, right]{read / write} (fs.north);
+
+%% ── SHARP server — bottom left ──
+\node[ext] (sharp) at (-6.5, -3.0) {SHARP Server\\(Mac, LAN)};
+\draw[darr] (app.west) -- ++(-1.2, 0) |- (sharp.east);
+\node[lbl] at (-3.2, -1.5) {POST JPEG\,/\,get .ply};
+
+%% ── Blender — bottom far left ──
+\node[ext] (blender) at (-6.5, -4.8) {Blender / Files app};
+\draw[darr] (fs.west) -- (blender.east);
+\node[lbl] at (-3.8, -4.45) {ZIP export};
+
+\end{tikzpicture}

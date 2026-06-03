@@ -1,0 +1,74 @@
+% fig2_3_dual_pipeline.tex
+% fig:capture_branches — two vertical pipelines side by side
+
+\begin{tikzpicture}[
+  node distance=0.6cm,
+  %% Shared stage style
+  stage/.style={rectangle, rounded corners=5pt, draw=gray!60, fill=gray!8,
+                line width=0.8pt, minimum width=4.8cm, minimum height=0.95cm,
+                font=\small, align=center},
+  %% Input boxes
+  input/.style={stage, draw=red!40, fill=red!6},
+  %% Output / terminal boxes
+  terminal/.style={stage, draw=gray!80, fill=gray!22, font=\small\bfseries},
+  %% Header labels
+  header/.style={font=\small\bfseries, align=center},
+  %% Arrows
+  arr/.style={-{Stealth[length=5pt]}, thick, draw=gray!60},
+  %% Italic annotations
+  ann/.style={font=\footnotesize\itshape, text=gray!70, align=center}
+]
+
+%%────────────────────────────────────────
+%% LEFT COLUMN — Object Capture
+%%────────────────────────────────────────
+\node[header] (hA) at (0, 0) {Object Capture};
+
+\node[input,    below=0.5cm of hA]  (imgs) {Multi-view RGB Images};
+\node[stage,    below=0.6cm of imgs](feat) {Feature Detection \& Matching};
+\node[stage,    below=0.6cm of feat](sfm)  {Structure from Motion (SfM)};
+\node[stage,    below=0.6cm of sfm] (mvs)  {Multi-View Stereo (MVS)};
+\node[stage,    below=0.6cm of mvs] (surf) {Surface Reconstruction (Poisson)};
+\node[terminal, below=0.6cm of surf](usdz) {USDZ Mesh};
+
+\draw[arr] (imgs) -- (feat);
+\draw[arr] (feat) -- (sfm);
+\draw[arr] (sfm)  -- (mvs);
+\draw[arr] (mvs)  -- (surf);
+\draw[arr] (surf) -- (usdz);
+
+%%────────────────────────────────────────
+%% RIGHT COLUMN — RoomPlan
+%%────────────────────────────────────────
+\node[header] (hB) at (6.2, 0) {RoomPlan};
+
+\node[input,    below=0.5cm of hB]  (sens) {LiDAR + RGB + IMU};
+\node[stage,    below=0.6cm of sens](vio)  {Visual-Inertial Odometry (VIO)};
+\node[stage,    below=0.6cm of vio] (tsdf) {TSDF Depth Fusion};
+\node[stage,    below=0.6cm of tsdf](plan) {Plane Fitting \& Semantics};
+\node[stage,    below=0.6cm of plan](param){Parametric Fitting};
+\node[terminal, below=0.6cm of param](room){\texttt{CapturedRoom} JSON};
+
+\draw[arr] (sens) -- (vio);
+\draw[arr] (vio)  -- (tsdf);
+\draw[arr] (tsdf) -- (plan);
+\draw[arr] (plan) -- (param);
+\draw[arr] (param)-- (room);
+
+%%────────────────────────────────────────
+%% Shared output — RealityKit Editor
+%%────────────────────────────────────────
+\node[terminal, minimum width=4.0cm,
+      below=1.4cm of $(usdz)!0.5!(room)$] (ed) {RealityKit Editor};
+
+\draw[arr] (usdz.south) |- (ed.west);
+\draw[arr] (room.south) |- (ed.east);
+
+%%── Role annotations ──
+\node[ann, below=0.12cm of usdz] {furniture assets (Asset A)};
+\node[ann, below=0.12cm of room] {room substrate};
+
+%%── Vertical divider between columns ──
+\draw[dashed, gray!40, line width=0.7pt] (3.1, 0.3) -- (3.1, -9.8);
+
+\end{tikzpicture}

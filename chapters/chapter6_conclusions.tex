@@ -1,8 +1,3 @@
-% \chapter{Concluzii}
-% %\chapter*{Concluzii}
-% \label{conclusions}
-
-% \par Concluzii ...
 \chapter{Conclusions}
 \label{ch:conclusions}
 
@@ -14,10 +9,16 @@ The software artefact demonstrates a coherent pipeline: \textbf{RoomPlan} $\righ
 
 \section{Limitations}
 
-Accuracy is bounded by RoomPlan detection quality, photogrammetry assumptions in Object Capture, and the lack of closed-loop feedback between splats and parametric room semantics. 3DGS training remains external; real-time splat \emph{training} on device is research-grade \cite{Guo26}. Usability has not been quantified with SUS/HARUS in this thesis text; Kandil et al.\ \cite{kandil2021ux} provide a methodology for a future study.
+Accuracy is bounded by RoomPlan detection quality, photogrammetry assumptions in Object Capture, and the lack of closed-loop feedback between splats and parametric room semantics. 3DGS training remains external; real-time splat \emph{training} on device is research-grade \cite{Guo26}. Usability has not been formally evaluated; Kandil et al.\ \cite{kandil2021ux} provide a methodology suitable for a future study.
 
 \section{Future Work}
 
-Promising extensions include: formal user evaluation; tighter integration between exported scan images and external COLMAP/3DGS pipelines; level-of-detail for large splats; semantic suggestions informed by work such as K\'an et al.\ \cite{kan2021ar} Mithun et al. \cite{Geo2023} demonstrate that synthetic datasets with rich semantic labels can substantially improve indoor scene understanding for AR applications, a direction complementary to the real-scan approach taken here.
+Promising extensions include: formal user evaluation; tighter integration between
+exported scan images and external COLMAP/3DGS pipelines; level-of-detail rendering
+for large splat clouds; and semantic furniture suggestions informed by procedural
+layout systems such as K\'an et al.~\cite{kan2021ar}. Mithun et al.\
+\cite{Geo2023} demonstrate that synthetic datasets with rich semantic labels
+can substantially improve indoor scene understanding for AR applications, a
+direction complementary to the real-scan pipeline used here.
 
 The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware.

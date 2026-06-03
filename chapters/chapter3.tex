@@ -1,82 +1,42 @@
-% % ═══════════════════════════════════════════════════════════════════════════
-% %  CHAPTER 3 — THEORETICAL FOUNDATIONS II: 3D GAUSSIAN SPLATTING
-% % ═══════════════════════════════════════════════════════════════════════════
 
-% \chapter{Theoretical Foundations II: 3D Gaussian Splatting}
-% \label{ch:theory2}
-
-% Object Capture and the photogrammetry pipeline of Chapter~\ref{ch:theory1} produce a \textbf{mesh-based} representation: a triangle mesh with textures. This chapter introduces \textbf{3D Gaussian Splatting} (3DGS) \cite{kerbl20233dgs}, an alternative scene representation that uses a set of 3D Gaussian primitives splatted onto the image plane and alpha-blended for rendering. 3DGS yields high visual quality and real-time rendering, and is differentiable, so it can be trained from multi-view images without explicit mesh or surface extraction. The application supports both mesh-based (Object Capture) and 3DGS reconstructions, allowing users to compare the two representations.
-
-% % ---------------------------------------------------------------------------
-% \section{What is 3D Gaussian Splatting}
-% \label{sec:3dgs_intro}
-
-% 3D Gaussian Splatting represents a scene as a large set of \textbf{3D Gaussian primitives}. Each primitive has a position in 3D space, an anisotropic shape (scale and orientation), an opacity, and a colour (or view-dependent colour). To render an image, each Gaussian is \textbf{projected} onto the 2D image plane, where it becomes a 2D Gaussian (or an elliptical blob). The primitives are then \textbf{sorted by depth} and \textbf{alpha-blended} back-to-front to produce the final pixel colours. The entire process is differentiable with respect to the Gaussian parameters, so that gradients from an image loss can be backpropagated during training to optimise positions, shapes, opacity, and colour from multi-view photographs.
-
-% Unlike mesh-based reconstruction, 3DGS does not require an explicit surface (e.g.\ Poisson reconstruction or mesh extraction). The scene is represented implicitly by the set of Gaussians, which can model complex geometry and view-dependent effects. In the application developed in this thesis, 3DGS models are typically trained off-device (e.g.\ from images exported by Object Capture or from a separate capture); the app then \emph{imports} the resulting \texttt{.ply} file and renders it with a custom Metal-based splatting pipeline for viewing and comparison with Object Capture meshes.
-
-% % ---------------------------------------------------------------------------
-% \section{Representation: 3D Gaussians}
-% \label{sec:3dgs_representation}
-
-% Each primitive is an \textbf{anisotropic 3D Gaussian} defined by:
-
-% \begin{itemize}
-%     \item \textbf{Position} $\boldsymbol{\mu} \in \mathbb{R}^3$: the centre of the Gaussian in world space.
-
-%     \item \textbf{Covariance} $\boldsymbol{\Sigma} \in \mathbb{R}^{3 \times 3}$: a symmetric positive definite matrix that defines the shape and orientation of the Gaussian. For stability and differentiability, 3DGS parameterises it using \textbf{scale} $\mathbf{s} \in \mathbb{R}^3$ (positive per-axis scales) and \textbf{rotation} as a unit quaternion $\mathbf{q}$. Then $\boldsymbol{\Sigma} = \mathbf{R} \mathbf{S} \mathbf{S}^\top \mathbf{R}^\top$, where $\mathbf{R}$ is the rotation matrix of $\mathbf{q}$ and $\mathbf{S} = \operatorname{diag}(\mathbf{s})$.
-
-%     \item \textbf{Opacity} $\alpha \in [0,1]$: used in alpha-blending during rasterisation.
-
-%     \item \textbf{Colour}: typically stored as spherical harmonics (SH) coefficients for view-dependent effects, or as a single RGB value per primitive. The application's \texttt{.ply} parser and Metal renderer use per-Gaussian RGB (linear space).
-% \end{itemize}
-
-% The 3D Gaussian function is
-% \[
-% G(\mathbf{x}) = \exp\bigl(-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x}-\boldsymbol{\mu})\bigr).
-% \]
-% For rendering, this 3D function is projected to 2D in screen space, as described in the next section.
-
-% % ---------------------------------------------------------------------------
-% \section{Splatting: Projection and Rasterisation}
-% \label{sec:3dgs_splatting}
-
-% Rendering proceeds by \textbf{splatting} each Gaussian onto the image plane:
-
-% \begin{enumerate}
-%     \item \textbf{View projection}: The 3D mean $\boldsymbol{\mu}$ is projected to 2D screen coordinates using the camera's view and projection matrices. The 3D covariance $\boldsymbol{\Sigma}$ is projected to a 2D covariance $\boldsymbol{\Sigma}'$ in screen space using the Jacobian of the projection at $\boldsymbol{\mu}$ \cite{kerbl20233dgs}. This 2D covariance defines an ellipse in the image plane.
-
-%     \item \textbf{Sorting}: Primitives must be composited in a consistent order for alpha-blending. Typically they are sorted by depth (e.g.\ by the $z$-coordinate of $\boldsymbol{\mu}$ in camera space) so that back-to-front blending is well-defined. Tile-based sorting can also be used for efficiency.
-
-%     \item \textbf{Rasterisation}: Each Gaussian is drawn as a quad or ellipse. The fragment shader evaluates the 2D Gaussian weight (or an approximation thereof), multiplies by opacity and colour, and composites with the frame buffer using alpha blending: $\mathbf{c}_{\mathrm{out}} = \alpha \cdot \mathbf{c}_{\mathrm{G}} + (1-\alpha) \mathbf{c}_{\mathrm{in}}$.
-% \end{enumerate}
-
-% Because each step is differentiable, the full pipeline allows gradients from a photometric loss (e.g.\ L1 or L2 between rendered and ground-truth pixels) to be backpropagated to update the Gaussian parameters during training. Training is usually performed off-device: given multi-view RGB images and camera poses (e.g.\ from COLMAP or from an AR/Object Capture session), the Gaussians are initialised from a sparse point cloud, then optimised by minimising the rendering loss, with optional pruning and densification to control the number of primitives. The output is a \texttt{.ply} file containing per-vertex (per-Gaussian) attributes: position, colour, opacity, scale, and rotation.
-
-% % ---------------------------------------------------------------------------
-% \section{Relation to Mesh-Based Reconstruction}
-% \label{sec:3dgs_vs_mesh}
-
-% In the context of this thesis, the two main scene representations are:
-
-% \begin{itemize}
-%     \item \textbf{Object Capture (mesh)}: Explicit geometry (triangle mesh) with textures; on-device SfM, MVS, Poisson reconstruction, and UV mapping; output USDZ. Well-suited for editable assets, placement in the room editor, and real-time rendering in RealityKit.
-
-%     \item \textbf{3D Gaussian Splatting}: Implicit representation (set of Gaussians); training off-device with differentiable splatting; output \texttt{.ply}. High visual quality and view-dependent effects; no explicit mesh, so geometric editing (e.g.\ boolean operations) is harder. The application uses 3DGS for \emph{viewing} and \emph{comparison} alongside Object Capture, not for replacing furniture in the room editor.
-% \end{itemize}
-
-% By supporting both, the application lets users compare the same object or scene as a mesh (Object Capture) and as a Gaussian splat, and provides a foundation for future extensions (e.g.\ hybrid workflows or on-device 3DGS training as future work).
 \chapter{3D Gaussian Splatting}
 \label{ch:theory2}
 
-Neural radiance fields (NeRF) showed that a scene can be encoded as a continuous volumetric function approximated by a neural network, enabling high-quality view synthesis from posed images. Training and rendering were initially slow. \textbf{3D Gaussian Splatting} (3DGS), introduced by Kerbl et al.\ \cite{kerbl20233dgs}, replaces the neural field by a set of \textbf{explicit anisotropic Gaussians} in space. Kerbl et al.\ show that this representation delivers \textbf{high visual quality together with real-time rendering}: their method matches or exceeds prior radiance-field quality while running at interactive frame rates on desktop GPUs \cite{kerbl20233dgs}. In this thesis, 3DGS is used as an \textbf{imported} representation (\texttt{.ply} files) rendered with a custom Metal pipeline for \textbf{comparison and viewing}; mesh-based USDZ assets remain the medium for interactive furniture editing. Figure~\ref{fig:ch3_nerf_pipeline} illustrates the NeRF rendering formulation that motivated later explicit real-time representations such as 3D Gaussian Splatting.
+Before introducing 3D Gaussian Splatting it helps to recall the volumetric
+representation it replaces. Neural Radiance Fields (NeRF) showed that a scene can
+be encoded as a continuous volumetric function approximated by a neural network,
+enabling high-quality view synthesis from posed
+images~\cite{mildenhall2020nerf}. Training required hours of GPU time and
+rendering was far from real-time, motivating the shift towards explicit,
+rasterisable representations. \textbf{3D Gaussian Splatting} (3DGS), introduced by Kerbl et al.\
+\cite{kerbl20233dgs}, replaces the neural field by a set of \textbf{explicit
+anisotropic Gaussians} in space. Kerbl et al.\ show that this representation delivers
+\textbf{high visual quality together with real-time rendering}: their method matches
+or exceeds prior radiance-field quality while running at interactive frame rates on
+desktop GPUs~\cite{kerbl20233dgs}. In this thesis, 3DGS is used as an \textbf{imported}
+representation (\texttt{.ply} files) rendered with a custom Metal pipeline for
+\textbf{comparison and viewing}; mesh-based USDZ assets remain the medium for
+interactive furniture editing.
+
+\paragraph{Chapter roadmap.}
+This chapter first explains what each Gaussian stores and how it is projected and
+composited into an image. It then outlines the differentiable training loop used in
+classical 3DGS, analyses why that loop is impractical for mobile capture, and contrasts
+mesh-based and Gaussian-based assets in the application. Finally, it introduces SHARP
+as a feedforward single-image alternative and describes how both splat paths are
+integrated on iOS.
+
+Figure~\ref{fig:ch3_nerf_pipeline} recalls the NeRF formulation that motivated later
+explicit real-time representations such as 3DGS.
+
 \begin{figure}[H]
 \centering
-\thesisfig{0.9\textwidth}{figures/fig3_1_nerf_overview.pdf}
-\caption{NeRF overview: sample points along camera rays are fed to a 
-neural MLP $F_\Theta$ predicting colour $c$ and density $\sigma$; 
-volume rendering accumulates pixel colours; a photometric L2 loss 
-drives backpropagation to update network weights. (adapted from: \cite{mildenhall2020nerf}).}
+\input{tikz_diagrams/fig3_1_nerf_overview}
+% \thesisfig{0.9\textwidth}{figures/fig3_1_nerf_overview.pdf}
+\caption{NeRF overview: sample points along camera rays are fed to a neural MLP
+$F_\Theta$ predicting colour $c$ and density $\sigma$; volume rendering accumulates
+pixel colours; a photometric $\mathcal{L}_2$ loss drives backpropagation to update
+network weights. (Adapted from~\cite{mildenhall2020nerf}.)}
 \label{fig:ch3_nerf_pipeline}
 \end{figure}
 
@@ -84,125 +44,202 @@ drives backpropagation to update network weights. (adapted from: \cite{mildenhal
 \section{Representation: 3D Gaussian Primitives}
 \label{sec:3dgs_representation}
 
-Each primitive stores a mean $\boldsymbol{\mu} \in \mathbb{R}^3$, a covariance $\boldsymbol{\Sigma}$ describing elongation and orientation, an opacity $\alpha$, and colour parameters. Following Kerbl et al.\ \cite{kerbl20233dgs}, $\boldsymbol{\Sigma}$ is built from a rotation matrix $\mathbf{R}$ (quaternion $\mathbf{q}$) and diagonal scale $\mathbf{S}=\operatorname{diag}(\mathbf{s})$ with positive entries: $\boldsymbol{\Sigma} = \mathbf{R}\mathbf{S}\mathbf{S}^\top\mathbf{R}^\top$. Colour may be view-dependent via spherical harmonics; the implementation described later also accepts per-Gaussian RGB in linear space.
+\paragraph{Intuition before formalization.}
+Before introducing equations, it helps to view each Gaussian as a soft, oriented
+``blob'' of radiance in space rather than as a hard surface sample. Many overlapping
+blobs approximate geometry and appearance without explicit triangle connectivity. The
+parameters below specify where each blob is centred, how elongated and rotated it is,
+and how strongly it contributes colour and opacity when projected onto the image.
 
-The spatial falloff is
-\[
-G(\mathbf{x}) = \exp\bigl(-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x}-\boldsymbol{\mu})\bigr).
-\]
+Each primitive stores a mean $\boldsymbol{\mu} \in \mathbb{R}^3$, a covariance
+$\boldsymbol{\Sigma}$ describing elongation and orientation, an opacity $\alpha$, and
+colour parameters. Following Kerbl et al.~\cite{kerbl20233dgs}, $\boldsymbol{\Sigma}$ is
+built from a rotation matrix $\mathbf{R}$ (from unit quaternion $\mathbf{q}$) and
+diagonal scale matrix $\mathbf{S}=\operatorname{diag}(\mathbf{s})$ with positive
+entries:
+\begin{equation}
+\boldsymbol{\Sigma} = \mathbf{R}\mathbf{S}\mathbf{S}^\top\mathbf{R}^\top .
+\label{eq:3dgs_covariance}
+\end{equation}
+Colour may be view-dependent via spherical harmonics; the implementation described
+later also accepts per-Gaussian RGB in linear space. The spatial falloff of a single
+primitive is
+\begin{equation}
+G(\mathbf{x}) = \exp\!\left(-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu})^\top
+\boldsymbol{\Sigma}^{-1} (\mathbf{x}-\boldsymbol{\mu})\right).
+\label{eq:3dgs_gaussian}
+\end{equation}
+where $\mathbf{x}$ is a point in world space. Large values of $G(\mathbf{x})$ indicate
+that $\mathbf{x}$ lies near the centre of the primitive along its principal axes.
 
 \begin{figure}[H]
 \centering
-\thesisfig{\textwidth}{figures/fig3_2_gaussian_splatting_projection.pdf}
-\caption{Conceptual illustration of 3D Gaussian projection and 
-splatting. Each 3D Gaussian primitive with mean $\boldsymbol{\mu}$ 
-and covariance $\Sigma$ is projected onto the image plane via the 
-Jacobian $J$ of the perspective mapping, yielding an oriented 
-elliptical footprint with 2D covariance $\Sigma'$. Footprints are 
-sorted by depth and composited per pixel using alpha blending: 
-$c_{\mathrm{out}} = \alpha \cdot c_G + (1-\alpha)\cdot 
-c_{\mathrm{in}}$, where $c_G$ is the view-dependent colour of the 
-Gaussian primitive, $\alpha$ is its opacity, and $c_{\mathrm{in}}$ 
-is the accumulated colour from primitives behind it  \cite{kerbl20233dgs}.}
+% \thesisfig{\textwidth}{figures/fig3_2_gaussian_splatting_projection.pdf}
+\input{tikz_diagrams/fig3_2_gaussian_splatting_projection}
+\caption{Conceptual illustration of 3D Gaussian projection and splatting. Each 3D
+Gaussian primitive with mean $\boldsymbol{\mu}$ and covariance $\boldsymbol{\Sigma}$ is
+projected onto the image plane via the Jacobian $\mathbf{J}$ of the perspective mapping,
+yielding an oriented elliptical footprint with 2D covariance $\boldsymbol{\Sigma}'$.
+Footprints are sorted by depth and composited per pixel using alpha blending:
+$c_{\mathrm{out}} = \alpha \cdot c_G + (1-\alpha)\cdot c_{\mathrm{in}}$, where $c_G$
+is the view-dependent colour of the Gaussian, $\alpha$ is its opacity, and
+$c_{\mathrm{in}}$ is the accumulated colour from primitives behind it~\cite{kerbl20233dgs}.}
 \label{fig:gaussian_project}
 \end{figure}
+
+Having defined the 3D primitives, the next section explains how they become pixels in a
+rendered image.
+
 
 \section{Projection, Rasterisation, and Real-Time Rendering}
 \label{sec:3dgs_splatting}
 
-Rendering splats each Gaussian onto the image \cite{kerbl20233dgs}:
+Rendering splats each Gaussian onto the image~\cite{kerbl20233dgs}. Conceptually, the
+pipeline proceeds in four steps:
 
 \begin{enumerate}
-    \item \textbf{Project} $\boldsymbol{\mu}$ with the camera matrix.
+    \item \textbf{Project} the mean $\boldsymbol{\mu}$ with the camera extrinsic and
+    intrinsic matrices.
 
-    \item \textbf{Project covariance} to $2\times2$ image-space covariance using the Jacobian $\mathbf{J}$ of the perspective mapping at $\boldsymbol{\mu}$, yielding an elliptical footprint.
+    \item \textbf{Project covariance} to a $2\times2$ image-space covariance
+    $\boldsymbol{\Sigma}'$ using the Jacobian $\mathbf{J}$ of the perspective mapping
+    evaluated at $\boldsymbol{\mu}$, yielding an elliptical footprint on the image plane.
 
     \item \textbf{Sort} primitives (globally or per tile) for approximate depth order.
 
-    \item \textbf{Rasterise} with alpha blending, accumulating colour and transmittance along rays.
+    \item \textbf{Rasterise} with alpha blending, accumulating colour and transmittance
+    along rays.
 \end{enumerate}
 
-Kerbl et al.\ describe tile-based culling and sorting strategies that make the above pipeline practical for \textbf{real-time} use \cite{kerbl20233dgs}. At each pixel, ordered compositing follows the familiar over-operator,
-\[
-\mathbf{c}_{\mathrm{out}} = \alpha \cdot \mathbf{c}_{\mathrm{G}} + (1-\alpha) \mathbf{c}_{\mathrm{in}}.
-\]
+Kerbl et al.\ describe tile-based culling and sorting strategies that make the above
+pipeline practical for \textbf{real-time} use~\cite{kerbl20233dgs}. At each pixel,
+ordered compositing follows the familiar over-operator,
+\begin{equation}
+\mathbf{c}_{\mathrm{out}} = \alpha \cdot \mathbf{c}_{\mathrm{G}}
++ (1-\alpha)\,\mathbf{c}_{\mathrm{in}},
+\label{eq:3dgs_alpha_blend}
+\end{equation}
+where $\mathbf{c}_{\mathrm{G}}$ is the Gaussian colour (possibly view-dependent),
+$\alpha$ is opacity after evaluating the projected footprint, and
+$\mathbf{c}_{\mathrm{in}}$ is the colour accumulated from Gaussians farther from the
+camera. In this application, imported \texttt{.ply} splats are rendered by a custom
+Metal orbit viewer; expensive training or feedforward inference remains outside the
+iOS runtime.
+
+Because splat parameters must be fitted to photographs in classical 3DGS, the
+following section summarises the differentiable optimisation loop.
+
 
 \section{Differentiable Rendering and Optimisation}
 \label{sec:3dgs_differentiable}
 
-To fit Gaussians to photographs, the renderer must be \textbf{differentiable}. Gradients of a photometric loss $\mathcal{L}$ with respect to rendered pixels propagate backwards through:
+To fit Gaussians to photographs, the renderer must be \textbf{differentiable}. A
+photometric loss $\mathcal{L}$ (typically $\mathcal{L}_2$ or a combination with
+structural terms) compares rendered and ground-truth images. Gradients
+$\partial \mathcal{L}/\partial \mathbf{c}_{\mathrm{out}}$ propagate backwards through:
 
 \begin{enumerate}
-    \item \textbf{Alpha compositing}: partial derivatives adjust per-Gaussian colour and opacity.
+    \item \textbf{Alpha compositing} (Equation~\ref{eq:3dgs_alpha_blend}): partial
+    derivatives adjust per-Gaussian colour and opacity.
 
-    \item \textbf{Rasterisation}: pixels influenced by a Gaussian receive scattered gradients.
+    \item \textbf{Rasterisation}: pixels influenced by a Gaussian receive scattered
+    gradients.
 
-    \item \textbf{Projection}: errors on the image plane differentiate through the projective transform and through the \textbf{Jacobian} $\mathbf{J}$ that maps 3D covariance to 2D, updating $\boldsymbol{\mu}$, scales, and rotations.
+    \item \textbf{Projection}: errors on the image plane differentiate through the
+    projective transform and through the Jacobian $\mathbf{J}$ that maps 3D covariance
+    $\boldsymbol{\Sigma}$ to 2D covariance $\boldsymbol{\Sigma}'$, updating
+    $\boldsymbol{\mu}$, scales $\mathbf{s}$, and rotations $\mathbf{q}$.
 \end{enumerate}
 
-This is structurally analogous to other differentiable rendering pipelines: screen-space residuals are tied to 3D parameters through a projection map. Optimisation typically alternates gradient steps with \textbf{adaptive density control} (splitting large Gaussians, culling transparent ones) \cite{kerbl20233dgs}. Initialisation often starts from a sparse point cloud (e.g.\ from COLMAP SfM), linking 3DGS training back to the same family of geometry estimation as Section~\ref{sec:photogrammetry}.
+This is structurally analogous to other differentiable rendering pipelines:
+screen-space residuals are tied to 3D parameters through a projection map. Optimisation
+typically alternates gradient steps with \textbf{adaptive density control} (splitting
+large Gaussians, cloning under-reconstructed regions, culling near-transparent ones)~\cite{kerbl20233dgs}.
+Initialisation often starts from a sparse point cloud (e.g.\ from COLMAP
+structure-from-motion), linking 3DGS training to the same family of geometry
+estimation as photogrammetry-based capture.
 
-% ─────────────────────────────────────────────────────────────────────────
-\subsection{Limitations of Classical 3DGS for Mobile and Real-Time Capture}
-\label{subsec:3dgs_limitations}
+\paragraph{Training loop in steps.}
+\begin{enumerate}
+    \item Initialise Gaussians from sparse SfM points and estimated camera poses.
+    \item Render the current scene from a sampled training viewpoint.
+    \item Compute $\mathcal{L}$ between rendered and reference images.
+    \item Backpropagate through compositing, rasterisation, and projection to update
+    $\boldsymbol{\mu}$, $\mathbf{s}$, $\mathbf{q}$, $\alpha$, and appearance parameters.
+    \item Apply densification/pruning heuristics and repeat until convergence.
+\end{enumerate}
 
-Despite its visual quality and real-time rendering speed, the original 3DGS
-pipeline~\cite{kerbl20233dgs} carries significant practical constraints that
-limit its applicability in a mobile, user-facing scenario:
+This loop yields high visual quality but requires many views, reliable calibration, and
+substantial GPU time. In the present thesis workflow, full optimisation is performed
+off-device; the mobile app consumes only resulting \texttt{.ply} assets. The next
+section explains why classical training is a poor match for user-initiated mobile
+capture.
+
+
+\section{Limitations of Classical 3DGS for Mobile and Real-Time Capture}
+\label{sec:3dgs_limitations}
+
+Despite its visual quality and real-time \emph{rendering} speed, the original 3DGS
+pipeline~\cite{kerbl20233dgs} carries practical constraints that limit applicability in
+a mobile, user-facing scenario:
 
 \begin{itemize}
-    \item \textbf{Multi-view requirement.} Classical 3DGS requires a set of
-    photographs taken from multiple, carefully distributed viewpoints around
-    the subject,  typically 50-200+ images. This makes it unsuitable for
-    capturing a scene from a single photo or from a handheld device with
-    limited movement.
+    \item \textbf{Multi-view requirement.} Classical 3DGS requires photographs from
+    multiple, carefully distributed viewpoints, typically 50--200+ images. This makes
+    it unsuitable for capturing a scene from a single photo or from limited handheld
+    movement.
 
-    \item \textbf{Dependency on SfM.} Before training can begin, camera
-    poses must be estimated by running Structure-from-Motion (SfM) software
-    such as COLMAP. This is a computationally
-    expensive offline process (minutes to hours) and requires sufficient
-    feature overlap between views.
+    \item \textbf{Dependency on SfM.} Before training, camera poses must be estimated by
+    running structure-from-motion software such as COLMAP~\cite{SSF16}. This offline step
+    can take minutes to hours and requires sufficient feature overlap between views.
 
-    \item \textbf{Per-scene optimisation.} Each new scene requires running the
-    full training loop from scratch, hundreds of thousands of gradient-descent
-    iterations on a GPU. There is no generalisation across scenes: a model
-    trained on one room cannot directly reconstruct another without retraining.
+    \item \textbf{Per-scene optimisation.} Each new scene requires hundreds of thousands
+    of gradient-descent iterations on a GPU. A model trained on one room cannot
+    reconstruct another without retraining.
 
-    \item \textbf{Adaptive densification overhead.} The original 3DGS algorithm
-    dynamically splits and clones Gaussians in under-reconstructed regions and
-    prunes near-transparent ones. While effective, this adaptive control makes
-    training non-trivial to port to mobile hardware.
+    \item \textbf{Adaptive densification overhead.} Splitting, cloning, and pruning
+    Gaussians during training improves quality but complicates porting the full pipeline
+    to mobile hardware.
 
-    \item \textbf{Relative scale.} Classical 3DGS initialises from a COLMAP
-    sparse point cloud which provides only relative (up-to-similarity) scale.
-    Without an explicit depth sensor or known camera baseline, the metric scale
-    of the scene is unknown.
+    \item \textbf{Relative scale.} Initialisation from a COLMAP sparse point cloud
+    yields geometry up to similarity only. Without metric depth or a known baseline,
+    absolute scale is unknown.
 \end{itemize}
 
-These constraints collectively make the classical pipeline impractical for
-real-time, user-initiated mobile capture. The need for a \emph{generalised,
-feedforward} approach that works from a single image motivated the development
-of Apple's SHARP framework, described below.
-
-% ─────────────────────────────────────────────────────────────────────────
+These constraints collectively make the classical \emph{training} pipeline impractical
+for real-time, user-initiated mobile capture. They do not invalidate splats as a
+\textbf{viewing} medium: pre-trained or server-generated \texttt{.ply} files remain
+useful benchmarks. They motivate feedforward alternatives such as SHARP (Section~\ref{sec:sharp})
+and clarify why mesh-based USDZ assets remain the authoring substrate (next section).
 
 
 \section{Meshes versus Gaussians: Editability and Role in the Application}
 \label{sec:3dgs_vs_mesh}
 
-\textbf{Meshes (USDZ from Object Capture)} are products of an on-device pipeline analogous to multi-view stereo plus \textbf{surface reconstruction} (e.g.\ Poisson reconstruction \cite{kazhdan2006poisson} in the classical photogrammetry literature). Such meshes expose \textbf{explicit connectivity}: faces can be clipped, simplified, or rigged; axis-aligned bounding boxes align naturally with RoomPlan's boxy furniture detections; RealityKit loads USDZ natively. \textbf{3D Gaussians} \cite{kerbl20233dgs} do not define a thin surface: ``moving'' an object means transforming thousands of primitives coherently; boolean cuts and physical simulation are ill-defined without conversion.
+\textbf{Meshes (USDZ from Object Capture)} are products of an on-device pipeline
+analogous to multi-view stereo plus \textbf{surface reconstruction} (e.g.\ Poisson
+reconstruction~\cite{kazhdan2006poisson} in the classical photogrammetry literature).
+Such meshes expose \textbf{explicit connectivity}: faces can be clipped, simplified, or
+rigged; axis-aligned bounding boxes align naturally with RoomPlan's boxy furniture
+detections; RealityKit loads USDZ natively. \textbf{3D Gaussians}~\cite{kerbl20233dgs}
+do not define a thin surface: ``moving'' an object means transforming thousands of
+primitives coherently; boolean cuts and physical simulation are ill-defined without
+conversion. Blender export in this project stages mesh-based room structure and USDZ
+furniture; splats remain in-app benchmarks unless imported manually in Blender.
 
-Therefore the product decision in this thesis is:
+The product decision in this thesis is therefore:
 
 \begin{itemize}
     \item \textbf{Authoring and replacement}: USDZ meshes only.
 
-    \item \textbf{Visualisation and comparison}: optional \texttt{.ply} splats via Metal, citing Kerbl et al.\ \cite{kerbl20233dgs} for the real-time splatting paradigm.
+    \item \textbf{Visualisation and comparison}: optional \texttt{.ply} splats via
+    Metal, following the real-time splatting paradigm of Kerbl et al.~\cite{kerbl20233dgs}.
 
-    \item \textbf{Training}: off-device in the current system; mobile or fast training remains future work \cite{Guo26}.
+    \item \textbf{Training}: off-device in the current system; on-device or fast
+    training remains future work~\cite{Guo26}.
 \end{itemize}
 
-Table~\ref{tab:mesh_vs_3dgs} summarises contrasts.
+Table~\ref{tab:mesh_vs_3dgs} summarises the contrasts.
 
 \begin{table}[htbp]
 \centering
@@ -214,7 +251,7 @@ Table~\ref{tab:mesh_vs_3dgs} summarises contrasts.
 \hline
 Geometry & Explicit triangles & Cloud of Gaussians \\
 \hline
-Rendering & RealityKit / Metal mesh & Splatting \cite{kerbl20233dgs} \\
+Rendering & RealityKit / Metal mesh & Splatting~\cite{kerbl20233dgs} \\
 \hline
 RoomPlan alignment & Scale-to-bounds, grounding & Manual alignment if needed \\
 \hline
@@ -223,63 +260,37 @@ Editing in app & Yes (replace, transform) & View / compare only \\
 \end{tabular}
 \end{table}
 
-Supporting both representations positions the thesis between \textbf{interactive CAD-like staging} (mesh assets, Poisson-class geometry \cite{kazhdan2006poisson}) and \textbf{image-quality novel-view synthesis} at real-time rates \cite{kerbl20233dgs}, without claiming that splats replace meshes for production editing workflows today.
+Supporting both representations positions the thesis between \textbf{interactive
+CAD-like staging} (mesh assets) and \textbf{image-quality novel-view synthesis} at
+real-time rates~\cite{kerbl20233dgs}, without claiming that splats replace meshes for
+production editing workflows today.
 
-\section{Limitations of Classical 3DGS for Mobile and Real-Time Capture}
-\label{sec:3dgs_limitations}
-
-Despite its visual quality and real-time rendering speed, the 3DGS pipeline
-of Kerbl et al.~\cite{kerbl20233dgs} carries practical constraints that limit its
-applicability in a mobile, user-facing scenario:
-
-\begin{itemize}
-    \item \textbf{Multi-view requirement.} Classical 3DGS requires 50--200+
-    photographs from distributed viewpoints. This makes it unsuitable for
-    capturing a scene from a single photo or from a handheld device with
-    limited movement.
-
-    \item \textbf{Dependency on SfM.} Camera poses must be estimated by
-    running Structure-from-Motion software such as COLMAP~\cite{SSF16} before
-    training can begin (an offline process taking minutes to hours).
-
-    \item \textbf{Per-scene optimisation.} Each new scene requires running the
-    full training loop from scratch. There is no generalisation: a model
-    trained on one room cannot reconstruct another without retraining.
-
-    \item \textbf{Relative scale only.} Initialisation from a COLMAP sparse
-    point cloud yields only relative scale. Without an explicit depth sensor
-    or known baseline, metric scale is unknown.
-\end{itemize}
-
-These constraints make the classical pipeline impractical for real-time,
-user-initiated mobile capture, motivating the feedforward approach described
-below.
 
 \section{SHARP: Feedforward Single-Image 3D Gaussian Splatting}
 \label{sec:sharp}
 
 \textbf{SHARP} (\emph{Sharp Monocular View Synthesis})~\cite{sharp-monocular-view} is a
-method developed at Apple and presented at ICLR~2025. Given a \emph{single}
-RGB photograph, SHARP predicts the full set of 3D Gaussian parameters for the
-depicted scene in one forward pass through a neural network, with no
-iterative optimisation, no multi-view input, and no SfM preprocessing. The
-output is a standard \texttt{.ply} that renders in real time via the same
-splatting pipeline. Inference takes
-under one second on a modern GPU.
+method developed at Apple and presented at ICLR~2025. Given a \emph{single} RGB
+photograph, SHARP predicts the full set of 3D Gaussian parameters for the depicted
+scene in one forward pass through a neural network, with no iterative optimisation, no
+multi-view input, and no SfM preprocessing. The output is a standard \texttt{.ply} that
+renders in real time via the same splatting pipeline as classical 3DGS
+(Equations~\ref{eq:3dgs_gaussian}--\ref{eq:3dgs_alpha_blend}). Inference takes under one
+second on a modern discrete GPU.
 
 The method builds on a pretrained monocular depth estimator (Depth
-Pro~\cite{BDGZ25}) to initialise $\approx$1.2 million Gaussians from the
-predicted metric depth map, then refines all Gaussian attributes through a
-learned decoder. This design yields three key properties: (1)~real-time
-novel-view rendering via standard 3DGS rasterisation; (2)~absolute metric
-scale, enabling physically meaningful camera displacements compatible with
-AR/VR sensors; and (3)~zero-shot generalisation across indoor and outdoor
-scenes, reducing LPIPS by 25--34\% and DISTS by 21--43\% versus the best
-prior feedforward method on six benchmark datasets~\cite{sharp-monocular-view}.
+Pro~\cite{BDGZ25}) to initialise $\approx 1.2\times10^6$ Gaussians from the predicted
+metric depth map, then refines all Gaussian attributes through a learned decoder. This
+design yields three properties relevant to this thesis: (1)~real-time novel-view
+rendering via standard 3DGS rasterisation; (2)~absolute metric scale, enabling
+physically meaningful camera displacements compatible with AR sensors; and
+(3)~zero-shot generalisation across indoor and outdoor scenes, reducing LPIPS by
+25--34\% and DISTS by 21--43\% versus the best prior feedforward method on six
+benchmark datasets~\cite{sharp-monocular-view}.
 
-Table~\ref{tab:sharp_bench} summarises the zero-shot benchmark results.
-Table~\ref{tab:3dgs_vs_sharp} contrasts classical 3DGS with SHARP across
-the dimensions most relevant to this application.
+Table~\ref{tab:sharp_bench} summarises zero-shot benchmark results.
+Table~\ref{tab:3dgs_vs_sharp} contrasts classical 3DGS with SHARP along dimensions
+most relevant to this application.
 
 \begin{table}[h]
 \centering
@@ -315,11 +326,11 @@ Gen3C   & .164/.545 & .207/.384 & .090/.227 & .106/.285 & .177/.566 & .408/.734 
 \textbf{Aspect} & \textbf{Classical 3DGS} & \textbf{SHARP} \\
 \midrule
 Input             & Multi-view images + poses & Single image \\
-Pose estimation   & COLMAP SfM (offline)      & Not required \\
+Pose estimation   & COLMAP SfM (offline)~\cite{SSF16} & Not required \\
 Inference mode    & Per-scene optimisation    & Single forward pass \\
 Inference time    & Minutes to hours          & ${<}$1\,s (GPU) / ${\approx}$10\,s (Apple Silicon) \\
 Gaussian count    & Adaptive ($10^4$--$10^6$) & Fixed ${\approx}$1.2\,M \\
-Depth source      & SfM (relative scale)      & Depth Pro (metric) \\
+Depth source      & SfM (relative scale)      & Depth Pro (metric)~\cite{BDGZ25} \\
 Colour model      & Spherical harmonics       & Plain RGB \\
 Generalisation    & Per-scene only            & Zero-shot \\
 Mobile suitability & Impractical on-device   & Via local server call \\
@@ -327,40 +338,56 @@ Mobile suitability & Impractical on-device   & Via local server call \\
 \end{tabular}
 \end{table}
 
+SHARP does not replace mesh authoring; it complements it by reducing capture friction
+for radiance-style previews. The following section describes how both splat paths are
+wired into the iOS application.
+
+
 \subsection{Integration in This Application}
 \label{subsec:sharp_integration}
 
-The application integrates SHARP as a supplementary capture mode alongside
-RoomPlan and Object Capture, using a client--server architecture:
+The application integrates SHARP as a supplementary capture mode alongside RoomPlan
+and Object Capture, using a client--server architecture:
 
 \begin{itemize}
     \item \textbf{Server (Python/PyTorch).} A Flask server
-    (\texttt{sharp\_server.py}) runs on a Mac on the local network. It loads
-    the pretrained SHARP weights once at startup and exposes a
-    \texttt{/sharp/infer} endpoint. When a JPEG is posted, the server calls
-    \texttt{predict\_image()}, applies opacity-based Gaussian pruning to
-    reduce $\approx$1.2\,M to $\approx$300\,k Gaussians for mobile rendering
-    performance, and returns the \texttt{.ply} file.
+    (\texttt{sharp\_server.py}) runs on a Mac on the local network. It loads the
+    pretrained SHARP weights once at startup and exposes a \texttt{/sharp/infer}
+    endpoint. When a JPEG is posted, the server calls \texttt{predict\_image()},
+    applies opacity-based Gaussian pruning to reduce $\approx 1.2\times10^6$ to
+    $\approx 3\times10^5$ Gaussians for mobile rendering performance, and returns the
+    \texttt{.ply} file.
 
-    \item \textbf{Client (SwiftUI/iOS).} \texttt{SHARPCaptureView} lets the
-    user capture one frame via \texttt{UIImagePickerController}.
+    \item \textbf{Client (SwiftUI/iOS).} \texttt{SHARPCaptureView} lets the user
+    capture one frame via \texttt{UIImagePickerController}.
     \texttt{SHARPService.infer(image:)} POSTs the JPEG using a custom
     \texttt{URLSession} with a 360-second timeout (the default
-    \texttt{URLSession.shared} caps at 60\,s, insufficient for first-run
-    Metal shader compilation on the server), saves the returned \texttt{.ply},
-    and opens it in the existing Metal orbit viewer.
+    \texttt{URLSession.shared} caps at 60\,s, insufficient for first-run Metal shader
+    compilation on the server), saves the returned \texttt{.ply}, and opens it in the
+    existing Metal orbit viewer shared with offline-trained splats.
 
     \item \textbf{Gaussian pruning.} The full SHARP output produces a
-    $\approx$66\,MB \texttt{.ply}. The per-frame Metal depth-sort over 1.2\,M
-    elements is too expensive for interactive rates on iPhone. The server
-    therefore retains the top 300\,k Gaussians by opacity score, reducing the
-    file to $\approx$18\,MB and enabling smooth real-time viewing on device.
+    $\approx 66$\,MB \texttt{.ply}. Per-frame depth sorting over $1.2\times10^6$
+    elements is too expensive for interactive rates on iPhone. The server therefore
+    retains the top $3\times10^5$ Gaussians by opacity score, reducing the file to
+    $\approx 18$\,MB and enabling smooth real-time viewing on device.
 \end{itemize}
 
-This positions the application to demonstrate the full reconstruction
-spectrum: \textbf{RoomPlan} (parametric, real-time) $\rightarrow$
+This positions the application to demonstrate the full reconstruction spectrum:
+\textbf{RoomPlan} (parametric, real-time) $\rightarrow$
 \textbf{Object Capture} (photogrammetric mesh, on-device) $\rightarrow$
 \textbf{3DGS} (optimisation-based, external GPU) $\rightarrow$
-\textbf{SHARP} (feedforward neural, single image, near real-time).
+\textbf{SHARP} (feedforward neural, single image, near real-time) $\rightarrow$
+\textbf{Blender export} (staged mesh hand-off).
 
 
+\paragraph{Chapter takeaway.}
+3D Gaussian Splatting offers an efficient explicit radiance representation: each
+primitive is parameterised by $\boldsymbol{\mu}$, $\boldsymbol{\Sigma}$, $\alpha$, and
+appearance; projection via $\mathbf{J}$ and alpha compositing
+(Equation~\ref{eq:3dgs_alpha_blend}) enable real-time viewing; and differentiable
+optimisation fits splats to multi-view photographs. Classical training nonetheless
+remains poorly matched to mobile, user-initiated capture because of data, pose, compute,
+and scale constraints. This thesis therefore keeps USDZ meshes for interactive room
+design and uses imported \texttt{.ply} splats, including SHARP outputs pruned for
+mobile performance, for visual comparison in a unified Metal viewer.

@@ -1,0 +1,79 @@
+% fig3_2_gaussian_splatting_projection.tex
+% fig:gaussian_project — 3D Gaussian projection, simplified
+
+\begin{tikzpicture}
+
+%% ── Background panels (tall enough, extra right margin for alpha labels) ──
+\draw[rounded corners=8pt, fill=gray!7, draw=gray!35, line width=0.8pt]
+  (-5.0,-1.4) rectangle (-0.3, 2.8);
+\draw[rounded corners=8pt, fill=gray!7, draw=gray!35, line width=0.8pt]
+  ( 0.3,-1.4) rectangle ( 4.6, 2.8);
+
+%% ── Panel titles ──
+\node[font=\small\bfseries] at (-2.65, 2.5) {3D world space};
+\node[font=\small\bfseries] at ( 2.45, 2.5) {Image plane};
+
+%% ── Divider ──
+\draw[dashed, gray!35, line width=0.6pt] (0,-1.2) -- (0, 2.6);
+
+%%────────────────────────────────────────
+%% LEFT: one 3D Gaussian
+%%────────────────────────────────────────
+\draw[fill=gray!18, draw=gray!55, line width=1pt, rotate around={-20:(-2.65,0.8)}]
+  (-2.65,0.8) ellipse (1.4cm and 0.7cm);
+\draw[dashed, gray!40, rotate around={-20:(-2.65,0.8)}]
+  (-4.05,0.8) -- (-1.25,0.8);
+\draw[dashed, gray!40, rotate around={-20:(-2.65,0.8)}]
+  (-2.65,0.1) -- (-2.65,1.5);
+
+\fill[red!55] (-2.65,0.8) circle (4.5pt);
+\node[font=\small\bfseries, red!65, right=6pt] at (-2.65,0.8) {$\boldsymbol{\mu}$};
+\node[font=\footnotesize, gray!65] at (-2.65,2.1) {covariance $\boldsymbol{\Sigma}$};
+
+%%────────────────────────────────────────
+%% Projection arrow (mid-height)
+%%────────────────────────────────────────
+\draw[-{Stealth[length=6pt]}, gray!50, line width=0.9pt, dashed]
+  (-1.1, 0.6) -- (0.9, 0.6)
+  node[midway, above=4pt, font=\footnotesize\itshape, gray!60]
+  {project via $\mathbf{J}$};
+
+%%────────────────────────────────────────
+%% RIGHT: three footprints with alpha labels to the right, OUTSIDE the panel
+%%────────────────────────────────────────
+
+%% Footprint 1 — back, darkest, top
+\draw[fill=gray!28, draw=gray!55, line width=0.8pt, rotate around={-15:(2.1,1.7)}]
+  (2.1,1.7) ellipse (1.1cm and 0.52cm);
+\node[font=\footnotesize, gray!55, right=4pt] at (3.3,1.7)
+  {$\alpha_1{=}0.8$\ {\scriptsize(opaque)}};
+
+%% Footprint 2 — middle
+\draw[fill=gray!16, draw=gray!45, line width=0.7pt, rotate around={5:(2.4,0.6)}]
+  (2.4,0.6) ellipse (0.9cm and 0.44cm);
+\node[font=\footnotesize, gray!55, right=4pt] at (3.4,0.6)
+  {$\alpha_2{=}0.5$};
+
+%% Footprint 3 — front, lightest, bottom
+\draw[fill=gray!7, draw=gray!38, line width=0.6pt, rotate around={-5:(2.1,-0.5)}]
+  (2.1,-0.5) ellipse (0.7cm and 0.34cm);
+\node[font=\footnotesize, gray!55, right=4pt] at (3.0,-0.5)
+  {$\alpha_3{=}0.3$\ {\scriptsize(transparent)}};
+
+%% "depth order" annotation — below footprints, inside panel
+\node[font=\scriptsize\itshape, gray!55] at (2.2,-1.1)
+  {sorted back $\to$ front by depth};
+
+%%────────────────────────────────────────
+%% Alpha blending box — below the right panel only
+%%────────────────────────────────────────
+\draw[-{Stealth[length=5pt]}, gray!50, line width=0.8pt]
+  (2.45,-1.4) -- (2.45,-2.0);
+
+\draw[rounded corners=6pt, fill=red!5, draw=red!35, line width=0.9pt]
+  (0.4,-2.0) rectangle ( 4.6,-3.2);
+\node[font=\small\bfseries] at (2.5,-2.38) {Alpha blending (front to back)};
+\node[font=\small] at (2.5,-2.82)
+  {$\mathbf{c}_{\mathrm{out}} = \alpha\,\mathbf{c}_G + (1{-}\alpha)\,\mathbf{c}_{\mathrm{in}}$};
+
+\end{tikzpicture}

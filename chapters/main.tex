@@ -31,14 +31,19 @@
 \newpage
 \pagenumbering{roman} 
 
-% \cleardoublepage
-% ABSTRACT
-% \vspace{0.5cm}	
-% \hrule
-% \vspace{0.5cm}	
-% \cleardoublepage
+\cleardoublepage
+ABSTRACT
+\vspace{0.5cm}	
+\hrule
+\vspace{0.5cm}	
 
-% Abstract: un rezumat în limba engleză cu prezentarea, pe scurt, a conținutului pe capitole, punând accent pe contribuțiile proprii și originalitate
+Interior design decisions are difficult to evaluate without spatially accurate visualisation of furniture and finishes in a real environment. Existing augmented reality solutions treat the room as a transiently detected floor plane, provide no persistent room model, and require the user to be physically present in the space for every design iteration. The result is a tool suited to a single in-store moment, not to the extended iterative process that characterises real interior redesign. This thesis addresses these limitations through five engineering contributions.
+
+The primary contribution is a unified scan-to-edit pipeline for iOS that connects Apple's RoomPlan API, which produces a metric, semantically annotated digital twin of a room, to a RealityKit-based editor in which detected furniture instances can be replaced with virtual USDZ assets via gesture-based manipulation, with state persisted across sessions. The second is the integration of Object Capture for on-device photogrammetric asset authoring, eliminating any dependency on external tooling. The third is a Metal-based Gaussian splat renderer and SHARP client for interactive viewing of 3D Gaussian Splatting scenes and direct comparison with mesh-based representations. The fourth is a reference SwiftUI/MVVM architecture with a two-level persistence cache and a virtual decor extension covering wall art, carpet, and dynamic lighting. The fifth is a DCC export service: completed room designs can be exported as a shareable ZIP archive containing a glTF scene, USDZ furniture copies, JSON placement manifests, and a Blender Python helper script for further editing in desktop tools.
+
+Chapter 2 grounds the work theoretically, mapping the classical photogrammetric chain and depth-fusion reconstruction to Apple's capture APIs. Chapter 3 introduces 3D Gaussian Splatting and presents SHARP as a feedforward single-image alternative to classical multi-view optimisation. Chapter 4 formalises functional and non-functional requirements. Chapter 5 describes the architecture, data flow, and implementation. Chapter 6 summarises results, limitations, and directions for future work.
+
+
 
 
 

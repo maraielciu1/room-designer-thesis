@@ -6,31 +6,72 @@
 //
 
 import SwiftUI
+import SwiftData
 
 // MARK: - App Entry Point
 
 @main
 struct RoomScanTestApp: App {
+    private let modelContainer: ModelContainer
+    @StateObject private var userManager: UserManager
+    @StateObject private var authManager: AuthenticationManager
+
     init() {
-        configureNavigationBar()
+        let container: ModelContainer
+        do {
+            container = try ModelContainer(for: AppUserEntity.self)
+        } catch {
+            fatalError("Failed to create SwiftData container: \(error)")
+        }
+        modelContainer = container
+        let um = UserManager()
+        _userManager = StateObject(wrappedValue: um)
+        _authManager = StateObject(
+            wrappedValue: AuthenticationManager(modelContainer: container, userManager: um)
+        )
+        Self.configureNavigationBar()
     }
 
-    private func configureNavigationBar() {
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(AppTheme.background)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().compactAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().tintColor = UIColor(AppTheme.accentLight)
+    private static func configureNavigationBar() {
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor(AppTheme.lightNeutral)
+        ]
+        let largeTitleAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor(AppTheme.lightNeutral),
+            .font: UIFont.systemFont(ofSize: 34, weight: .bold)
+        ]
+
+        let standard = UINavigationBarAppearance()
+        standard.configureWithOpaqueBackground()
+        standard.backgroundColor = UIColor(AppTheme.background)
+        standard.titleTextAttributes = titleAttrs
+        standard.largeTitleTextAttributes = largeTitleAttrs
+
+        let scrollEdge = UINavigationBarAppearance()
+        scrollEdge.configureWithTransparentBackground()
+        scrollEdge.backgroundColor = .clear
+        scrollEdge.shadowColor = .clear
+        scrollEdge.titleTextAttributes = titleAttrs
+        scrollEdge.largeTitleTextAttributes = largeTitleAttrs
+
+        UINavigationBar.appearance().standardAppearance = standard
+        UINavigationBar.appearance().compactAppearance = standard
+        UINavigationBar.appearance().scrollEdgeAppearance = scrollEdge
+        UINavigationBar.appearance().tintColor = UIColor(AppTheme.lightNeutral)
     }
 
     var body: some Scene {
         WindowGroup {
             AppRootView()
+                .environmentObject(userManager)
+                .environmentObject(authManager)
+                .modelContainer(modelContainer)
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    #if canImport(GoogleSignIn)
+                    GIDSignIn.sharedInstance.handle(url)
+                    #endif
+                }
         }
     }
 }
@@ -38,7 +79,8 @@ struct RoomScanTestApp: App {
 // MARK: - Root View
 
 struct AppRootView: View {
-    @StateObject private var userManager = UserManager()
+    @EnvironmentObject var userManager: UserManager
+    @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var catalogManager = FurnitureCatalogManager()
 
     @State private var roomManager: RoomManager?
@@ -51,33 +93,85 @@ struct AppRootView: View {
     var body: some View {
         Group {
             if showSplash {
-                AppSplashView { showSplash = false }
+                AppSplashView { finishSplash() }
+                    .transition(.opacity)
+            } else if !authManager.isAuthenticated {
+                AuthenticationView(authManager: authManager)
                     .transition(.opacity)
             } else {
-                LocalLandingView()
-                    .environmentObject(userManager)
-                    .environmentObject(catalogManager)
-                    .modifier(ManagerEnvironmentModifier(
-                        roomManager: roomManager,
-                        historyManager: historyManager,
-                        scannedFurnitureManager: scannedFurnitureManager,
-                        projectManager: projectManager
-                    ))
+                AuthenticatedShell(
+                    roomManager: $roomManager,
+                    historyManager: $historyManager,
+                    scannedFurnitureManager: $scannedFurnitureManager,
+                    projectManager: $projectManager
+                )
+                .environmentObject(catalogManager)
+                .modifier(ManagerEnvironmentModifier(
+                    roomManager: roomManager,
+                    historyManager: historyManager,
+                    scannedFurnitureManager: scannedFurnitureManager,
+                    projectManager: projectManager
+                ))
             }
         }
         .animation(.easeInOut(duration: 0.4), value: showSplash)
+        .animation(.easeInOut(duration: 0.35), value: authManager.isAuthenticated)
         .onAppear {
-            ensureLocalManagers()
+            authManager.onAuthStateChanged = { syncManagersAfterAuthChange() }
         }
     }
 
-    private func ensureLocalManagers() {
+    private func finishSplash() {
+        authManager.restoreSession()
+        syncManagersAfterAuthChange()
+        showSplash = false
+    }
+
+    private func syncManagersAfterAuthChange() {
+        if authManager.isAuthenticated {
+            ensureManagers()
+            roomManager?.reloadForCurrentUser()
+            historyManager?.reloadForCurrentUser()
+            scannedFurnitureManager?.reloadForCurrentUser()
+            projectManager?.reloadForCurrentUser()
+        } else {
+            roomManager = nil
+            historyManager = nil
+            scannedFurnitureManager = nil
+            projectManager = nil
+        }
+    }
+
+    private func ensureManagers() {
         if roomManager == nil { roomManager = RoomManager(userManager: userManager) }
         if historyManager == nil { historyManager = HistoryManager(userManager: userManager) }
-        if scannedFurnitureManager == nil { scannedFurnitureManager = ScannedFurnitureManager(userManager: userManager) }
+        if scannedFurnitureManager == nil {
+            scannedFurnitureManager = ScannedFurnitureManager(userManager: userManager)
+        }
         if projectManager == nil, let rm = roomManager {
             projectManager = ProjectManager(userManager: userManager, roomManager: rm)
         }
+    }
+}
+
+// MARK: - Authenticated main UI
+
+private struct AuthenticatedShell: View {
+    @EnvironmentObject var userManager: UserManager
+    @EnvironmentObject var authManager: AuthenticationManager
+    @Binding var roomManager: RoomManager?
+    @Binding var historyManager: HistoryManager?
+    @Binding var scannedFurnitureManager: ScannedFurnitureManager?
+    @Binding var projectManager: ProjectManager?
+
+    @State private var showAccount = false
+
+    var body: some View {
+        LocalLandingView(showAccount: $showAccount)
+            .sheet(isPresented: $showAccount) {
+                AccountView(authManager: authManager)
+                    .environmentObject(userManager)
+            }
     }
 }
 
@@ -106,3 +200,7 @@ struct ManagerEnvironmentModifier: ViewModifier {
         }
     }
 }
+
+#if canImport(GoogleSignIn)
+import GoogleSignIn
+#endif

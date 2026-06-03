@@ -35,10 +35,15 @@ struct MainTabBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
-        .background(AppTheme.surfacePrimary.opacity(0.97), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.45), radius: 28, y: 10)
-        .shadow(color: AppTheme.glowAccent, radius: 18, y: 4)
+        .background {
+            ZStack {
+                Capsule().fill(.ultraThinMaterial)
+                Capsule().fill(AppTheme.primaryDark.opacity(0.92))
+            }
+        }
+        .overlay(Capsule().strokeBorder(AppTheme.warmAccent.opacity(0.28), lineWidth: 1))
+        .shadow(color: AppTheme.primaryDark.opacity(0.5), radius: 28, y: 10)
+        .shadow(color: AppTheme.glowAccent, radius: 14, y: 4)
         .fixedSize(horizontal: true, vertical: true)
     }
 
@@ -63,17 +68,17 @@ struct MainTabBar: View {
 
                 Text(tab.rawValue)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? AppTheme.accentLight : AppTheme.tabBarItemInactive)
+                    .foregroundStyle(isSelected ? AppTheme.lightNeutral : AppTheme.tabBarItemInactive)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 9)
             .background {
                 if isSelected {
                     Capsule()
-                        .fill(AppTheme.accentMuted)
+                        .fill(AppTheme.warmAccent.opacity(0.2))
                         .overlay(
                             Capsule().strokeBorder(
-                                AppTheme.accent.opacity(0.25), lineWidth: 1)
+                                AppTheme.warmAccent.opacity(0.35), lineWidth: 1)
                         )
                         .matchedGeometryEffect(id: "tabPill", in: indicator)
                 }

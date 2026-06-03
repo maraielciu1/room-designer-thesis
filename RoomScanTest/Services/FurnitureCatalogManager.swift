@@ -60,14 +60,35 @@ class FurnitureCatalogManager: ObservableObject {
         name.hasPrefix("scanned_")
     }
 
+    /// Locate a scanned USDZ in per-user folders or the legacy shared directory.
+    static func findScannedModelURL(fileName: String) -> URL? {
+        let legacy = UserStoragePaths.legacyScannedFurniture.appendingPathComponent(fileName)
+        if FileManager.default.fileExists(atPath: legacy.path) { return legacy }
+
+        let usersRoot = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("users", isDirectory: true)
+        guard let userDirs = try? FileManager.default.contentsOfDirectory(
+            at: usersRoot, includingPropertiesForKeys: nil
+        ) else { return nil }
+
+        for userDir in userDirs {
+            let candidate = userDir
+                .appendingPathComponent("ScannedFurniture", isDirectory: true)
+                .appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
     /// Resolve a scanned-model catalog key to its USDZ file URL on disk.
     func scannedModelURL(for name: String) -> URL? {
         guard isScannedModel(name) else { return nil }
         let uuidString = String(name.dropFirst("scanned_".count))
         guard let uuid = UUID(uuidString: uuidString) else { return nil }
-        let url = ScannedFurnitureManager.modelDirectory
-            .appendingPathComponent("\(uuid.uuidString).usdz")
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        let fileName = "\(uuid.uuidString).usdz"
+        return Self.findScannedModelURL(fileName: fileName)
     }
 
     /// Load a model entity — app-bundle or user-scanned USDZ.

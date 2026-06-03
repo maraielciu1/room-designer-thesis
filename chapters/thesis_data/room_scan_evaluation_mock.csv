@@ -1,0 +1,37 @@
+trial_id,room_type,capture_mode,window_visibility,gt_length_m,gt_width_m,gt_height_m,measured_length_m,measured_width_m,measured_height_m,abs_length_error_m,abs_width_error_m,abs_height_error_m,gt_window_count,detected_window_count,window_detection_ok,scan_duration_s,notes
+ROOM-001,bedroom,LiDAR+RGB,clear,3.55,3.2,2.51,3.566,3.181,2.524,0.016,0.019,0.014,1,1,true,92,all windows visible
+ROOM-002,living_room,LiDAR+RGB,clear,3.9,3.5,2.57,3.878,3.474,2.578,0.022,0.026,0.008,2,2,true,99,all windows visible
+ROOM-003,office,LiDAR+RGB,curtains_closed,4.25,3.8,2.63,4.278,3.812,2.644,0.028,0.012,0.014,1,0,false,106,window fully occluded by curtains
+ROOM-004,kitchen,LiDAR+RGB,drapes_partial,4.6,4.1,2.69,4.59,4.081,2.682,0.01,0.019,0.008,2,0,false,113,partial drape coverage caused missed pane
+ROOM-005,bedroom,LiDAR+RGB,clear,4.95,4.4,2.45,4.966,4.374,2.464,0.016,0.026,0.014,1,1,true,120,all windows visible
+ROOM-006,living_room,LiDAR+RGB,clear,5.3,4.7,2.51,5.278,4.712,2.518,0.022,0.012,0.008,2,2,true,127,all windows visible
+ROOM-007,office,LiDAR+RGB,clear,5.65,2.9,2.57,5.678,2.881,2.584,0.028,0.019,0.014,1,1,true,134,all windows visible
+ROOM-008,kitchen,LiDAR+RGB,curtains_closed,6.0,3.2,2.63,5.99,3.174,2.622,0.01,0.026,0.008,2,0,false,141,window fully occluded by curtains
+ROOM-009,bedroom,LiDAR+RGB,drapes_partial,3.2,3.5,2.69,3.216,3.512,2.704,0.016,0.012,0.014,1,0,false,148,partial drape coverage caused missed pane
+ROOM-010,living_room,LiDAR+RGB,clear,3.55,3.8,2.45,3.528,3.781,2.458,0.022,0.019,0.008,2,2,true,85,all windows visible
+ROOM-011,office,LiDAR+RGB,clear,3.9,4.1,2.51,3.928,4.074,2.524,0.028,0.026,0.014,3,3,true,92,all windows visible
+ROOM-012,kitchen,LiDAR+RGB,clear,4.25,4.4,2.57,4.24,4.412,2.562,0.01,0.012,0.008,2,2,true,99,all windows visible
+ROOM-013,bedroom,LiDAR+RGB,curtains_closed,4.6,4.7,2.63,4.616,4.681,2.644,0.016,0.019,0.014,1,0,false,106,window fully occluded by curtains
+ROOM-014,living_room,LiDAR+RGB,drapes_partial,4.95,2.9,2.69,4.928,2.874,2.698,0.022,0.026,0.008,2,2,true,113,windows identified with partial drape coverage
+ROOM-015,office,LiDAR+RGB,clear,5.3,3.2,2.45,5.328,3.212,2.464,0.028,0.012,0.014,1,1,true,120,all windows visible
+ROOM-016,kitchen,LiDAR+RGB,clear,5.65,3.5,2.51,5.64,3.481,2.502,0.01,0.019,0.008,2,2,true,127,all windows visible
+ROOM-017,bedroom,LiDAR+RGB,clear,6.0,3.8,2.57,6.016,3.774,2.584,0.016,0.026,0.014,1,1,true,134,all windows visible
+ROOM-018,living_room,LiDAR+RGB,curtains_closed,3.2,4.1,2.63,3.178,4.112,2.638,0.022,0.012,0.008,2,2,true,141,windows identified with curtains present
+ROOM-019,office,LiDAR+RGB,drapes_partial,3.55,4.4,2.69,3.578,4.381,2.704,0.028,0.019,0.014,1,1,true,148,windows identified with partial drape coverage
+ROOM-020,kitchen,LiDAR+RGB,clear,3.9,4.7,2.45,3.89,4.674,2.442,0.01,0.026,0.008,2,2,true,85,all windows visible
+ROOM-021,bedroom,LiDAR+RGB,clear,4.25,2.9,2.51,4.266,2.912,2.524,0.016,0.012,0.014,1,1,true,92,all windows visible
+ROOM-022,living_room,LiDAR+RGB,clear,4.6,3.2,2.57,4.578,3.181,2.578,0.022,0.019,0.008,3,3,true,99,all windows visible
+ROOM-023,office,LiDAR+RGB,curtains_closed,4.95,3.5,2.63,4.978,3.474,2.644,0.028,0.026,0.014,1,1,true,106,windows identified with curtains present
+ROOM-024,kitchen,LiDAR+RGB,drapes_partial,5.3,3.8,2.69,5.29,3.812,2.682,0.01,0.012,0.008,2,2,true,113,windows identified with partial drape coverage
+ROOM-025,bedroom,LiDAR+RGB,clear,5.65,4.1,2.45,5.666,4.081,2.464,0.016,0.019,0.014,1,1,true,120,all windows visible
+ROOM-026,living_room,LiDAR+RGB,clear,6.0,4.4,2.51,5.978,4.374,2.518,0.022,0.026,0.008,2,2,true,127,all windows visible
+ROOM-027,office,LiDAR+RGB,clear,3.2,4.7,2.57,3.228,4.712,2.584,0.028,0.012,0.014,1,1,true,134,all windows visible
+ROOM-028,kitchen,LiDAR+RGB,curtains_closed,3.55,2.9,2.63,3.54,2.881,2.622,0.01,0.019,0.008,2,2,true,141,windows identified with curtains present
+ROOM-029,bedroom,LiDAR+RGB,drapes_partial,3.9,3.2,2.69,3.916,3.174,2.704,0.016,0.026,0.014,1,1,true,148,windows identified with partial drape coverage
+ROOM-030,living_room,LiDAR+RGB,clear,4.25,3.5,2.45,4.228,3.512,2.458,0.022,0.012,0.008,2,2,true,85,all windows visible
+ROOM-031,office,LiDAR+RGB,clear,4.6,3.8,2.51,4.628,3.781,2.524,0.028,0.019,0.014,1,1,true,92,all windows visible
+ROOM-032,kitchen,LiDAR+RGB,clear,4.95,4.1,2.57,4.94,4.074,2.562,0.01,0.026,0.008,2,2,true,99,all windows visible
+ROOM-033,bedroom,LiDAR+RGB,curtains_closed,5.3,4.4,2.63,5.316,4.412,2.644,0.016,0.012,0.014,3,3,true,106,windows identified with curtains present
+ROOM-034,living_room,LiDAR+RGB,drapes_partial,5.65,4.7,2.69,5.628,4.681,2.698,0.022,0.019,0.008,2,2,true,113,windows identified with partial drape coverage
+ROOM-035,office,LiDAR+RGB,clear,6.0,2.9,2.45,6.028,2.874,2.464,0.028,0.026,0.014,1,1,true,120,all windows visible
+ROOM-036,kitchen,LiDAR+RGB,clear,3.2,3.2,2.51,3.19,3.212,2.502,0.01,0.012,0.008,2,2,true,127,all windows visible

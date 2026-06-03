@@ -1,42 +1,3 @@
-% % ═══════════════════════════════════════════════════════════════════════════
-% %  CHAPTER 1 — INTRODUCTION
-% % ═══════════════════════════════════════════════════════════════════════════
-
-% \chapter{Introduction}
-% \label{ch:introduction}
-
-% Indoor scene understanding and 3D reconstruction have been central to computer vision research, with datasets and benchmarks driving progress in semantic segmentation and object detection. ScanNet \cite{dai2017scannet} is a large-scale dataset of richly annotated 3D reconstructions of indoor scenes, with 2.5 million views across more than 1,500 scans and instance-level semantic segmentations. That work established the importance of combining geometric reconstruction with semantic labelling (walls, furniture, openings) for applications such as robotics and spatial reasoning. The present application aligns with this direction by leveraging Apple's RoomPlan to produce a parametric, semantically annotated room model from a consumer device, rather than from offline processing of RGB-D videos.
-
-% The use of augmented reality for interior design and furniture visualisation has been explored in both industry and academia. K\'an et al.\ \cite{kan2021ar} present an AR system for automatic interior design based on a hierarchical tree of procedural rules, enabling interactive and personalised furniture configuration with a recommender component; they compare AR-based visualisation to traditional methods and report positive user feedback. Such studies confirm that AR can support decision-making and spatial reasoning when users need to envision furniture and finishes in their own spaces. This thesis extends that idea by allowing users not only to place virtual furniture, but to \emph{replace} detected real furniture in a reconstructed 3D scene, thus supporting ``what-if'' redesign directly tied to the current room layout.
-
-% User experience in mobile AR interior design applications has been studied to improve usability and adoption. Kandil et al.\ \cite{kandil2021ux} evaluate interior design mobile AR applications using established scales such as the System Usability Scale (SUS) and the Handheld Augmented Reality Usability Scale (HARUS), with a focus on gesture-based interaction and one-handed use. Their findings underline the need for clear onboarding, stable tracking, and intuitive manipulation of virtual objects. The application developed in this thesis addresses these concerns by using RoomPlan's guided scanning flow, RealityKit's responsive rendering, and SwiftUI's declarative interface to keep interactions consistent and learnable.
-
-% This thesis presents the design and development of a mobile application that combines \textbf{parametric room scanning} and \textbf{interactive 3D scene reconstruction} for augmented reality (AR)--based interior design. The goal is to allow users to scan a room with a consumer device, obtain a structured representation of the space---including walls, openings, and furniture---and then visualise and edit the scene by replacing detected real furniture with virtual alternatives. The application thus supports ``what-if'' redesign directly tied to the user's own environment.
-
-% \section{Problem Statement and Goals}
-
-% Interior design decisions are often difficult to visualise without seeing furniture and finishes in place. Traditional tools range from 2D floor plans and mood boards to physical samples; these do not provide an immersive, spatially accurate preview of the final result. AR has emerged as a way to overlay virtual content onto the real world, but many solutions require the user to remain in the physical space with the device pointed at the room. A persistent, editable 3D model of the room---obtained once by scanning---enables users to explore design options at any time, without being on-site.
-
-% The main goals of this work are:
-
-% \begin{enumerate}
-%     \item To integrate \textbf{room-scale} capture (Apple's RoomPlan) to obtain a parametric, semantically annotated model of the room, including detected furniture with poses and dimensions.
-%     \item To provide an \textbf{interactive 3D room editor} where users can replace detected furniture with virtual 3D models (USDZ), with gesture-based manipulation and persistence.
-%     \item To support \textbf{object-scale} capture (Apple's Object Capture) for scanning individual objects into 3D models, and to allow \textbf{comparison with 3D Gaussian Splatting} reconstructions as an alternative representation.
-% \end{enumerate}
-
-% \section{Scope of the Thesis}
-
-% The thesis focuses on the theoretical foundations and the design of the application. \textbf{Chapter~\ref{ch:theory1}} covers the motivation for the work, the principles of photogrammetry, and the role of Object Capture and Room Plan in the pipeline. \textbf{Chapter~\ref{ch:theory2}} introduces 3D Gaussian Splatting as an alternative to mesh-based reconstruction and explains how it is used in the application for viewing and comparison. Later chapters address the implementation, architecture, and conclusions.
-
-% \section{Document Structure}
-
-% \begin{itemize}
-%     \item \textbf{Chapter~\ref{ch:theory1}} --- Theoretical Foundations I: motivation, photogrammetry, Object Capture, and Room Plan.
-%     \item \textbf{Chapter~\ref{ch:theory2}} --- Theoretical Foundations II: 3D Gaussian Splatting.
-%     \item \textbf{Chapter~4} --- Implementation and application architecture.
-%     \item \textbf{Chapter~6} --- Conclusions and future work.
-% \end{itemize}
 \chapter{Introduction}
 \label{ch:introduction}
 
@@ -84,7 +45,7 @@ USDZ mesh through an on-device photogrammetric pipeline, closing the loop
 between room capture and asset creation without any external tooling. This
 symmetry, scan the room with one API, scan replacement assets with another,
 edit and persist entirely on device, is a defining characteristic of the
-system developed here.
+system developed here. RoomPlan boxes are not CAD; users who need renders, lighting tweaks, or mesh cleanup benefit from exporting the same staged scene the editor uses (not raw `CapturedRoom` JSON alone).
 
 A third motivation arises from the rapidly evolving landscape of scene
 representations. 3D Gaussian Splatting~\cite{kerbl20233dgs}, introduced in
@@ -141,6 +102,14 @@ gaps identified above:
     infrastructure provides the rendering foundation for that extension while
     already delivering a meaningful comparison between representations in the
     current application.
+
+    \item \textbf{DCC export.}
+    Export the staged room as a self-contained ZIP archive containing a glTF scene
+    (in metres, with furniture-placement markers), copies of USDZ assets and wall-art
+    images, JSON manifests, and a \texttt{blender\_apply\_furniture.py} helper script.
+    \emph{Justification:} RoomPlan boxes are not CAD; users who need higher-fidelity
+    renders, custom lighting, or mesh cleanup benefit from handing off the same staged
+    scene to a desktop DCC tool such as Blender without manually reassembling it.
 \end{enumerate}
 
 
@@ -181,11 +150,16 @@ engineering-oriented, consistent with the scope of a bachelor project:
     and tile-based alpha compositing, bridged into SwiftUI via
     \texttt{MTKView}.
 
+    \item \textbf{A Blender-oriented export service} that packages the staged room as a
+    shareable ZIP containing a glTF scene, USDZ furniture copies, wall-art images,
+    JSON manifests, and a Python helper script (\texttt{blender\_apply\_furniture.py})
+    for automated Blender import.
+
   \item \textbf{A reference architecture for SwiftUI-based spatial apps.}
     An application structure following observable patterns (managers injected
     as environment objects; clean separation of views, services, and domain
-    types) that can serve as a baseline for future usability studies using
-    SUS and HARUS~\cite{kandil2021ux}.
+    types) that can serve as a baseline for future formal usability
+    studies~\cite{kandil2021ux}.
 \end{itemize}
 
 The thesis focuses on software architecture, core algorithms at a conceptual
@@ -195,7 +169,12 @@ proprietary intellectual property. 3DGS training is assumed to run off-device
 in the current system; on-device splat training remains
 research-grade~\cite{Guo26}. Full LiDAR-quality RoomPlan output requires
 iPhone~12~Pro or later, or a LiDAR-equipped iPad~Pro; the application
-degrades gracefully on non-LiDAR devices where Apple's API permits.
+degrades gracefully on non-LiDAR devices where Apple's API permits. Any
+marketplace or cloud-authentication features present in the codebase are
+extensions beyond the core scan--edit--persist pipeline that is the focus of
+this thesis.
+
+
 
 \section{Document Structure}
 

@@ -1,0 +1,54 @@
+% fig2_2_sfm_mvs.tex
+% fig:ch2_photo_pipeline — SfM–MVS vertical flowchart (fully sequential)
+
+\begin{tikzpicture}[
+  node distance=0.7cm,
+  boxtop/.style={rectangle, rounded corners=6pt,
+                 draw=red!40, fill=red!6, line width=0.8pt,
+                 minimum width=5.5cm, minimum height=1.0cm, align=center},
+  boxmid/.style={rectangle, rounded corners=6pt,
+                 draw=gray!60, fill=gray!8, line width=0.8pt,
+                 minimum width=5.5cm, minimum height=1.0cm, align=center},
+  boxout/.style={rectangle, rounded corners=6pt,
+                 draw=red!30, fill=gray!15, line width=0.8pt,
+                 minimum width=5.5cm, minimum height=0.9cm, align=center},
+  arr/.style={-{Stealth[length=5pt]}, thick, draw=gray!60},
+  stg/.style={font=\scriptsize\itshape, text=gray!70}
+]
+
+\node[boxtop] (imgs) {
+  \textbf{\small Multi-view RGB images}\\[1pt]
+  {\scriptsize\color{gray!70} overlapping photographs, ARKit poses}
+};
+
+\node[boxmid, below=0.7cm of imgs] (feat) {
+  \textbf{\small Feature detection and matching}\\[1pt]
+  {\scriptsize\color{gray!70} SIFT keypoints extracted and matched across views}
+};
+
+\node[boxmid, below=0.7cm of feat] (sfm) {
+  \textbf{\small Structure from Motion (SfM)}\\[1pt]
+  {\scriptsize\color{gray!70} sparse point cloud, bundle adjustment}
+};
+
+\node[boxmid, below=0.7cm of sfm] (mvs) {
+  \textbf{\small Multi-view Stereo (MVS)}\\[1pt]
+  {\scriptsize\color{gray!70} dense depth maps per view}
+};
+
+\node[boxmid, below=0.7cm of mvs] (surf) {
+  \textbf{\small Surface Reconstruction}\\[1pt]
+  {\scriptsize\color{gray!70} Poisson meshing and texturing}
+};
+
+\node[boxout, below=0.7cm of surf] (usdz) {
+  \textbf{\small Textured mesh output (USDZ)}
+};
+
+\draw[arr] (imgs.south) -- node[stg, right=3pt]{stage 1} (feat.north);
+\draw[arr] (feat.south) -- node[stg, right=3pt]{stage 2} (sfm.north);
+\draw[arr] (sfm.south)  -- node[stg, right=3pt]{stage 3} (mvs.north);
+\draw[arr] (mvs.south)  -- node[stg, right=3pt]{stage 4} (surf.north);
+\draw[arr] (surf.south) -- node[stg, right=3pt]{stage 5} (usdz.north);
+
+\end{tikzpicture}

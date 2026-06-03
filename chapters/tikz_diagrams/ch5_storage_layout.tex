@@ -1,0 +1,93 @@
+% ch5_storage_layout.tex
+% fig:storage_layout — on-device file-system layout
+
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  dir/.style={rectangle, rounded corners=3pt, draw=black, fill=gray!15,
+              minimum width=3.4cm, minimum height=0.60cm,
+              font=\small\bfseries, align=center, line width=0.7pt},
+  file/.style={rectangle, rounded corners=2pt, draw=black!60, fill=white,
+               font=\scriptsize, align=center, inner sep=6pt, line width=0.5pt},
+  store/.style={rectangle, rounded corners=3pt, draw=black, fill=gray!30,
+                minimum width=3.8cm, minimum height=0.60cm,
+                font=\small\bfseries, align=center},
+  bus/.style={thick, draw=black!70},
+  dbus/.style={thick, draw=black!70, dashed},
+  arrow/.style={-{Stealth[length=4pt]}, thick, draw=black!70},
+  darrow/.style={-{Stealth[length=4pt]}, thick, draw=black!70, dashed},
+  lbl/.style={font=\footnotesize\itshape, text=gray, align=center}
+]
+
+%%──── Root ────
+\node[dir, minimum width=5.0cm] (root) at (0,0) {App Sandbox / Documents/};
+
+%%──── Sub-directories (row 2)  centres at ±1.9, ±5.7
+\node[dir] (rs) at (-5.7,-3.0) {RoomScans/};
+\node[dir] (sf) at (-1.9,-3.0) {ScannedFurniture/};
+\node[dir] (wa) at ( 1.9,-3.0) {WallArt/};
+\node[dir] (sp) at ( 5.7,-3.0) {SplatClouds/};
+
+%%──── Files under each subdir ────
+\node[file, below=0.4cm of rs] (rsf) {%
+  \parbox[c]{3.6cm}{\centering
+    \texttt{<roomID>.json}\\[3pt]
+    \texttt{capturedRoom\_<id>.json}}};
+\node[lbl, below=0.12cm of rsf] {Room metadata +\\CapturedRoom};
+
+\node[file, below=0.4cm of sf] (sff) {\texttt{<name>.usdz}};
+\node[lbl,  below=0.12cm of sff] {USDZ from\\Object Capture};
+
+\node[file, below=0.4cm of wa] (waf) {\texttt{<id>.jpg}};
+\node[lbl,  below=0.12cm of waf] {Wall art\\images (local)};
+
+\node[file, below=0.4cm of sp] (spf) {%
+  \parbox[c]{3.1cm}{\centering
+    \texttt{sharp\_<ts>.ply}\\[3pt]
+    \texttt{offline\_<name>.ply}}};
+\node[lbl, below=0.12cm of spf] {SHARP + offline\\3DGS splats};
+
+%%──── Row 3 storage nodes  centres at -5.0, 0, +5.0
+\node[store] (ud) at (-5.0,-8.8) {UserDefaults};
+\node[file, below=0.4cm of ud] (udf) {%
+  \parbox[c]{3.9cm}{\centering
+    \texttt{saved\_rooms\_<uid>}\\[3pt]
+    \texttt{saved\_projects\_<uid>}\\[3pt]
+    \texttt{scanned\_furniture\_<uid>}\\[3pt]
+    \texttt{sharp\_server\_base\_url}}};
+\node[lbl, below=0.12cm of udf] {Room list, projects,\\furniture \& server config};
+
+\node[store] (sd) at (0,-8.8) {SwiftData (SQLite)};
+\node[file, below=0.4cm of sd] (sdf) {%
+  \parbox[c]{3.4cm}{\centering
+    \texttt{AppUserEntity}\\[4pt]
+    name, email,\\passwordHash, googleUserId}};
+\node[lbl, below=0.12cm of sdf] {Registered accounts};
+
+\node[store, fill=black!75, text=white] (kc) at (5.0,-8.8) {Keychain};
+\node[file, below=0.4cm of kc] (kcf) {%
+  \parbox[c]{3.4cm}{\centering
+    Auth tokens /\\password hash}};
+\node[lbl, below=0.12cm of kcf] {credentials};
+
+%%══════════════════════════════════════
+%% ARROWS — bus / crossbar style
+%%══════════════════════════════════════
+
+%% Row 2: solid vertical stem → horizontal crossbar → drops to each subdir
+\coordinate (j1) at (0, -1.6);
+\draw[bus]   (root.south) -- (j1);
+\draw[bus]   (j1 -| rs.north) -- (j1 -| sp.north);   %% horizontal crossbar
+\foreach \sub in {rs, sf, wa, sp}{
+  \draw[arrow] (j1 -| \sub.north) -- (\sub.north);
+}
+
+%% Row 3: dashed vertical stem → horizontal crossbar → drops to each store
+\coordinate (j2) at (0, -7.4);
+\draw[dbus]  (root.south) -- (j2);
+\draw[dbus]  (j2 -| ud.north) -- (j2 -| kc.north);   %% horizontal crossbar
+\foreach \store in {ud, sd, kc}{
+  \draw[darrow] (j2 -| \store.north) -- (\store.north);
+}
+
+\end{tikzpicture}%
+}

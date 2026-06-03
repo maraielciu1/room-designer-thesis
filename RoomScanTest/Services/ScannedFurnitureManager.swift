@@ -19,15 +19,16 @@ class ScannedFurnitureManager: ObservableObject {
 
     // MARK: - Shared directory paths
 
-    /// Permanent directory for finished USDZ models.
-    static var modelDirectory: URL {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ScannedFurniture", isDirectory: true)
-        if !FileManager.default.fileExists(atPath: dir.path) {
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    /// Per-user directory for finished USDZ models.
+    func modelDirectory() -> URL {
+        guard let userId = userManager.currentUser?.id else {
+            return UserStoragePaths.legacyScannedFurniture
         }
-        return dir
+        return UserStoragePaths.scannedFurniture(userId: userId)
     }
+
+    /// Legacy shared path (pre–account isolation). Prefer `modelDirectory()`.
+    static var legacyModelDirectory: URL { UserStoragePaths.legacyScannedFurniture }
 
     /// Temporary directory used during an Object Capture session.
     static var captureSessionDirectory: URL {
@@ -43,6 +44,10 @@ class ScannedFurnitureManager: ObservableObject {
 
     init(userManager: UserManager) {
         self.userManager = userManager
+        reloadForCurrentUser()
+    }
+
+    func reloadForCurrentUser() {
         loadItems()
     }
 
@@ -67,7 +72,7 @@ class ScannedFurnitureManager: ObservableObject {
         // Move/copy USDZ to permanent directory with a stable name
         let id = UUID()
         let permanentFileName = "\(id.uuidString).usdz"
-        let permanentURL = Self.modelDirectory.appendingPathComponent(permanentFileName)
+        let permanentURL = modelDirectory().appendingPathComponent(permanentFileName)
 
         do {
             if FileManager.default.fileExists(atPath: permanentURL.path) {
@@ -125,7 +130,7 @@ class ScannedFurnitureManager: ObservableObject {
 
     func deleteFurniture(_ item: ScannedFurniture) {
         // Remove USDZ file from disk
-        let fileURL = Self.modelDirectory.appendingPathComponent(item.usdzFileName)
+        let fileURL = item.usdzURL
         try? FileManager.default.removeItem(at: fileURL)
 
         items.removeAll { $0.id == item.id }
@@ -161,7 +166,7 @@ class ScannedFurnitureManager: ObservableObject {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
         // Remove .ply file from disk
         if let splatName = items[idx].splatFileName {
-            let splatURL = Self.modelDirectory.appendingPathComponent(splatName)
+            let splatURL = item.splatURL ?? modelDirectory().appendingPathComponent(splatName)
             try? FileManager.default.removeItem(at: splatURL)
         }
         items[idx].splatFileName = nil
@@ -180,7 +185,7 @@ class ScannedFurnitureManager: ObservableObject {
         let uuidString = String(key.dropFirst("scanned_".count))
         guard let id = UUID(uuidString: uuidString) else { return nil }
         guard let item = items.first(where: { $0.id == id }) else { return nil }
-        let url = Self.modelDirectory.appendingPathComponent(item.usdzFileName)
+        let url = item.usdzURL
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
@@ -208,14 +213,15 @@ class ScannedFurnitureManager: ObservableObject {
     // MARK: - Persistence
 
     private func loadItems() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([ScannedFurniture].self, from: data) else { return }
-        items = decoded
+        guard let userId = userManager.currentUser?.id else {
+            items = []
+            return
+        }
+        items = UserScopedStorage.load([ScannedFurniture].self, baseKey: storageKey, userId: userId) ?? []
     }
 
     private func saveItems() {
-        if let encoded = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(encoded, forKey: storageKey)
-        }
+        guard let userId = userManager.currentUser?.id else { return }
+        UserScopedStorage.save(items, baseKey: storageKey, userId: userId)
     }
 }

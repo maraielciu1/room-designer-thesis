@@ -48,7 +48,7 @@ enum RoomBlenderExportService {
         }
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
 
-        let innerName = "\(room.name.sanitizedForPath)_\(room.id.uuidString.prefix(8))"
+        let innerName = "\(room.name.sanitizedForPath())_\(room.id.uuidString.prefix(8))"
         let root = work.appendingPathComponent(innerName, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let texDir = root.appendingPathComponent("textures", isDirectory: true)
@@ -61,9 +61,11 @@ enum RoomBlenderExportService {
         var builder = GltfMiniBuilder()
         var textureFileCounter = 0
         var furnitureIndex = 0
-        var usdzNodes: [(name: String, file: String, matrix: simd_float4x4)] = []
+        var manifestItems: [FurnitureManifestItem] = []
+        var lightManifestItems: [LightManifestItem] = []
 
         let arResolver = ExportPoseResolver(catalog: catalog)
+        let markerColor = SIMD4<Float>(0.2, 0.92, 0.45, 0.12)
 
         // ── Structure: walls ──
         for (i, wall) in capturedRoom.walls.enumerated() {
@@ -86,7 +88,8 @@ enum RoomBlenderExportService {
                 transform: wall.transform,
                 halfExtents: d * 0.5,
                 baseColor: rgba,
-                textureRelativePath: texRel
+                textureRelativePath: texRel,
+                unlit: true
             )
         }
 
@@ -111,7 +114,8 @@ enum RoomBlenderExportService {
                 transform: floor.transform,
                 halfExtents: d * 0.5,
                 baseColor: rgba,
-                textureRelativePath: texRel
+                textureRelativePath: texRel,
+                unlit: true
             )
         }
 
@@ -158,8 +162,16 @@ enum RoomBlenderExportService {
                     targetDimensions: target,
                     replacement: rep
                 ) {
-                    let nodeName = Self.blenderReferenceEmptyName(usdzFileName: destName)
-                    usdzNodes.append((nodeName, "furniture/\(destName)", world))
+                    try appendFurniturePlacement(
+                        destName: destName,
+                        world: world,
+                        targetDimensions: target,
+                        useRealWorldScale: catalog.isScannedModel(rep.replacedWithUSDZ),
+                        customScale: rep.customScale.map { Float($0) },
+                        markerColor: markerColor,
+                        builder: &builder,
+                        manifestItems: &manifestItems
+                    )
                 }
             } else {
                 let cat = categoryKey(object)
@@ -193,8 +205,16 @@ enum RoomBlenderExportService {
                 defaultDims: defaultDims,
                 replacement: rep
             ) {
-                let nodeName = Self.blenderReferenceEmptyName(usdzFileName: destName)
-                usdzNodes.append((nodeName, "furniture/\(destName)", world))
+                try appendFurniturePlacement(
+                    destName: destName,
+                    world: world,
+                    targetDimensions: defaultDims,
+                    useRealWorldScale: catalog.isScannedModel(rep.replacedWithUSDZ),
+                    customScale: rep.customScale.map { Float($0) },
+                    markerColor: markerColor,
+                    builder: &builder,
+                    manifestItems: &manifestItems
+                )
             }
         }
 
@@ -232,7 +252,7 @@ enum RoomBlenderExportService {
             }
         }
 
-        // ── Lighting & carpet: coloured boxes approximating footprint ──
+        // ── Lighting: placeholder box + manifest for Blender lights / simple fixture mesh ──
         for rep in room.furnitureReplacements where rep.isLighting {
             guard let xform = rep.getTransformMatrix(),
                   let fixtureRaw = rep.lightFixtureType,
@@ -242,20 +262,38 @@ enum RoomBlenderExportService {
             if let rgb = rep.lightColorRGB, rgb.count >= 3 {
                 color = UIColor(red: CGFloat(rgb[0]), green: CGFloat(rgb[1]), blue: CGFloat(rgb[2]), alpha: 1)
             } else { color = .white }
-            let dims = SIMD3<Float>(0.45, 0.55, 0.45)
-            if let world = arResolver.worldMatrixForSimpleDecor(
+            if let (world, half) = arResolver.worldMatrixAndHalfExtentsForDecor(
                 transform: xform,
                 replacement: rep,
                 attach: {
-                    DecorManager.createLightFixture(type: fixtureType, color: color, intensity: Float(rep.lightIntensity ?? 3000))
+                    DecorManager.createLightFixture(
+                        type: fixtureType,
+                        color: color,
+                        intensity: Float(rep.lightIntensity ?? 3000)
+                    )
                 }
             ) {
+                let placeholder = "lighting_\(rep.id.uuidString.prefix(8))"
                 try builder.addBox(
-                    name: "lighting_\(rep.id.uuidString.prefix(8))",
+                    name: placeholder,
                     transform: world,
-                    halfExtents: dims * 0.5,
-                    baseColor: rgbaFloats(color.withAlphaComponent(0.85)),
-                    textureRelativePath: nil
+                    halfExtents: half,
+                    baseColor: rgbaFloats(color.withAlphaComponent(0.2)),
+                    textureRelativePath: nil,
+                    alphaMode: "BLEND",
+                    unlit: true
+                )
+                lightManifestItems.append(
+                    LightManifestItem(
+                        id: String(rep.id.uuidString.prefix(8)),
+                        placeholderName: placeholder,
+                        fixtureType: fixtureRaw,
+                        colorRGB: {
+                            let c = rgbaFloats(color)
+                            return [Double(c.x), Double(c.y), Double(c.z)]
+                        }(),
+                        intensity: rep.lightIntensity ?? 3000
+                    )
                 )
             }
         }
@@ -285,9 +323,13 @@ enum RoomBlenderExportService {
             } else {
                 carpetColor = UIColor(red: 0.55, green: 0.40, blue: 0.30, alpha: 1)
             }
-            if let world = arResolver.worldMatrixForSimpleDecor(
+            let carpetHalf = isRound
+                ? SIMD3<Float>(widthM * 0.5, 0.006, widthM * 0.5)
+                : SIMD3<Float>(widthM * 0.5, 0.006, depthM * 0.5)
+            if let (world, half) = arResolver.worldMatrixAndHalfExtentsForDecor(
                 transform: xform,
                 replacement: rep,
+                overrideHalfExtents: carpetHalf,
                 attach: {
                     DecorManager.createCarpetEntity(
                         widthM: widthM, depthM: depthM,
@@ -296,20 +338,37 @@ enum RoomBlenderExportService {
                     )
                 }
             ) {
-                let ext = SIMD3<Float>(max(widthM, 0.2), 0.03, max(depthM, 0.2))
+                var carpetTex: String?
+                if let png = carpetPatternPNG(
+                    pattern: carpetPattern,
+                    color: carpetColor,
+                    widthM: widthM,
+                    depthM: depthM,
+                    isRound: isRound
+                ) {
+                    textureFileCounter += 1
+                    let fn = "textures/carpet_\(rep.id.uuidString.prefix(8))_\(textureFileCounter).png"
+                    try png.write(to: root.appendingPathComponent(fn))
+                    carpetTex = fn
+                }
                 try builder.addBox(
                     name: "carpet_\(rep.id.uuidString.prefix(8))",
                     transform: world,
-                    halfExtents: ext * 0.5,
+                    halfExtents: half,
                     baseColor: rgbaFloats(carpetColor),
-                    textureRelativePath: nil
+                    textureRelativePath: carpetTex,
+                    unlit: true
                 )
             }
         }
 
-        for node in usdzNodes {
-            builder.addEmptyNode(name: node.name, matrix: node.matrix)
-        }
+        let manifest = FurnitureManifest(items: manifestItems)
+        let manifestData = try JSONEncoder.pretty.encode(manifest)
+        try manifestData.write(to: root.appendingPathComponent("furniture_manifest.json"), options: .atomic)
+
+        let sceneManifest = SceneManifest(lights: lightManifestItems)
+        let sceneData = try JSONEncoder.pretty.encode(sceneManifest)
+        try sceneData.write(to: root.appendingPathComponent("scene_manifest.json"), options: .atomic)
 
         let (gltfDict, binData) = try builder.build(rootName: innerName)
         let gltfData = try JSONSerialization.data(withJSONObject: gltfDict, options: [.prettyPrinted, .sortedKeys])
@@ -327,8 +386,9 @@ enum RoomBlenderExportService {
         let zipBytes = try ZipStoreArchive.zip(directory: root, stripPrefix: work.path + "/")
         try FileManager.default.removeItem(at: work)
 
+        let zipBaseName = exportZipBaseName(roomName: room.name)
         let zipURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(innerName).zip")
+            .appendingPathComponent("\(zipBaseName).zip")
         if FileManager.default.fileExists(atPath: zipURL.path) {
             try FileManager.default.removeItem(at: zipURL)
         }
@@ -336,33 +396,60 @@ enum RoomBlenderExportService {
         return zipURL
     }
 
-    /// Empty name prefix in glTF; matches USDZ stem: `RF_<stem>` ↔ `furniture/<stem>.usdz`
-    private static let blenderEmptyPrefix = "RF_"
-
-    private static func blenderReferenceEmptyName(usdzFileName: String) -> String {
-        let stem = (usdzFileName as NSString).deletingPathExtension
-        // Keep the exact stem (including UUID hyphens) so RF_<stem> maps 1:1
-        // to furniture/<stem>.usdz inside the Blender helper script.
-        return "\(blenderEmptyPrefix)\(stem)"
+    private static func appendFurniturePlacement(
+        destName: String,
+        world: simd_float4x4,
+        targetDimensions: SIMD3<Float>,
+        useRealWorldScale: Bool,
+        customScale: Float?,
+        markerColor: SIMD4<Float>,
+        builder: inout GltfMiniBuilder,
+        manifestItems: inout [FurnitureManifestItem]
+    ) throws {
+        let id = (destName as NSString).deletingPathExtension
+        let markerName = "marker_\(id)"
+        try builder.addBox(
+            name: markerName,
+            transform: world,
+            halfExtents: targetDimensions * 0.5,
+            baseColor: markerColor,
+            textureRelativePath: nil,
+            alphaMode: "BLEND",
+            unlit: true
+        )
+        manifestItems.append(
+            FurnitureManifestItem(
+                id: id,
+                usdz: "furniture/\(destName)",
+                markerName: markerName,
+                targetDimensions: [
+                    Double(targetDimensions.x),
+                    Double(targetDimensions.y),
+                    Double(targetDimensions.z)
+                ],
+                useRealWorldScale: useRealWorldScale,
+                customScale: customScale.map { Double($0) }
+            )
+        )
     }
 
     private static let blenderApplyFurnitureScriptUTF8 = """
-    # RoomScanTest — import USDZ furniture and place via RF_* empties from room_scene.gltf
-    # Usage:
-    #   1) Import room_scene.gltf
-    #   2) Open this script in Blender's Scripting workspace and Run Script
-    # This avoids name-matching and importer-axis ambiguities by importing each USDZ from
-    # ./furniture and applying the reference empty's matrix_world to the imported roots.
+    # RoomScanTest — finalize Blender scene after importing room_scene.gltf
+    #
+    # 1) File -> Import -> glTF 2.0: room_scene.gltf
+    # 2) Scripting -> open this file -> Run Script
+    #
+    # - Aligns USDZ furniture to green marker_* (bottom sits on marker floor)
+    # - Replaces lighting_* placeholders with real lights + simple fixture meshes
+    # - Fades marker_* / lighting_* guide meshes
 
+    import json
     import os
-    import math
     import bpy
+    import bmesh
+    from mathutils import Vector, Matrix
 
-    PREFIX = "\(blenderEmptyPrefix)"
-    # Blender USD importer often yields assets with a different axis/unit basis than glTF.
-    # These defaults fix the common case (USD authored in centimeters, Y-up).
-    USD_UNIT_SCALE = 0.01
-    USD_AXIS_FIX_EULER_DEG = (-90.0, 0.0, 0.0)  # applied in XYZ order
+    MARKER_PREFIX = "marker_"
 
     def script_dir():
         txt = bpy.context.space_data.text if bpy.context.space_data else None
@@ -372,151 +459,304 @@ enum RoomBlenderExportService {
             return os.path.dirname(bpy.path.abspath(bpy.data.filepath))
         return os.getcwd()
 
-    def candidate_base_dirs():
-        cands = []
-        cands.append(script_dir())
-        if bpy.data.filepath:
-            cands.append(os.path.dirname(bpy.path.abspath(bpy.data.filepath)))
-        cands.append(os.getcwd())
-        # Directories referenced by imported images from glTF (often beside room_scene.gltf)
-        for img in bpy.data.images:
-            fp = getattr(img, "filepath", None)
-            if fp:
-                cands.append(os.path.dirname(bpy.path.abspath(fp)))
-        # De-duplicate while keeping order
-        out = []
-        seen = set()
-        for d in cands:
-            if not d:
-                continue
-            d = os.path.normpath(d)
-            if d not in seen:
-                seen.add(d)
-                out.append(d)
-        return out
+    def resolve_path(base, rel):
+        return os.path.normpath(os.path.join(base, rel))
 
-    def find_furniture_dir(ref_stems):
-        # First pass: immediate "furniture" subdir near likely bases
-        for base in candidate_base_dirs():
-            fd = os.path.join(base, "furniture")
-            if os.path.isdir(fd):
-                return fd
-            # If base is already the extracted room folder, also check parent/furniture
-            parent_fd = os.path.join(os.path.dirname(base), "furniture")
-            if os.path.isdir(parent_fd):
-                return parent_fd
-        # Second pass: shallow recursive search for a folder containing expected usdz names
-        wanted = set(stem + ".usdz" for stem in ref_stems if stem)
-        for base in candidate_base_dirs():
-            try:
-                for root, dirs, files in os.walk(base):
-                    if os.path.basename(root).lower() != "furniture":
-                        continue
-                    file_set = set(files)
-                    if wanted & file_set:
-                        return root
-            except Exception:
-                pass
+    def find_object(name):
+        obj = bpy.data.objects.get(name)
+        if obj:
+            return obj
+        for o in bpy.data.objects:
+            if o.name.split(".")[0] == name:
+                return o
         return None
+
+    def mesh_world_bounds(mesh_objects):
+        corners = []
+        for o in mesh_objects:
+            if o.type != "MESH":
+                continue
+            for c in o.bound_box:
+                corners.append(o.matrix_world @ Vector(c))
+        if not corners:
+            z = Vector((0, 0, 0))
+            return z, Vector((1, 1, 1)), z, z
+        xs = [c.x for c in corners]
+        ys = [c.y for c in corners]
+        zs = [c.z for c in corners]
+        bmin = Vector((min(xs), min(ys), min(zs)))
+        bmax = Vector((max(xs), max(ys), max(zs)))
+        center = (bmin + bmax) * 0.5
+        size = bmax - bmin
+        return center, size, bmin, bmax
 
     def roots_of(objs):
         s = set(objs)
         return [o for o in objs if o.parent not in s]
 
     def import_usdz(filepath):
-        before = set(bpy.data.objects)
         if not hasattr(bpy.ops.wm, "usd_import"):
-            raise RuntimeError("Blender USD importer is unavailable (bpy.ops.wm.usd_import missing)")
+            raise RuntimeError("USD importer not available (enable USD add-on)")
+        before = set(bpy.data.objects)
         bpy.ops.wm.usd_import(filepath=filepath)
-        after = [o for o in bpy.data.objects if o not in before]
-        return after
+        return [o for o in bpy.data.objects if o not in before]
 
-    def choose_anchor_root(roots):
-        active = bpy.context.view_layer.objects.active
-        if active:
-            r = active
-            while r.parent:
-                r = r.parent
-            if r in roots:
-                return r
-        # Fallback: root with most descendants (usually the meaningful import root)
-        def score(obj):
-            return len(obj.children_recursive)
-        return max(roots, key=score)
+    def parent_preserve_world(child, parent):
+        mw = child.matrix_world.copy()
+        child.parent = parent
+        child.matrix_world = mw
 
-    def group_roots_under_wrapper(roots, stem):
-        anchor = choose_anchor_root(roots)
-        placement = bpy.data.objects.new("RS_PLACE_" + stem, None)
-        placement.empty_display_type = 'PLAIN_AXES'
-        bpy.context.scene.collection.objects.link(placement)
-        placement.matrix_world = anchor.matrix_world.copy()
+    def align_to_marker(imported_roots, marker_obj, use_real_scale, custom_scale, align_mode):
+        group = bpy.data.objects.new("FURN_" + marker_obj.name, None)
+        bpy.context.scene.collection.objects.link(group)
+        group.matrix_world = Matrix.Identity(4)
 
-        asset = bpy.data.objects.new("RS_ASSET_" + stem, None)
-        asset.empty_display_type = 'PLAIN_AXES'
-        bpy.context.scene.collection.objects.link(asset)
-        asset.parent = placement
-        asset.matrix_parent_inverse.identity()
-        asset.rotation_mode = 'XYZ'
-        asset.rotation_euler = tuple(math.radians(v) for v in USD_AXIS_FIX_EULER_DEG)
-        asset.scale = (USD_UNIT_SCALE, USD_UNIT_SCALE, USD_UNIT_SCALE)
+        for r in imported_roots:
+            parent_preserve_world(r, group)
 
-        for r in roots:
-            world = r.matrix_world.copy()
-            r.parent = asset
-            r.matrix_world = world
-        return placement, asset
+        bpy.context.view_layer.update()
+        meshes = [o for o in group.children_recursive if o.type == "MESH"]
+        _, g_size, _, _ = mesh_world_bounds(meshes)
+        _, m_size, _, m_max = mesh_world_bounds([marker_obj])
 
-    def main():
-        refs = [o for o in bpy.data.objects if o.type == "EMPTY" and o.name.startswith(PREFIX)]
-        if not refs:
-            print("No RF_* empties found. Import room_scene.gltf first.")
+        if not use_real_scale:
+            sx = m_size.x / g_size.x if g_size.x > 1e-5 else 1.0
+            sy = m_size.y / g_size.y if g_size.y > 1e-5 else 1.0
+            sz = m_size.z / g_size.z if g_size.z > 1e-5 else 1.0
+            uniform = min(sx, sy, sz) * 0.92
+            if custom_scale:
+                uniform *= float(custom_scale)
+            group.scale = (group.scale.x * uniform, group.scale.y * uniform, group.scale.z * uniform)
+
+        bpy.context.view_layer.update()
+        meshes = [o for o in group.children_recursive if o.type == "MESH"]
+        g_center, _, g_min, _ = mesh_world_bounds(meshes)
+        m_center, _, m_min, _ = mesh_world_bounds([marker_obj])
+
+        if align_mode == "bottom":
+            delta = Vector((m_center.x - g_center.x, m_center.y - g_center.y, m_min.z - g_min.z))
+        else:
+            delta = m_center - g_center
+        group.matrix_world = Matrix.Translation(delta) @ group.matrix_world
+
+    def remove_objects_by_prefix(prefixes):
+        to_remove = []
+        for o in list(bpy.data.objects):
+            base = o.name.split(".")[0]
+            for p in prefixes:
+                if base.startswith(p):
+                    to_remove.append(o)
+                    break
+        for o in to_remove:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+    def disable_viewport_bounds():
+        for o in bpy.data.objects:
+            o.show_bounds = False
+            if o.display_type == "WIRE":
+                o.display_type = "TEXTURED"
+
+    def make_mat(name, rgba, emission=False):
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf:
+            bsdf.inputs["Base Color"].default_value = rgba
+            bsdf.inputs["Roughness"].default_value = 0.55
+            if emission:
+                bsdf.inputs["Emission Color"].default_value = rgba[:3] + (1.0,)
+                bsdf.inputs["Emission Strength"].default_value = 2.5
+        return mat
+
+    def add_cylinder(name, radius, depth, location, mat):
+        mesh = bpy.data.meshes.new(name)
+        bm = bmesh.new()
+        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=20,
+                              radius1=radius, radius2=radius, depth=depth)
+        bm.to_mesh(mesh)
+        bm.free()
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.location = location
+        if mat:
+            obj.data.materials.append(mat)
+        return obj
+
+    def add_sphere(name, radius, location, mat):
+        mesh = bpy.data.meshes.new(name)
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=12, radius=radius)
+        bm.to_mesh(mesh)
+        bm.free()
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.location = location
+        if mat:
+            obj.data.materials.append(mat)
+        return obj
+
+    def intensity_to_watts(value):
+        return max(8.0, float(value) * 0.2)
+
+    def add_box(name, sx, sy, sz, location, mat):
+        mesh = bpy.data.meshes.new(name)
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=(sx, sy, sz), verts=bm.verts)
+        bm.to_mesh(mesh)
+        bm.free()
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.location = location
+        if mat:
+            obj.data.materials.append(mat)
+        return obj
+
+    def build_fixture_mesh(fixture_type, color, center, bmin, bmax, uid):
+        import math
+        cx, cy = center.x, center.y
+        cz_top = bmax.z
+        cz_floor = bmin.z
+        pfx = "FIX_" + str(uid) + "_"
+        metal = make_mat(pfx + "metal", (0.22, 0.22, 0.24, 1.0))
+        gold = make_mat(pfx + "gold", (0.76, 0.60, 0.32, 1.0))
+        bulb = make_mat(pfx + "bulb", (*color[:3], 1.0), emission=True)
+        ft = (fixture_type or "").strip()
+
+        if ft == "Floor Lamp":
+            # Match DecorManager floorLamp: base at floor, pole 1.5m, shade on top
+            add_cylinder(pfx + "base", 0.14, 0.02, (cx, cy, cz_floor + 0.01), metal)
+            add_cylinder(pfx + "pole", 0.012, 1.50, (cx, cy, cz_floor + 0.77), metal)
+            add_cylinder(pfx + "shade", 0.16, 0.22, (cx, cy, cz_floor + 1.56), bulb)
             return
+        elif ft == "Wall Sconce":
+            add_box(pfx + "plate", 0.06, 0.10, 0.02, (cx, cy, center.z), metal)
+            add_cylinder(pfx + "arm", 0.006, 0.08, (cx, cy + 0.05, center.z), metal)
+            add_sphere(pfx + "globe", 0.06, (cx, cy + 0.10, center.z), bulb)
+        elif ft == "Ceiling Flush":
+            add_cylinder(pfx + "rim", 0.19, 0.05, (cx, cy, cz_top - 0.025), metal)
+            add_cylinder(pfx + "disc", 0.18, 0.04, (cx, cy, cz_top - 0.04), bulb)
+        elif ft == "Chandelier":
+            add_cylinder(pfx + "canopy", 0.05, 0.02, (cx, cy, cz_top - 0.01), metal)
+            add_cylinder(pfx + "rod", 0.008, 0.25, (cx, cy, cz_top - 0.14), gold)
+            add_sphere(pfx + "hub", 0.04, (cx, cy, cz_top - 0.28), gold)
+            arm_len = 0.18
+            hub_z = cz_top - 0.28
+            for i in range(6):
+                ang = i * (2.0 * math.pi / 6.0)
+                bx = cx + math.cos(ang) * arm_len
+                by = cy + math.sin(ang) * arm_len
+                add_cylinder(pfx + "arm" + str(i), 0.005, arm_len, ((cx + bx) * 0.5, (cy + by) * 0.5, hub_z), gold)
+                add_sphere(pfx + "bulb" + str(i), 0.025, (bx, by, hub_z), bulb)
+        elif ft == "Pendant Drum":
+            add_cylinder(pfx + "canopy", 0.06, 0.02, (cx, cy, cz_top - 0.01), metal)
+            add_cylinder(pfx + "rod", 0.004, 0.25, (cx, cy, cz_top - 0.14), metal)
+            add_cylinder(pfx + "shade", 0.14, 0.18, (cx, cy, cz_top - 0.35), bulb)
+        else:
+            # Pendant Globe (default)
+            add_cylinder(pfx + "canopy", 0.06, 0.02, (cx, cy, cz_top - 0.01), metal)
+            add_cylinder(pfx + "rod", 0.004, 0.35, (cx, cy, cz_top - 0.19), metal)
+            add_sphere(pfx + "globe", 0.10, (cx, cy, cz_top - 0.36), bulb)
 
-        stems = [e.name[len(PREFIX):] for e in refs if len(e.name) > len(PREFIX)]
-        furniture_dir = find_furniture_dir(stems)
-        if not furniture_dir:
-            print("Missing furniture folder. Checked bases:")
-            for b in candidate_base_dirs():
-                print("  -", b)
+    def apply_scene_lights(base):
+        path = resolve_path(base, "scene_manifest.json")
+        if not os.path.isfile(path):
+            print("No scene_manifest.json (skip lights).")
             return
-        print("Using furniture folder:", furniture_dir)
-
-        for e in refs:
-            stem = e.name[len(PREFIX):]
-            if not stem:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        lights = data.get("lights", [])
+        for item in lights:
+            ph = item.get("placeholderName", "")
+            placeholder = find_object(ph)
+            if placeholder is None:
+                print("Skip light", item.get("id"), "-> placeholder not found:", ph)
                 continue
-            usdz = os.path.join(furniture_dir, stem + ".usdz")
-            # Backward compatibility for older exports where RF stem replaced '-' with '_'
-            if not os.path.exists(usdz):
-                alt = os.path.join(furniture_dir, stem.replace("_", "-") + ".usdz")
-                if os.path.exists(alt):
-                    usdz = alt
-            if not os.path.exists(usdz):
-                print("Skip", e.name, "-> missing file", usdz)
-                continue
+            center, size, bmin, bmax = mesh_world_bounds([placeholder])
+            rgb = item.get("colorRGB", [1.0, 1.0, 1.0])
+            color = (float(rgb[0]), float(rgb[1]), float(rgb[2]))
+            watts = intensity_to_watts(item.get("intensity", 3000))
+            ft = item.get("fixtureType", "")
 
+            loc = center.copy()
+            if ft == "Floor Lamp":
+                loc = Vector((center.x, center.y, bmin.z + 1.55))
+            elif ft == "Wall Sconce":
+                loc = center
+            elif ft == "Ceiling Flush":
+                loc.z = bmax.z - 0.06
+            elif "Chandelier" in ft or "Pendant" in ft:
+                loc.z = bmax.z - 0.36
+            else:
+                loc.z = bmax.z - size.z * 0.12
+
+            light_data = bpy.data.lights.new(name="LT_" + str(item.get("id", ph)), type="POINT")
+            light_data.color = color
+            light_data.energy = watts
+            light_data.shadow_soft_size = 0.15
+            light_obj = bpy.data.objects.new(light_data.name, light_data)
+            bpy.context.scene.collection.objects.link(light_obj)
+            light_obj.location = loc
+
+            build_fixture_mesh(ft, color, center, bmin, bmax, item.get("id", ph))
+            bpy.data.objects.remove(placeholder, do_unlink=True)
+            print("Light + fixture:", ph, "->", ft, watts, "W")
+
+    def ensure_sun():
+        for o in bpy.data.objects:
+            if o.type == "LIGHT" and o.data.type == "SUN":
+                return
+        sun_data = bpy.data.lights.new(name="RoomScanTest_Sun", type="SUN")
+        sun_data.energy = 2.5
+        sun_obj = bpy.data.objects.new("RoomScanTest_Sun", sun_data)
+        bpy.context.scene.collection.objects.link(sun_obj)
+        sun_obj.rotation_euler = (0.9, 0.1, 0.6)
+
+    def apply_furniture(base):
+        manifest_path = resolve_path(base, "furniture_manifest.json")
+        if not os.path.isfile(manifest_path):
+            print("No furniture_manifest.json")
+            return
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        items = manifest.get("items", [])
+        for item in items:
+            marker_name = item.get("markerName", "")
+            marker = find_object(marker_name)
+            if marker is None:
+                print("Skip", item.get("id"), "-> marker not found:", marker_name)
+                continue
+            usdz_path = resolve_path(base, item.get("usdz", ""))
+            if not os.path.isfile(usdz_path):
+                print("Skip", item.get("id"), "-> missing", usdz_path)
+                continue
             try:
-                imported = import_usdz(usdz)
+                imported = import_usdz(usdz_path)
             except Exception as ex:
-                print("Skip", e.name, "-> usd import failed:", ex)
+                print("Skip", item.get("id"), "->", ex)
                 continue
-            if not imported:
-                print("Skip", e.name, "-> USD import produced no objects")
-                continue
-
             roots = roots_of(imported)
             if not roots:
-                print("Skip", e.name, "-> no import roots")
                 continue
+            align_to_marker(
+                roots, marker,
+                bool(item.get("useRealWorldScale", False)),
+                item.get("customScale"),
+                item.get("alignMode", "bottom"),
+            )
+            print("Aligned", os.path.basename(usdz_path), "->", marker_name)
 
-            placement, asset = group_roots_under_wrapper(roots, stem)
-            placement.parent = None
-            placement.matrix_world = e.matrix_world.copy()
-            placement["roomscan_ref"] = e.name
-            placement["roomscan_usdz"] = os.path.basename(usdz)
-            placement["roomscan_scale_hint"] = USD_UNIT_SCALE
-            placement["roomscan_axis_fix_deg"] = str(USD_AXIS_FIX_EULER_DEG)
-            print("Imported + aligned", os.path.basename(usdz), "to", e.name)
+    def main():
+        base = script_dir()
+        if not any(o.type == "MESH" for o in bpy.data.objects):
+            print("Import room_scene.gltf first, then run this script.")
+            return
+        ensure_sun()
+        apply_furniture(base)
+        apply_scene_lights(base)
+        remove_objects_by_prefix([MARKER_PREFIX])
+        disable_viewport_bounds()
+        print("Done. Guide markers removed; fixtures and furniture kept.")
 
     main()
     """
@@ -531,16 +771,16 @@ enum RoomBlenderExportService {
         2. Import the room: File → Import → glTF 2.0 — pick "room_scene.gltf".
            Keep "room_scene.bin", "textures/", and "wall_art/" beside it (same layout as this folder).
 
-        3. Open the Scripting workspace and run "blender_apply_furniture.py" from this folder.
-           The script imports every USDZ from "furniture/" and aligns it to matching
-           reference empties named "RF_<usdz_filename_without_extension>".
-           It also applies a USD correction transform (unit scale + axis fix) to avoid
-           oversized or rotated models caused by glTF-vs-USD importer differences.
-           You can tweak constants at the top of the script:
-             USD_UNIT_SCALE (default 0.01)
-             USD_AXIS_FIX_EULER_DEG (default -90, 0, 0)
+        3. Open Scripting and run "blender_apply_furniture.py" from this folder.
+           • Imports each USDZ and places it on the bottom of the matching green marker_* box.
+           • Replaces lighting_* placeholders with point lights + fixture meshes (pendant, floor lamp, etc.).
+           • Deletes green marker_* guide boxes when finished (no black wireframes).
+           • Wall/floor colours and patterns use glTF unlit materials.
 
-        4. Units are metres.
+        4. Switch viewport shading to Material Preview or Rendered to see colours/textures.
+           USDZ furniture materials come from the USD importer (enable the USD add-on).
+
+        5. Units are metres.
 
         Generated by RoomScanTest.
         """
@@ -548,8 +788,65 @@ enum RoomBlenderExportService {
 
     // MARK: - Helpers
 
+    /// e.g. `LivingRoom_BlenderExport_2026-05-15_14-30-00`
+    private static func exportZipBaseName(roomName: String, date: Date = Date()) -> String {
+        let roomPart = roomName.sanitizedForPath()
+        return "\(roomPart)_BlenderExport_\(exportDateStamp(date))"
+    }
+
+    private static func exportDateStamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return formatter.string(from: date)
+    }
+
     private static func clampDims(_ d: SIMD3<Float>) -> SIMD3<Float> {
         SIMD3<Float>(max(d.x, 0.01), max(d.y, 0.01), max(d.z, 0.01))
+    }
+
+    /// Procedural carpet top-down texture for Blender (solid / stripes / geometric).
+    private static func carpetPatternPNG(
+        pattern: CarpetPattern,
+        color: UIColor,
+        widthM: Float,
+        depthM: Float,
+        isRound: Bool
+    ) -> Data? {
+        let ppm: CGFloat = 96
+        let w = min(max(Int(CGFloat(widthM) * ppm), 64), 512)
+        let h = min(max(Int(CGFloat(depthM) * ppm), 64), 512)
+        let size = CGSize(width: w, height: h)
+        UIGraphicsBeginImageContextWithOptions(size, true, 1)
+        guard let ctx = UIGraphicsGetCurrentContext() else { return nil }
+        color.setFill()
+        ctx.fill(CGRect(origin: .zero, size: size))
+        let accent = color.withAlphaComponent(0.55)
+        accent.setFill()
+        switch pattern {
+        case .solid:
+            break
+        case .striped:
+            let stripeH = max(size.height / 7, 4)
+            for i in 0..<6 where i % 2 == 0 {
+                ctx.fill(CGRect(x: 0, y: CGFloat(i) * stripeH, width: size.width, height: stripeH))
+            }
+        case .geometric, .oriental, .herringbone:
+            let inset = min(size.width, size.height) * 0.18
+            ctx.fill(CGRect(x: inset, y: inset, width: size.width - inset * 2, height: size.height - inset * 2))
+        case .shaggy:
+            let inset = min(size.width, size.height) * 0.1
+            ctx.fill(CGRect(x: inset, y: inset, width: size.width - inset * 2, height: size.height - inset * 2))
+        }
+        if isRound {
+            ctx.setBlendMode(.destinationIn)
+            ctx.setFillColor(UIColor.black.cgColor)
+            ctx.fillEllipse(in: CGRect(origin: .zero, size: size))
+        }
+        let img = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return img?.pngData()
     }
 
     private static func rgbaFloats(_ c: UIColor) -> SIMD4<Float> {
@@ -576,6 +873,71 @@ enum RoomBlenderExportService {
             let d = t.columns.3 - object.transform.columns.3
             return abs(d.x) < 0.05 && abs(d.y) < 0.05 && abs(d.z) < 0.05
         }
+    }
+}
+
+// MARK: - Furniture manifest (Blender alignment)
+
+private struct FurnitureManifest: Encodable {
+    let version: Int
+    let items: [FurnitureManifestItem]
+
+    init(items: [FurnitureManifestItem]) {
+        version = 1
+        self.items = items
+    }
+}
+
+private struct FurnitureManifestItem: Encodable {
+    let id: String
+    let usdz: String
+    let markerName: String
+    let targetDimensions: [Double]
+    let useRealWorldScale: Bool
+    let customScale: Double?
+    let alignMode: String
+
+    init(
+        id: String,
+        usdz: String,
+        markerName: String,
+        targetDimensions: [Double],
+        useRealWorldScale: Bool,
+        customScale: Double?
+    ) {
+        self.id = id
+        self.usdz = usdz
+        self.markerName = markerName
+        self.targetDimensions = targetDimensions
+        self.useRealWorldScale = useRealWorldScale
+        self.customScale = customScale
+        alignMode = "bottom"
+    }
+}
+
+private struct SceneManifest: Encodable {
+    let version: Int
+    let lights: [LightManifestItem]
+
+    init(lights: [LightManifestItem]) {
+        version = 1
+        self.lights = lights
+    }
+}
+
+private struct LightManifestItem: Encodable {
+    let id: String
+    let placeholderName: String
+    let fixtureType: String
+    let colorRGB: [Double]
+    let intensity: Double
+}
+
+private extension JSONEncoder {
+    static var pretty: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
     }
 }
 
@@ -768,6 +1130,50 @@ private final class ExportPoseResolver {
         clearScene()
         return m
     }
+
+    /// World matrix and half-extents for decor (lighting, carpet).
+    /// Translation is taken from world-space `visualBounds.center` so floor-anchored items
+    /// (carpet, floor lamp) are not shifted — the stored transform is often at floor level
+    /// while the mesh extends upward.
+    func worldMatrixAndHalfExtentsForDecor(
+        transform: simd_float4x4,
+        replacement: FurnitureReplacement,
+        overrideHalfExtents: SIMD3<Float>? = nil,
+        attach: () -> Entity?
+    ) -> (simd_float4x4, SIMD3<Float>)? {
+        clearScene()
+        guard let content = attach() else { return nil }
+        if let yRot = replacement.yRotation {
+            content.orientation = simd_quatf(angle: Float(yRot), axis: [0, 1, 0])
+        }
+
+        let anchor = AnchorEntity(world: transform)
+        let mover = Entity()
+        anchor.addChild(mover)
+        mover.addChild(content)
+        arView.scene.addAnchor(anchor)
+
+        if let off = replacement.positionOffset, off.count >= 3 {
+            let o = transform.columns.3
+            let orig = SIMD3<Float>(o.x, o.y, o.z)
+            let targetPos = orig + SIMD3<Float>(Float(off[0]), Float(off[1]), Float(off[2]))
+            mover.setPosition(targetPos, relativeTo: nil)
+        }
+
+        let bounds = content.visualBounds(relativeTo: nil)
+        var m = content.transformMatrix(relativeTo: nil)
+        let c = bounds.center
+        m.columns.3 = SIMD4<Float>(c.x, c.y, c.z, 1)
+
+        let rawHalf = overrideHalfExtents ?? (bounds.extents * 0.5)
+        let clamped = SIMD3<Float>(
+            max(rawHalf.x, 0.02),
+            max(rawHalf.y, 0.006),
+            max(rawHalf.z, 0.02)
+        )
+        clearScene()
+        return (m, clamped)
+    }
 }
 
 // MARK: - Minimal glTF 2.0 writer (single .bin, external PNG textures)
@@ -782,6 +1188,15 @@ private struct GltfMiniBuilder {
     private var bufferViews: [[String: Any]] = []
     private var nodes: [[String: Any]] = []
     private var nodeChildren: [Int] = []
+    private var usesUnlitExtension = false
+
+    private mutating func markUnlit(_ enabled: Bool) {
+        if enabled { usesUnlitExtension = true }
+    }
+
+    private func unlitExtensions(_ enabled: Bool) -> [String: Any]? {
+        enabled ? ["KHR_materials_unlit": [:] as [String: Any]] : nil
+    }
 
     mutating func addEmptyNode(name: String, matrix: simd_float4x4) {
         let idx = nodes.count
@@ -798,8 +1213,10 @@ private struct GltfMiniBuilder {
         halfExtents: SIMD3<Float>,
         baseColor: SIMD4<Float>,
         textureRelativePath: String?,
-        alphaMode: String = "OPAQUE"
+        alphaMode: String = "OPAQUE",
+        unlit: Bool = false
     ) throws {
+        markUnlit(unlit)
         var positions: [Float] = []
         var normals: [Float] = []
         var uvs: [Float] = []
@@ -833,30 +1250,35 @@ private struct GltfMiniBuilder {
             images.append(["uri": tex])
             let texIndex = textures.count
             textures.append(["source": imgIndex])
-            matIndex = materials.count
-            materials.append([
+            var mat: [String: Any] = [
                 "name": "mat_tex_\(name)",
                 "pbrMetallicRoughness": [
                     "baseColorTexture": ["index": texIndex],
+                    "baseColorFactor": [1.0, 1.0, 1.0, Double(baseColor.w)],
                     "metallicFactor": 0,
                     "roughnessFactor": 0.92
                 ],
                 "alphaMode": alphaMode,
                 "doubleSided": true
-            ])
-        } else {
+            ]
+            if let ext = unlitExtensions(unlit) { mat["extensions"] = ext }
             matIndex = materials.count
-            var pbr: [String: Any] = [
+            materials.append(mat)
+        } else {
+            let pbr: [String: Any] = [
                 "baseColorFactor": [Double(baseColor.x), Double(baseColor.y), Double(baseColor.z), Double(baseColor.w)],
                 "metallicFactor": 0,
                 "roughnessFactor": 0.9
             ]
-            materials.append([
+            var mat: [String: Any] = [
                 "name": "mat_\(name)",
                 "pbrMetallicRoughness": pbr,
                 "alphaMode": alphaMode,
                 "doubleSided": true
-            ])
+            ]
+            if let ext = unlitExtensions(unlit) { mat["extensions"] = ext }
+            matIndex = materials.count
+            materials.append(mat)
         }
 
         let meshIndex = meshes.count
@@ -887,8 +1309,10 @@ private struct GltfMiniBuilder {
         width: Float,
         height: Float,
         textureRelativePath: String,
-        tint: SIMD4<Float>
+        tint: SIMD4<Float>,
+        unlit: Bool = true
     ) throws {
+        markUnlit(unlit)
         // Two triangles in X-Y plane (local), normal +Z, then transform to world
         let hx = width * 0.5
         let hy = height * 0.5
@@ -938,8 +1362,7 @@ private struct GltfMiniBuilder {
         images.append(["uri": textureRelativePath])
         let texIndex = textures.count
         textures.append(["source": imgIndex])
-        let matIndex = materials.count
-        materials.append([
+        var mat: [String: Any] = [
             "name": "mat_\(name)",
             "pbrMetallicRoughness": [
                 "baseColorTexture": ["index": texIndex],
@@ -949,7 +1372,10 @@ private struct GltfMiniBuilder {
             ],
             "alphaMode": "OPAQUE",
             "doubleSided": true
-        ])
+        ]
+        if let ext = unlitExtensions(unlit) { mat["extensions"] = ext }
+        let matIndex = materials.count
+        materials.append(mat)
 
         let meshIndex = meshes.count
         meshes.append([
@@ -1038,15 +1464,29 @@ private struct GltfMiniBuilder {
             "name": rootName,
             "children": nodeChildren
         ])
-        let gltf: [String: Any] = [
+
+        var samplers: [[String: Any]] = []
+        if !textures.isEmpty {
+            samplers.append([
+                "magFilter": 9729,
+                "minFilter": 9987,
+                "wrapS": 10497,
+                "wrapT": 10497
+            ])
+            textures = textures.map { tex in
+                var t = tex
+                t["sampler"] = 0
+                return t
+            }
+        }
+
+        var gltf: [String: Any] = [
             "asset": ["version": "2.0", "generator": "RoomScanTest"],
             "scene": 0,
             "scenes": [["nodes": [rootIdx]]],
             "nodes": nodes,
             "meshes": meshes,
             "materials": materials,
-            "textures": textures,
-            "images": images,
             "accessors": accessors,
             "bufferViews": bufferViews,
             "buffers": [[
@@ -1054,6 +1494,14 @@ private struct GltfMiniBuilder {
                 "uri": "room_scene.bin"
             ]]
         ]
+        if !textures.isEmpty {
+            gltf["textures"] = textures
+            gltf["images"] = images
+            gltf["samplers"] = samplers
+        }
+        if usesUnlitExtension {
+            gltf["extensionsUsed"] = ["KHR_materials_unlit"]
+        }
         return (gltf, binFinal)
     }
 }

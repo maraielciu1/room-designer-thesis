@@ -18,7 +18,7 @@ struct CreateRoomView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 VStack(spacing: 28) {
                     Spacer().frame(height: 20)
@@ -26,7 +26,7 @@ struct CreateRoomView: View {
                     // Header icon
                     ZStack {
                         Circle()
-                            .fill(AppTheme.glowCyan.opacity(0.10))
+                            .fill(AppTheme.warmAccent.opacity(0.14))
                             .frame(width: 100, height: 100)
                             .blur(radius: 25)
                         Image(systemName: "camera.viewfinder")
@@ -36,13 +36,13 @@ struct CreateRoomView: View {
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
                             .overlay(
-                                Circle().stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                Circle().stroke(AppTheme.warmAccent.opacity(0.35), lineWidth: 1)
                             )
                     }
 
                     Text("Create New Room")
                         .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
 
                     // Name input card
                     VStack(alignment: .leading, spacing: 10) {
@@ -54,18 +54,18 @@ struct CreateRoomView: View {
                         TextField("e.g. Living Room, Bedroom", text: $roomName)
                             .textInputAutocapitalization(.words)
                             .padding(14)
-                            .background(Color.white.opacity(0.06))
+                            .background(AppTheme.secondaryTint.opacity(0.35))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(
                                         roomName.isEmpty
-                                        ? Color.white.opacity(0.08)
-                                        : AppTheme.glowCyan.opacity(0.4),
+                                        ? AppTheme.warmAccent.opacity(0.2)
+                                        : AppTheme.warmAccent.opacity(0.5),
                                         lineWidth: 1
                                     )
                             )
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                     }
                     .padding(.horizontal, 28)
 
@@ -83,16 +83,24 @@ struct CreateRoomView: View {
                             Text("Start Room Scan")
                         }
                         .font(.headline.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(
+                            roomName.isEmpty
+                            ? AppTheme.secondaryText
+                            : AppTheme.primaryDark
+                        )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
                             roomName.isEmpty
-                            ? AnyShapeStyle(Color.white.opacity(0.08))
-                            : AnyShapeStyle(AppTheme.accentGradientInline)
+                            ? AnyShapeStyle(AppTheme.secondaryTint.opacity(0.5))
+                            : AnyShapeStyle(AppTheme.warmAccent)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius))
-                        .shadow(color: roomName.isEmpty ? .clear : AppTheme.glowCyan.opacity(0.3),
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppTheme.buttonCornerRadius)
+                                .strokeBorder(AppTheme.lightNeutral.opacity(roomName.isEmpty ? 0.15 : 0.35), lineWidth: 1)
+                        )
+                        .shadow(color: roomName.isEmpty ? .clear : AppTheme.glowAccent,
                                 radius: 10, y: 4)
                     }
                     .disabled(roomName.isEmpty)
@@ -112,13 +120,15 @@ struct CreateRoomView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
+        .appSheetBackground()
     }
 }
 

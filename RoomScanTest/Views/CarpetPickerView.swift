@@ -48,7 +48,7 @@ struct CarpetPickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -78,14 +78,16 @@ struct CarpetPickerView: View {
             }
             .navigationTitle("Carpet / Rug")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -126,7 +128,7 @@ struct CarpetPickerView: View {
 
             Text(size.label)
                 .font(.caption2.weight(.medium))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -136,7 +138,7 @@ struct CarpetPickerView: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(isSel ? AppTheme.glowGreen.opacity(0.18)
-                            : Color.white.opacity(0.06))
+                            : AppTheme.secondaryTint.opacity(0.35))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -162,12 +164,12 @@ struct CarpetPickerView: View {
             TextField("", text: text)
                 .keyboardType(.decimalPad)
                 .font(.body.monospacedDigit())
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(AppTheme.warmAccent.opacity(0.2))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -205,7 +207,7 @@ struct CarpetPickerView: View {
 
             Text(pat.label)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
                 .lineLimit(1)
 
             Text(pat.subtitle)
@@ -225,7 +227,7 @@ struct CarpetPickerView: View {
             Circle()
                 .fill(isSelected
                       ? AppTheme.glowGreen.opacity(0.15)
-                      : Color.white.opacity(0.06))
+                      : AppTheme.secondaryTint.opacity(0.35))
                 .frame(width: 44, height: 44)
 
             Image(systemName: pat.icon)
@@ -238,14 +240,14 @@ struct CarpetPickerView: View {
         RoundedRectangle(cornerRadius: 12)
             .fill(isSelected
                   ? AppTheme.glowGreen.opacity(0.10)
-                  : Color.white.opacity(0.04))
+                  : AppTheme.lightNeutral.opacity(0.06))
     }
 
     private func patternCardBorder(isSelected: Bool) -> some View {
         RoundedRectangle(cornerRadius: 12)
             .stroke(isSelected
                     ? AppTheme.glowGreen.opacity(0.4)
-                    : Color.white.opacity(0.08), lineWidth: 1)
+                    : AppTheme.warmAccent.opacity(0.2), lineWidth: 1)
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -266,7 +268,7 @@ struct CarpetPickerView: View {
                                 Circle()
                                     .stroke(carpetColor == preset.color
                                             ? AppTheme.glowGreen
-                                            : Color.white.opacity(0.15),
+                                            : AppTheme.warmAccent.opacity(0.3),
                                             lineWidth: 2))
                     }
                 }
@@ -309,7 +311,7 @@ struct CarpetPickerView: View {
 
         return ZStack {
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
+                .fill(AppTheme.lightNeutral.opacity(0.06))
                 .frame(height: 130)
 
             VStack(spacing: 6) {
@@ -317,7 +319,7 @@ struct CarpetPickerView: View {
 
                 Text("\(selectedPattern.label)")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
 
                 Text("\(wCm)×\(dCm) cm" + (selectedSize.isRound ? " (round)" : ""))
                     .font(.caption2)
@@ -338,14 +340,14 @@ struct CarpetPickerView: View {
                 .frame(width: previewH, height: previewH)
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .stroke(AppTheme.warmAccent.opacity(0.3), lineWidth: 1))
         } else {
             RoundedRectangle(cornerRadius: 4)
                 .fill(carpetColor)
                 .frame(width: max(previewW, 30), height: previewH)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .stroke(AppTheme.warmAccent.opacity(0.3), lineWidth: 1))
         }
     }
 }

@@ -1,0 +1,83 @@
+% ch5_auth_flow.tex
+% NEW figure for auth system (email registration + Google OAuth)
+% Add to chapter5_implementation.tex wherever auth is described.
+% Suggested figure label: fig:auth_flow
+% Suggested \thesisfig replacement:
+%   \input{tikz_diagrams/ch5_auth_flow}
+
+\begin{tikzpicture}[
+  node distance=0.5cm and 1.3cm,
+  box/.style={rectangle, rounded corners=4pt, draw=black, fill=white,
+              minimum width=3.0cm, minimum height=0.75cm,
+              font=\small, align=center, line width=0.7pt},
+  decision/.style={diamond, draw=black, fill=gray!10,
+                   minimum width=2.8cm, minimum height=0.72cm,
+                   font=\small, align=center, inner sep=1pt},
+  term/.style={box, fill=black!80, text=white},
+  err/.style={box, fill=red!10, draw=red!60},
+  arrow/.style={-{Stealth[length=5pt]}, thick},
+  lbl/.style={font=\footnotesize\itshape}
+]
+
+%% Start
+\node[term] (start) {\texttt{AppSplashView}};
+\node[box,  below=0.7cm of start] (sel) {\texttt{UserSelectionView}};
+\node[decision, below=0.7cm of sel] (choice) {Auth\\method?};
+
+\draw[arrow] (start) -- (sel);
+\draw[arrow] (sel)   -- (choice);
+
+%%──── LEFT: Email ────
+\node[box, below left=1.0cm and 2.4cm of choice] (emailReg)
+  {Email Registration\\(name + email + password)};
+\node[box, below=0.55cm of emailReg] (emailVal)
+  {Input Validation\\(format, strength)};
+\node[box, below=0.55cm of emailVal] (emailSave)
+  {Store credentials\\(\texttt{AuthenticationManager})};
+\node[box, below=0.55cm of emailSave] (emailLogin)
+  {Email Login};
+\node[decision, below=0.55cm of emailLogin] (emailOK)
+  {Credentials\\valid?};
+\node[err, below left=0.65cm and 0.4cm of emailOK] (emailFail)
+  {Error alert;\\retry};
+
+\draw[arrow] (choice.west) -| node[lbl,above,pos=0.2]{Email} (emailReg.north);
+\draw[arrow] (emailReg)   -- (emailVal);
+\draw[arrow] (emailVal)   -- (emailSave);
+\draw[arrow] (emailSave)  -- (emailLogin);
+\draw[arrow] (emailLogin) -- (emailOK);
+\draw[arrow] (emailOK.west) -| node[lbl,left]{No} (emailFail.north);
+\draw[arrow] (emailFail.north) |- (emailLogin.west);
+
+%%──── RIGHT: Google ────
+\node[box, below right=1.0cm and 2.4cm of choice] (gStart)
+  {Google Sign-In\\(\texttt{GIDSignIn})};
+\node[box, below=0.55cm of gStart]  (gConsent)
+  {Google OAuth\\Consent Screen};
+\node[box, below=0.55cm of gConsent] (gToken)
+  {Receive ID Token};
+\node[decision, below=0.55cm of gToken] (gOK)
+  {Token\\valid?};
+\node[err, below right=0.65cm and 0.4cm of gOK] (gFail)
+  {Error alert;\\retry};
+
+\draw[arrow] (choice.east) -| node[lbl,above,pos=0.2]{Google} (gStart.north);
+\draw[arrow] (gStart)   -- (gConsent);
+\draw[arrow] (gConsent) -- (gToken);
+\draw[arrow] (gToken)   -- (gOK);
+\draw[arrow] (gOK.east) -| node[lbl,right]{No} (gFail.north);
+\draw[arrow] (gFail.north) |- (gStart.east);
+
+%%──── Merge: success ────
+\node[box, fill=gray!14, below=5.6cm of choice, minimum width=3.4cm] (profile)
+  {Create / Load User Profile\\(\texttt{UserManager})};
+\node[term, below=0.65cm of profile] (hub)
+  {\texttt{LocalLandingView} (hub)};
+
+\draw[arrow] (emailOK.south) -- node[lbl,right]{Yes}
+  ++(0,-0.35) -| (profile.west);
+\draw[arrow] (gOK.south) -- node[lbl,right]{Yes}
+  ++(0,-0.35) -| (profile.east);
+\draw[arrow] (profile) -- (hub);
+
+\end{tikzpicture}

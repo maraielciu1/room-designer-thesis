@@ -1,0 +1,65 @@
+% ch5_arch_layers.tex
+% fig:architecture — layered architecture, compact vertical stack
+
+\begin{tikzpicture}[
+  layer/.style={rectangle, rounded corners=5pt, draw=gray!55, fill=gray!8,
+                line width=0.8pt, minimum width=9.5cm, minimum height=1.3cm,
+                align=center},
+  toplayer/.style={layer, draw=red!40, fill=red!6},
+  botlayer/.style={layer, fill=gray!22, draw=gray!60},
+  arr/.style={-{Stealth[length=5pt]}, thick, draw=gray!55},
+  lbl/.style={font=\scriptsize\itshape, text=gray!65, fill=white, inner sep=1pt},
+  title/.style={font=\small\bfseries, text=black}
+]
+
+%% ── Layer 1: Views ──
+\node[toplayer] (L1) at (0, 0) {
+  \begin{tabular}{c}
+    {\small\bfseries Views (SwiftUI)}\\[3pt]
+    {\footnotesize \texttt{AppSplashView} · \texttt{UserSelectionView} · \texttt{RoomScanView}}\\
+    {\footnotesize \texttt{RoomDesignerView} · \texttt{FurnitureLibraryView} · \texttt{SHARPCaptureView}}
+  \end{tabular}
+};
+
+%% ── Layer 2: Managers ──
+\node[layer] (L2) at (0, -2.2) {
+  \begin{tabular}{c}
+    {\small\bfseries Managers (\texttt{ObservableObject})}\\[3pt]
+    {\footnotesize \texttt{UserManager} · \texttt{AuthenticationManager} · \texttt{RoomManager}}\\
+    {\footnotesize \texttt{ProjectManager} · \texttt{FurnitureCatalogManager} · \texttt{ScannedFurnitureManager}}
+  \end{tabular}
+};
+
+%% ── Layer 3: Services ──
+\node[layer, fill=gray!12] (L3) at (0, -4.4) {
+  \begin{tabular}{c}
+    {\small\bfseries Services (pure / HTTP)}\\[3pt]
+    {\footnotesize \texttt{SmartSuggestionsService} · \texttt{MeasurementService} · \texttt{RoomBlenderExportService}}\\
+    {\footnotesize \texttt{GaussianSplatCloudService} · \texttt{SHARPService} · \texttt{RoomColorCaptureService}}
+  \end{tabular}
+};
+
+%% ── Layer 4: Frameworks ──
+\node[layer, fill=gray!18] (L4) at (0, -6.6) {
+  \begin{tabular}{c}
+    {\small\bfseries Apple Frameworks}\\[3pt]
+    {\footnotesize RoomPlan · Object Capture · RealityKit / ARKit · Metal · Google Sign-In SDK}
+  \end{tabular}
+};
+
+%% ── Layer 5: Storage ──
+\node[botlayer] (L5) at (0, -8.6) {
+  \begin{tabular}{c}
+    {\small\bfseries Persistence}\\[3pt]
+    {\footnotesize SwiftData DB (user accounts) · \texttt{Documents/users/<id>/} (rooms, USDZ, .ply)}\\
+    {\footnotesize Keychain (auth tokens) · UserDefaults (lightweight metadata)}
+  \end{tabular}
+};
+
+%% ── Arrows between layers ──
+\draw[arr] (L1.south) -- node[lbl, right=3pt]{\texttt{@EnvironmentObject}} (L2.north);
+\draw[arr] (L2.south) -- node[lbl, right=3pt]{call services}               (L3.north);
+\draw[arr] (L3.south) -- node[lbl, right=3pt]{invoke APIs}                  (L4.north);
+\draw[arr] (L4.south) -- node[lbl, right=3pt]{read / write}                 (L5.north);
+
+\end{tikzpicture}

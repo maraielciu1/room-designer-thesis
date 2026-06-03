@@ -38,10 +38,15 @@ struct ProjectDetailView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(currentProject.name)
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(AppTheme.lightNeutral)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                     summaryHeader
                     roomsSection
                     dangerZone
@@ -51,7 +56,10 @@ struct ProjectDetailView: View {
             }
         }
         .navigationTitle(currentProject.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .appNavigationChrome()
+        .tint(AppTheme.lightNeutral)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -69,9 +77,10 @@ struct ProjectDetailView: View {
                         Label("Add Room", systemImage: "plus")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .tintedIcon()
+                    Image(systemName: "ellipsis")
+                        .appToolbarMenuLabel()
                 }
+                .menuStyle(.borderlessButton)
             }
         }
         .sheet(isPresented: $showAddRoomSheet) {
@@ -120,7 +129,7 @@ struct ProjectDetailView: View {
                 .foregroundStyle(AppTheme.accentGradientInline)
             Text(value)
                 .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
             Text(label)
                 .font(.caption2)
                 .foregroundColor(AppTheme.secondaryText)
@@ -150,7 +159,7 @@ struct ProjectDetailView: View {
                         .foregroundStyle(AppTheme.accentGradientInline)
                     Text("No Rooms Yet")
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Text("Add scanned rooms to this project.")
                         .font(.caption)
                         .foregroundColor(AppTheme.secondaryText)
@@ -176,7 +185,7 @@ struct ProjectDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(room.name)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
 
                 if let captured = room.getCapturedRoom() {
                     let m = MeasurementService.measure(captured)
@@ -237,7 +246,7 @@ struct ProjectDetailView: View {
         let unassigned = projectManager.unassignedRooms()
         return NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 if unassigned.isEmpty {
                     VStack(spacing: 12) {
@@ -246,7 +255,7 @@ struct ProjectDetailView: View {
                             .foregroundStyle(AppTheme.accentGradientInline)
                         Text("No Available Rooms")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                         Text("All your rooms are already assigned to projects. Scan a new room first.")
                             .font(.subheadline)
                             .foregroundColor(AppTheme.secondaryText)
@@ -272,14 +281,16 @@ struct ProjectDetailView: View {
             }
             .navigationTitle("Add Room")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showAddRoomSheet = false }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 
     private func addRoomRow(_ room: Room) -> some View {
@@ -291,7 +302,7 @@ struct ProjectDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(room.name)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(room.updatedAt.formatted(.relative(presentation: .named)))
                     .font(.caption2)
                     .foregroundColor(AppTheme.secondaryText)
@@ -311,7 +322,7 @@ struct ProjectDetailView: View {
     private var editProjectSheet: some View {
         NavigationView {
             ZStack {
-                Color(hex: 0x0B0D17).ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
 
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -321,13 +332,13 @@ struct ProjectDetailView: View {
                         TextField("Project name", text: $editName)
                             .textFieldStyle(.plain)
                             .font(.body)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .padding(14)
-                            .background(Color.white.opacity(0.06))
+                            .background(AppTheme.secondaryTint.opacity(0.35))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    .stroke(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
                             )
                     }
 
@@ -338,14 +349,14 @@ struct ProjectDetailView: View {
                         TextField("Description…", text: $editDescription, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.body)
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                             .lineLimit(3...5)
                             .padding(14)
-                            .background(Color.white.opacity(0.06))
+                            .background(AppTheme.secondaryTint.opacity(0.35))
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    .stroke(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
                             )
                     }
 
@@ -367,13 +378,15 @@ struct ProjectDetailView: View {
             }
             .navigationTitle("Edit Project")
             .navigationBarTitleDisplayMode(.inline)
+            .appNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showEditSheet = false }
-                        .foregroundColor(AppTheme.glowCyan)
+                        .foregroundStyle(AppTheme.warmAccent)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .appSheetBackground()
     }
 }

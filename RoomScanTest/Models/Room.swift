@@ -51,19 +51,17 @@ extension Room {
 
     // ── Disk storage directory ──────────────────────────────────
 
-    /// Folder in Documents where room scan JSON files are stored
-    private static var roomDataDirectory: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("RoomScans", isDirectory: true)
-        if !FileManager.default.fileExists(atPath: dir.path) {
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        }
-        return dir
+    private func roomDataDirectory(for userId: UUID) -> URL {
+        UserStoragePaths.roomScans(userId: userId)
     }
 
-    /// Path to this room's scan data JSON file
+    /// Path to this room's scan data JSON file (per-user folder).
     private var scanDataURL: URL {
-        Room.roomDataDirectory.appendingPathComponent("\(id.uuidString).json")
+        roomDataDirectory(for: userId).appendingPathComponent("\(id.uuidString).json")
+    }
+
+    private var legacyScanDataURL: URL {
+        UserStoragePaths.legacyRoomScans.appendingPathComponent("\(id.uuidString).json")
     }
 
     // ── Public API ──────────────────────────────────────────────
@@ -72,6 +70,7 @@ extension Room {
     var hasScanData: Bool {
         Room.inMemoryRooms[self.id] != nil
             || FileManager.default.fileExists(atPath: scanDataURL.path)
+            || FileManager.default.fileExists(atPath: legacyScanDataURL.path)
     }
 
     /// Get the CapturedRoom — checks memory cache first, then loads from disk
@@ -121,11 +120,18 @@ extension Room {
 
     /// Load CapturedRoom from its JSON file on disk
     private func loadFromDisk() -> CapturedRoom? {
-        guard FileManager.default.fileExists(atPath: scanDataURL.path) else { return nil }
+        let url: URL
+        if FileManager.default.fileExists(atPath: scanDataURL.path) {
+            url = scanDataURL
+        } else if FileManager.default.fileExists(atPath: legacyScanDataURL.path) {
+            url = legacyScanDataURL
+        } else {
+            return nil
+        }
         do {
-            let data = try Data(contentsOf: scanDataURL)
+            let data = try Data(contentsOf: url)
             let room = try JSONDecoder().decode(CapturedRoom.self, from: data)
-            print("[Room] Loaded scan (\(data.count / 1024) KB) ← \(scanDataURL.lastPathComponent)")
+            print("[Room] Loaded scan (\(data.count / 1024) KB) ← \(url.lastPathComponent)")
             return room
         } catch {
             print("[Room] ⚠️ Failed to load scan: \(error.localizedDescription)")
@@ -136,16 +142,20 @@ extension Room {
     // ── Maintenance ─────────────────────────────────────────────
 
     /// Remove orphaned scan files that no longer have a matching Room
-    static func cleanOrphanedScanFiles(existingRoomIds: Set<UUID>) {
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: roomDataDirectory, includingPropertiesForKeys: nil
-        ) else { return }
+    static func cleanOrphanedScanFiles(userId: UUID, existingRoomIds: Set<UUID>) {
+        let directories = [UserStoragePaths.roomScans(userId: userId), UserStoragePaths.legacyRoomScans]
+        for directory in directories {
+            guard FileManager.default.fileExists(atPath: directory.path),
+                  let files = try? FileManager.default.contentsOfDirectory(
+                    at: directory, includingPropertiesForKeys: nil
+                  ) else { continue }
 
-        for file in files where file.pathExtension == "json" {
-            let stem = file.deletingPathExtension().lastPathComponent
-            if let fileId = UUID(uuidString: stem), !existingRoomIds.contains(fileId) {
-                try? FileManager.default.removeItem(at: file)
-                print("[Room] Cleaned orphaned scan: \(file.lastPathComponent)")
+            for file in files where file.pathExtension == "json" {
+                let stem = file.deletingPathExtension().lastPathComponent
+                if let fileId = UUID(uuidString: stem), !existingRoomIds.contains(fileId) {
+                    try? FileManager.default.removeItem(at: file)
+                    print("[Room] Cleaned orphaned scan: \(file.lastPathComponent)")
+                }
             }
         }
     }

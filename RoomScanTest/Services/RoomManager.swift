@@ -17,9 +17,14 @@ class RoomManager: ObservableObject {
     
     init(userManager: UserManager) {
         self.userManager = userManager
+        reloadForCurrentUser()
+    }
+
+    func reloadForCurrentUser() {
         loadRooms()
-        // Clean up any orphaned scan files left from deleted rooms
-        Room.cleanOrphanedScanFiles(existingRoomIds: Set(rooms.map(\.id)))
+        if let userId = userManager.currentUser?.id {
+            Room.cleanOrphanedScanFiles(userId: userId, existingRoomIds: Set(rooms.map(\.id)))
+        }
     }
     
     func createRoom(name: String, capturedRoom: CapturedRoom? = nil, roomMaterials: RoomMaterials? = nil) -> Room {
@@ -122,15 +127,15 @@ class RoomManager: ObservableObject {
     }
     
     private func loadRooms() {
-        if let data = UserDefaults.standard.data(forKey: roomsKey),
-           let decoded = try? JSONDecoder().decode([Room].self, from: data) {
-            rooms = decoded
+        guard let userId = userManager.currentUser?.id else {
+            rooms = []
+            return
         }
+        rooms = UserScopedStorage.load([Room].self, baseKey: roomsKey, userId: userId) ?? []
     }
-    
+
     private func saveRooms() {
-        if let encoded = try? JSONEncoder().encode(rooms) {
-            UserDefaults.standard.set(encoded, forKey: roomsKey)
-        }
+        guard let userId = userManager.currentUser?.id else { return }
+        UserScopedStorage.save(rooms, baseKey: roomsKey, userId: userId)
     }
 }

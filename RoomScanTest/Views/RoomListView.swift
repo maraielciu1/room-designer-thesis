@@ -12,7 +12,11 @@ struct RoomListView: View {
     @EnvironmentObject var userManager: UserManager
     @EnvironmentObject var roomManager: RoomManager
     @EnvironmentObject var catalogManager: FurnitureCatalogManager
+    @EnvironmentObject var projectManager: ProjectManager
+    @Environment(\.presentAccount) private var presentAccount
     @State private var showCreateRoom = false
+    @State private var showRoom3DGSCapture = false
+    @State private var showSHARPCapture = false
 
     // Programmatic navigation after scanning
     @State private var pendingRoom: Room? = nil
@@ -23,147 +27,257 @@ struct RoomListView: View {
     @State private var showBlenderExportError = false
     @State private var blenderExportErrorMessage = ""
     @State private var isBlenderExporting = false
+    @State private var roomPendingDeletion: Room?
+    @State private var showDeleteConfirmation = false
+
+    private var roomScanMenuItems: [AppScreenHeaderMenuItem] {
+        [
+            AppScreenHeaderMenuItem(title: "Room Scan (RoomPlan)", systemImage: "viewfinder") {
+                showCreateRoom = true
+            },
+            AppScreenHeaderMenuItem(title: "3D Gaussian Splat", systemImage: "sparkles") {
+                showRoom3DGSCapture = true
+            },
+            AppScreenHeaderMenuItem(title: "SHARP ML", systemImage: "camera.viewfinder") {
+                showSHARPCapture = true
+            },
+        ]
+    }
 
     var userRooms: [Room] {
         roomManager.getRoomsForCurrentUser()
     }
 
     var body: some View {
+        mainContent
+            .background(hiddenNavigationLinks.hidden())
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) { screenHeader }
+            .fullScreenCover(isPresented: $showRoom3DGSCapture) { room3DGSCaptureCover }
+            .fullScreenCover(isPresented: $showSHARPCapture) { sharpCaptureCover }
+            .sheet(isPresented: $showCreateRoom, onDismiss: handleCreateRoomDismiss) { createRoomSheet }
+            .onChange(of: navigateToNewRoom) { _, active in
+                if !active { pendingRoom = nil }
+            }
+            .sheet(isPresented: $showBlenderExportShare, onDismiss: handleBlenderExportShareDismiss) {
+                blenderExportShareSheet
+            }
+            .alert("Could not export", isPresented: $showBlenderExportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(blenderExportErrorMessage)
+            }
+            .alert("Delete Room?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    roomPendingDeletion = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let room = roomPendingDeletion {
+                        deleteRoom(room)
+                    }
+                    roomPendingDeletion = nil
+                }
+            } message: {
+                deleteConfirmationMessage
+            }
+            .overlay { blenderExportOverlay }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
         ZStack {
-            // Dark background
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             if userRooms.isEmpty {
-                // ── Empty State ──
-                VStack(spacing: 20) {
-                    ZStack {
-                        Circle()
-                            .fill(AppTheme.glowViolet.opacity(0.10))
-                            .frame(width: 120, height: 120)
-                            .blur(radius: 30)
-                        Image(systemName: "house.lodge.fill")
-                            .font(.system(size: 52))
-                            .foregroundStyle(AppTheme.accentGradientInline)
-                    }
-                    Text("No Rooms Yet")
-                        .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
-                    Text("Scan your first room to get started")
-                        .font(.subheadline)
-                        .foregroundColor(AppTheme.secondaryText)
-
-                    Button(action: { showCreateRoom = true }) {
-                        Label("Scan a Room", systemImage: "plus.viewfinder")
-                    }
-                    .buttonStyle(GradientButtonStyle())
-                    .padding(.top, 8)
-                }
+                emptyStateView
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(userRooms) { room in
-                            NavigationLink(destination: RoomDesignerView(room: room)) {
-                                RoomRowView(room: room)
-                            }
-                            .contextMenu {
-                                Button {
-                                    exportRoomForBlender(room)
-                                } label: {
-                                    Label("Export for Blender…", systemImage: "square.and.arrow.up.on.square")
-                                }
-                                .disabled(!room.hasScanData)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
+                roomsList
             }
         }
-        // Hidden links for programmatic navigation
-        .background(
-            Group {
-                NavigationLink(
-                    destination: Group {
-                        if let room = pendingRoom {
-                            RoomDesignerView(room: room)
-                        }
-                    },
-                    isActive: $navigateToNewRoom,
-                    label: { EmptyView() }
-                )
-                NavigationLink(
-                    destination: HistoryView(),
-                    isActive: $showHistory,
-                    label: { EmptyView() }
-                )
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.glowViolet.opacity(0.10))
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 30)
+                Image(systemName: "house.lodge.fill")
+                    .font(.system(size: 52))
+                    .foregroundStyle(AppTheme.accentGradientInline)
             }
-            .hidden()
+            Text("No Rooms Yet")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(AppTheme.primaryText)
+            Text("Scan your first room to get started")
+                .font(.subheadline)
+                .foregroundColor(AppTheme.secondaryText)
+
+            Menu {
+                roomScanMenuButtons
+            } label: {
+                Label("Scan a Room", systemImage: "plus.viewfinder")
+            }
+            .buttonStyle(GradientButtonStyle())
+            .padding(.top, 8)
+        }
+    }
+
+    private var roomsList: some View {
+        List {
+            ForEach(userRooms) { room in
+                roomRow(for: room)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private func roomRow(for room: Room) -> some View {
+        ZStack {
+            NavigationLink(destination: RoomDesignerView(room: room)) {
+                Color.clear
+            }
+            .opacity(0)
+            RoomRowView(room: room)
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .contextMenu {
+            Button {
+                exportRoomForBlender(room)
+            } label: {
+                Label("Export for Blender…", systemImage: "square.and.arrow.up.on.square")
+            }
+            .disabled(!room.hasScanData)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                roomPendingDeletion = room
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(AppTheme.glowRed)
+        }
+    }
+
+    @ViewBuilder
+    private var hiddenNavigationLinks: some View {
+        NavigationLink(
+            destination: Group {
+                if let room = pendingRoom {
+                    RoomDesignerView(room: room)
+                }
+            },
+            isActive: $navigateToNewRoom,
+            label: { EmptyView() }
         )
-        .navigationTitle("My Rooms")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color(hex: 0x0B0D17).opacity(0.88), for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { showHistory = true }) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 18))
-                        .foregroundColor(AppTheme.secondaryText)
+        NavigationLink(
+            destination: HistoryView(),
+            isActive: $showHistory,
+            label: { EmptyView() }
+        )
+    }
+
+    private var screenHeader: some View {
+        AppScreenHeader(
+            title: "My Rooms",
+            leading: .leading("clock.arrow.circlepath", accessibilityLabel: "History") {
+                showHistory = true
+            },
+            trailingMenu: roomScanMenuItems,
+            profileInitial: userManager.currentUser.map { String($0.name.prefix(1)).uppercased() },
+            onProfileTap: presentAccount
+        )
+    }
+
+    private var room3DGSCaptureCover: some View {
+        NavigationStack {
+            Room3DGSCaptureView()
+        }
+        .appSheetBackground()
+    }
+
+    private var sharpCaptureCover: some View {
+        NavigationStack {
+            SHARPCaptureView()
+        }
+        .appSheetBackground()
+    }
+
+    private var createRoomSheet: some View {
+        CreateRoomView { createdRoom in
+            pendingRoom = createdRoom
+            showCreateRoom = false
+        }
+    }
+
+    @ViewBuilder
+    private var blenderExportShareSheet: some View {
+        if let url = blenderExportURL {
+            ShareSheet(activityItems: [url])
+        }
+    }
+
+    @ViewBuilder
+    private var deleteConfirmationMessage: some View {
+        if let room = roomPendingDeletion {
+            Text("“\(room.name)” and its scan data will be permanently deleted. This cannot be undone.")
+        }
+    }
+
+    @ViewBuilder
+    private var blenderExportOverlay: some View {
+        if isBlenderExporting {
+            ZStack {
+                Color.black.opacity(0.45).ignoresSafeArea()
+                ProgressView("Preparing export…")
+                    .padding(24)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(AppTheme.surfacePrimary))
+            }
+        }
+    }
+
+    private func handleCreateRoomDismiss() {
+        if pendingRoom != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                navigateToNewRoom = true
+            }
+        }
+    }
+
+    private func handleBlenderExportShareDismiss() {
+        if let url = blenderExportURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        blenderExportURL = nil
+    }
+
+    @ViewBuilder
+    private var roomScanMenuButtons: some View {
+        ForEach(roomScanMenuItems) { item in
+            Button(action: item.action) {
+                if let icon = item.systemImage {
+                    Label(item.title, systemImage: icon)
+                } else {
+                    Text(item.title)
                 }
-                .accessibilityLabel("History")
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showCreateRoom = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(AppTheme.accentGradientInline)
-                }
-                .accessibilityLabel("Scan a room")
             }
         }
-        .sheet(isPresented: $showCreateRoom, onDismiss: {
-            if pendingRoom != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    navigateToNewRoom = true
-                }
-            }
-        }) {
-            CreateRoomView { createdRoom in
-                pendingRoom = createdRoom
-                showCreateRoom = false
-            }
+    }
+
+    private func deleteRoom(_ room: Room) {
+        if pendingRoom?.id == room.id {
+            pendingRoom = nil
+            navigateToNewRoom = false
         }
-        .onChange(of: navigateToNewRoom) { _, active in
-            if !active { pendingRoom = nil }
-        }
-        .sheet(isPresented: $showBlenderExportShare, onDismiss: {
-            if let url = blenderExportURL {
-                try? FileManager.default.removeItem(at: url)
-            }
-            blenderExportURL = nil
-        }) {
-            if let url = blenderExportURL {
-                ShareSheet(activityItems: [url])
-            }
-        }
-        .alert("Could not export", isPresented: $showBlenderExportError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(blenderExportErrorMessage)
-        }
-        .overlay {
-            if isBlenderExporting {
-                ZStack {
-                    Color.black.opacity(0.45).ignoresSafeArea()
-                    ProgressView("Preparing export…")
-                        .padding(24)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x1A1D2E)))
-                }
-            }
-        }
+        projectManager.removeRoomReferences(for: room.id)
+        roomManager.deleteRoom(room)
     }
 
     private func exportRoomForBlender(_ room: Room) {
@@ -206,7 +320,7 @@ struct RoomRowView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(room.hasScanData
                           ? AppTheme.glowCyan.opacity(0.12)
-                          : Color.white.opacity(0.06))
+                          : AppTheme.secondaryTint.opacity(0.35))
                     .frame(width: 50, height: 50)
                 Image(systemName: room.hasScanData ? "view.3d" : "cube.transparent")
                     .font(.system(size: 22))
@@ -218,7 +332,7 @@ struct RoomRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(room.name)
                     .font(.headline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
 
                 Text("Updated \(room.updatedAt, style: .relative) ago")
                     .font(.caption)
@@ -228,7 +342,7 @@ struct RoomRowView: View {
                     if !room.furnitureReplacements.isEmpty {
                         Label("\(room.furnitureReplacements.count)", systemImage: "cube.fill")
                             .font(.caption2.weight(.medium))
-                            .foregroundColor(AppTheme.glowCyan)
+                            .foregroundStyle(AppTheme.warmAccent)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(AppTheme.glowCyan.opacity(0.12))
@@ -264,6 +378,7 @@ struct RoomRowView: View {
             .environmentObject(UserManager())
             .environmentObject(RoomManager(userManager: UserManager()))
             .environmentObject(FurnitureCatalogManager())
+            .environmentObject(ProjectManager(userManager: UserManager(), roomManager: RoomManager(userManager: UserManager())))
     }
     .preferredColorScheme(.dark)
 }

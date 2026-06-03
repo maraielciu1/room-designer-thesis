@@ -19,7 +19,11 @@ enum GaussianSplatCloudConfig {
 
     /// User-configurable server base URL (no trailing slash). Example: "https://my-gs-backend.run.app"
     static var serverBaseURL: String? {
-        get { UserDefaults.standard.string(forKey: serverBaseURLKey)?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        get {
+            UserDefaults.standard
+                .string(forKey: serverBaseURLKey)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         set { UserDefaults.standard.set(newValue, forKey: serverBaseURLKey) }
     }
 
@@ -134,6 +138,26 @@ struct GaussianSplatCloudService {
             throw Error.downloadFailed(underlying: nil)
         }
         return data
+    }
+
+    private static let pingSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 4
+        cfg.timeoutIntervalForResource = 4
+        return URLSession(configuration: cfg)
+    }()
+
+    /// Returns `true` if the backend responds (GET `/jobs` on Flask returns 405).
+    static func ping(serverBaseURL: URL) async -> Bool {
+        var request = URLRequest(url: serverBaseURL.appendingPathComponent("jobs"))
+        request.httpMethod = "GET"
+        do {
+            let (_, response) = try await pingSession.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+            return http.statusCode == 405 || http.statusCode == 200
+        } catch {
+            return false
+        }
     }
 
     /// Full flow: upload zip, poll until completed/failed, return .ply data.

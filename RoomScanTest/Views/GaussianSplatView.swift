@@ -24,7 +24,7 @@ struct GaussianSplatView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             if let renderer {
                 GaussianSplatMetalView(renderer: renderer)
@@ -40,7 +40,7 @@ struct GaussianSplatView: View {
                                     .frame(width: 8, height: 8)
                                 Text("\(gaussianCount.formatted()) splats")
                                     .font(.caption.weight(.medium))
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(AppTheme.primaryText)
                             }
                             Text("\(fps) FPS")
                                 .font(.caption2.monospaced())
@@ -72,7 +72,7 @@ struct GaussianSplatView: View {
                         .foregroundColor(AppTheme.glowOrange)
                     Text("Failed to Load")
                         .font(.title3.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                     Text(errorMessage)
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
@@ -87,7 +87,7 @@ struct GaussianSplatView: View {
                         .scaleEffect(1.3)
                     Text("Loading Gaussian Splats…")
                         .font(.subheadline.weight(.medium))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppTheme.primaryText)
                 }
             }
         }

@@ -36,7 +36,7 @@ struct HistoryView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // ── Custom segmented picker ──
@@ -51,7 +51,7 @@ struct HistoryView: View {
                                 .background(
                                     selectedFilter == filter
                                     ? AnyShapeStyle(AppTheme.accentGradientInline)
-                                    : AnyShapeStyle(Color.white.opacity(0.06))
+                                    : AnyShapeStyle(AppTheme.secondaryTint.opacity(0.35))
                                 )
                                 .clipShape(Capsule())
                         }
@@ -74,7 +74,7 @@ struct HistoryView: View {
                         }
                         Text("No History")
                             .font(.title3.weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                         Text("Your furniture replacements will appear here")
                             .font(.subheadline)
                             .foregroundColor(AppTheme.secondaryText)
@@ -104,7 +104,9 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .appNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !filteredHistory.isEmpty {
@@ -153,7 +155,7 @@ struct HistoryRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.action.rawValue.capitalized)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
                 if !entry.details.isEmpty {
                     Text(entry.details)
                         .font(.caption)

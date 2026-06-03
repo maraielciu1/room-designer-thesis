@@ -8,24 +8,25 @@ import SwiftUI
 // MARK: - Local Landing View
 
 struct LocalLandingView: View {
-    @EnvironmentObject var userManager: UserManager
+    @Binding var showAccount: Bool
     @State private var selectedTab: MainTab = .rooms
 
+    init(showAccount: Binding<Bool> = .constant(false)) {
+        _showAccount = showAccount
+    }
+
     var body: some View {
-        // Tab roots set their own title display mode (lists use `.inline` so titles stay visible).
         NavigationStack {
             MainTabContent(selectedTab: selectedTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppTheme.background.ignoresSafeArea())
+                .environment(\.presentAccount, { showAccount = true })
                 .safeAreaInset(edge: .bottom) {
                     MainTabBar(selection: $selectedTab)
                         .padding(.bottom, 20)
                         .frame(maxWidth: .infinity)
                         .background(Color.clear)
                 }
-                .toolbarBackground(AppTheme.background, for: .navigationBar)
-                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 }
@@ -52,7 +53,8 @@ private struct MainTabContent: View {
 
 struct LandingView: View {
     @EnvironmentObject var userManager: UserManager
-    @State private var showUserSelection = false
+    @EnvironmentObject var authManager: AuthenticationManager
+    @State private var showAccount = false
     @State private var logoScale: CGFloat = 0.6
     @State private var logoOpacity: Double = 0
     @State private var buttonsOffset: CGFloat = 40
@@ -81,7 +83,7 @@ struct LandingView: View {
                             .overlay(
                                 Circle().strokeBorder(
                                     LinearGradient(
-                                        colors: [Color.white.opacity(0.20), Color.white.opacity(0.04)],
+                                        colors: [Color.white.opacity(0.20), AppTheme.lightNeutral.opacity(0.06)],
                                         startPoint: .topLeading, endPoint: .bottomTrailing),
                                     lineWidth: 1)
                             )
@@ -92,7 +94,7 @@ struct LandingView: View {
                     VStack(spacing: 8) {
                         Text("Room Designer")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundStyle(AppTheme.primaryText)
                         Text("Transform your space with AR")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
                             .foregroundColor(AppTheme.secondaryText)
@@ -103,14 +105,14 @@ struct LandingView: View {
                 Spacer().frame(height: 48)
 
                 if let user = userManager.currentUser {
-                    Button(action: { showUserSelection = true }) {
+                    Button(action: { showAccount = true }) {
                         HStack(spacing: 10) {
                             Image(systemName: "person.crop.circle.fill")
                                 .foregroundStyle(AppTheme.accentGradient)
                             Text(user.name)
                                 .foregroundColor(AppTheme.primaryText)
                             Spacer()
-                            Text("Switch")
+                            Text("Account")
                                 .font(.appCaption2.weight(.semibold))
                                 .foregroundColor(AppTheme.accentLight)
                         }
@@ -148,7 +150,10 @@ struct LandingView: View {
                 Spacer().frame(height: 50)
             }
         }
-        .sheet(isPresented: $showUserSelection) { UserSelectionView() }
+        .sheet(isPresented: $showAccount) {
+            AccountView(authManager: authManager)
+                .environmentObject(userManager)
+        }
         .onAppear {
             withAnimation(.spring(response: 0.7, dampingFraction: 0.7).delay(0.1)) {
                 logoScale = 1.0; logoOpacity = 1.0
@@ -189,6 +194,7 @@ struct LandingView: View {
 
 #Preview("Tab bar") {
     let userManager = UserManager()
+    userManager.setCurrentUser(User(name: "Preview", email: "preview@test.com"))
     let roomManager = RoomManager(userManager: userManager)
     return LocalLandingView()
         .environmentObject(userManager)

@@ -1,0 +1,162 @@
+\chapter{Photogrammetry, Depth Fusion, and Apple Capture APIs}
+\label{ch:theory1}
+
+This chapter explains the geometric and algorithmic ideas behind the capture pipelines used in the thesis application. It first reviews \textbf{photogrammetry} and the classical chain \textbf{structure from motion (SfM) $\rightarrow$ multi-view stereo (MVS) $\rightarrow$ Poisson surface reconstruction} \cite{luhmann2014photogrammetry,lowe2004sift,furukawa2010pmvs,kazhdan2006poisson}. It then describes \textbf{depth fusion} with a \textbf{truncated signed distance function (TSDF)} as used in real-time RGB-D and LiDAR systems \cite{newcombe2011kinectfusion,whelan2016elasticfusion}, which underpins ARKit-style scene meshes that RoomPlan builds upon. A comparison between \textbf{image-only} object reconstruction and \textbf{depth-assisted} room understanding clarifies why Object Capture and RoomPlan behave differently. Finally, the chapter maps these ideas to Apple's \textbf{Object Capture} and \textbf{RoomPlan} APIs, documents the \texttt{CapturedRoom} data model, and summarises limitations including external refinement via Blender export.
+
+\section{Motivation}
+\label{sec:motivation}
+
+Users redesign interiors more confidently when they can \textbf{see} alternatives in context. Traditional representations (2D plans, catalog photos, or material swatches) omit depth, occlusion, and the relation between existing objects and new ones. Augmented reality can composite virtual furniture into a live video stream, but that mode ties the experience to being physically present and holding the device. If the room is first captured as a structured 3D model, the user can reopen and edit that model later: the scan becomes a \textbf{persistent spatial substrate} for experimentation.
+
+Research datasets such as ScanNet~\cite{dai2017scannet} demonstrated that indoor applications benefit from joint \textbf{geometry} and \textbf{semantics} (which surfaces are walls, which objects are chairs or tables). RoomPlan brings a consumer subset of that idea to supported iPhones and iPads: it outputs not only geometry but labelled entities with rough dimensions. This thesis uses that output as the basis for \textbf{furniture replacement}, substituting USDZ models for detected instances, which goes beyond merely placing a free-floating object on a manually identified floor plane.
+
+\section{Photogrammetry and the Classical Reconstruction Pipeline}
+\label{sec:photogrammetry}
+
+\subsection{Definition and triangulation}
+
+\textbf{Photogrammetry} is the discipline of extracting metric information from photographs \cite{luhmann2014photogrammetry}. In 3D reconstruction, the elementary geometric operation is \textbf{triangulation}: corresponding points in two or more calibrated images determine a 3D point by intersecting rays. Stable triangulation requires \textbf{baseline} between cameras and sufficient \textbf{overlap} so that the same surface points appear in multiple views.
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.82\textwidth}{figures/ch2_photogrammetry_concept.png}
+\caption{Conceptual photogrammetry model: multi-view image observations, camera parameters, and additional constraints used to estimate 3D coordinates.}
+\label{fig:ch2_photo_concept}
+\end{figure}
+
+\subsection{From features to textured mesh}
+
+A widely used multi-view pipeline proceeds in stages \cite{luhmann2014photogrammetry,lowe2004sift,furukawa2010pmvs,kazhdan2006poisson}:
+
+\begin{enumerate}
+    \item \textbf{Feature detection and matching}: Distinctive keypoints (e.g.\ SIFT \cite{lowe2004sift}) are extracted and matched across images.
+
+    \item \textbf{Structure from Motion}: Camera intrinsics and extrinsics are estimated together with a \emph{sparse} 3D point cloud. \textbf{Bundle adjustment} refines parameters by minimising reprojection error across all observations.
+
+    \item \textbf{Multi-view stereo}: Dense correspondence and depth estimation across views yield a dense point cloud or per-view depth maps \cite{furukawa2010pmvs}.
+
+    \item \textbf{Surface reconstruction}: The dense samples are converted to a watertight or oriented surface, commonly using \textbf{Poisson surface reconstruction} \cite{kazhdan2006poisson}.
+
+    \item \textbf{Texture mapping}: The mesh is parameterised; colours are blended from source images onto the surface.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\thesisfig{0.92\textwidth}{figures/fig2_2_sfm_mvs}
+\caption{SfM--MVS reconstruction pipeline: from multi-view image input through feature detection, Structure from Motion, dense Multi-View Stereo, to surface reconstruction and textured mesh output (adapted from \cite{Kholil_2021}).}
+\label{fig:ch2_photo_pipeline}
+\end{figure}
+
+This end-to-end path is what Section~\ref{sec:on_device_pipeline} relates to \textbf{Object Capture} (Asset~A in Chapter~\ref{ch:theory2}).
+
+\section{Depth Fusion and TSDF-Based Scene Meshing}
+\label{sec:depth_fusion}
+
+Room-scale tracking on mobile devices fuses \textbf{depth} (LiDAR or stereo) with \textbf{visual--inertial odometry}. A standard volumetric representation is the \textbf{TSDF}: for each voxel in a bounded volume, one stores a (truncated) signed distance to the nearest surface along with a weight; each new depth frame updates voxels along viewing rays \cite{newcombe2011kinectfusion}. Over time, noise averages down and a coherent surface emerges. ElasticFusion~\cite{whelan2016elasticfusion} extended the idea to room-scale consistency when loop closures occur.
+
+Let $D_t(\mathbf{x})$ denote the signed distance implied by depth frame $t$ at voxel $\mathbf{x}$, with confidence weight $w_t$. A common fusion rule updates the field $F$ and weight $W$ as
+\[
+  F_{t+1}(\mathbf{x}) = \frac{W_t(\mathbf{x}) F_t(\mathbf{x}) + w_t D_t(\mathbf{x})}{W_t(\mathbf{x}) + w_t},
+  \qquad
+  W_{t+1}(\mathbf{x}) = W_t(\mathbf{x}) + w_t,
+\]
+with truncation so that voxels far from the surface stop updating. ARKit's scene mesh used during RoomPlan scanning is, conceptually, an isosurface of such a field, though Apple does not expose the raw voxel grid.
+
+Semantic interpretation (which planar patch is a ``wall'' and which blob is a ``sofa'') is not solved by the TSDF alone; RoomPlan adds learning-based detection and classification on top of ARKit scene understanding.
+
+\section{Image-Only versus Depth-Assisted Reconstruction}
+\label{sec:depth_vs_photo}
+
+\textbf{Object Capture} is primarily an \textbf{image-driven} pipeline (with poses from ARKit): geometry is inferred from many RGB views through stages analogous to SfM, MVS, and Poisson-class meshing, followed by texturing. \textbf{RoomPlan} is \textbf{depth- and semantics-first}: it targets a structured, parametric room description (\texttt{CapturedRoom}) rather than a single closed mesh of the whole interior. Table~\ref{tab:depth_vs_photo} contrasts the two paradigms at the level relevant to this thesis.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of image-centric object reconstruction (Object Capture) and depth-assisted parametric room capture (RoomPlan).}
+\label{tab:depth_vs_photo}
+\begin{tabular}{|p{0.28\textwidth}|p{0.30\textwidth}|p{0.30\textwidth}|}
+\hline
+\textbf{Aspect} & \textbf{Object Capture} & \textbf{RoomPlan} \\
+\hline
+Primary sensing & Dense RGB coverage, parallax & LiDAR depth + RGB + IMU \\
+\hline
+Dominant geometry cue & Photo-consistency (MVS) & TSDF fusion + plane fitting \\
+\hline
+Typical output & Textured triangle mesh (USDZ) & Parametric walls, openings, objects \\
+\hline
+Semantics & Optional masking & Built-in categories (e.g.\ chair, table) \\
+\hline
+Role in application & Furniture library (Asset~A) & Editor substrate \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{On-Device Capture Pipeline}
+\label{sec:on_device_pipeline}
+
+Figure~\ref{fig:capture_branches} compares two \textbf{parallel pipelines}. The \textbf{top lane} is the photogrammetric/Object Capture path: multi-view RGB images and poses $\rightarrow$ feature matching $\rightarrow$ SfM $\rightarrow$ MVS $\rightarrow$ surface reconstruction and texturing $\rightarrow$ USDZ output. The \textbf{bottom lane} is the RoomPlan path: LiDAR/RGB/IMU input $\rightarrow$ VIO tracking $\rightarrow$ TSDF-class fusion $\rightarrow$ semantic object/opening detection $\rightarrow$ parametric fitting $\rightarrow$ \texttt{CapturedRoom} output. Apple's internal implementations are proprietary; Table~\ref{tab:pipeline_to_api} is a conceptual mapping of stages to public APIs.
+
+\begin{table}[htbp]
+\centering
+\caption{Conceptual mapping from classical stages to Apple's on-device APIs.}
+\label{tab:pipeline_to_api}
+\begin{tabular}{|l|p{0.35\textwidth}|p{0.35\textwidth}|}
+\hline
+\textbf{Stage} & \textbf{Object Capture} & \textbf{RoomPlan} \\
+\hline
+Camera trajectory & ARKit VIO; session stores images & ARKit world tracking during scan \\
+\hline
+Sparse / dense geometry & Photogrammetry engine (SfM/MVS class) & TSDF-class fusion + parametric fitting \\
+\hline
+Surface model & Textured mesh & Structural elements + object boxes \\
+\hline
+Serialised output & USDZ file & \texttt{CapturedRoom} (Codable) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\thesisfig{1\textwidth}{figures/fig2_3_dual_pipeline.pdf}
+\caption{Parallel capture pipelines: Object Capture follows an image-based reconstruction chain (top lane); RoomPlan combines LiDAR depth fusion with parametric and semantic inference to produce a \texttt{CapturedRoom} (bottom lane).}
+\label{fig:capture_branches}
+\end{figure}
+
+\subsection{Object Capture}
+
+\texttt{ObjectCaptureSession} guides the user around an object so that views overlap; \texttt{PhotogrammetrySession} reconstructs a mesh and materials, outputting \textbf{USDZ}. That format is well supported in RealityKit and matches the furniture assets used in the editor and in Blender export copies.
+
+\subsection{Room Plan and \texttt{CapturedRoom}}
+
+Room Plan exposes types such as walls, doors, windows, and \texttt{CapturedRoom.Object} instances with \texttt{category}, \texttt{dimensions}, and \texttt{transform}. Because \texttt{CapturedRoom} conforms to \texttt{Codable}, applications can persist scans as JSON, as done in the implementation (Chapter~\ref{ch:implementation}) under a per-room file in the Documents hierarchy. Scan-time colour sampling attaches optional \texttt{RoomMaterials} to the \texttt{Room} aggregate for editor defaults.
+
+\subsection{Feature-to-API mapping}
+
+Table~\ref{tab:feature_api} ties user-visible capabilities to frameworks.
+
+\begin{table}[h]
+\centering
+\caption{Major application features and the APIs or artefacts that implement them.}
+\label{tab:feature_api}
+\begin{tabular}{|l|l|p{0.42\textwidth}|}
+\hline
+\textbf{Feature} & \textbf{API / artefact} & \textbf{Role} \\
+\hline
+Room scanning & RoomPlan & Produce \texttt{CapturedRoom} \\
+\hline
+Room persistence & \texttt{Codable} + file I/O & Reload scans after app restart \\
+\hline
+3D editor & RealityKit (non-AR) & Visualise and edit room \\
+\hline
+Object scanning & Object Capture & Author USDZ furniture \\
+\hline
+Splat viewing & Metal + \texttt{.ply} & Compare with meshes \\
+\hline
+Blender export & ZIP (glTF + USDZ + script) & DCC hand-off \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Limitations}
+\label{sec:limitations_capture}
+
+Photogrammetry remains sensitive to glass, mirrors, and uniform surfaces. RoomPlan can miss small objects, merge adjacent pieces, or mislabel categories; coarse bounding boxes are not CAD precision. These issues motivate manual touch-up in the editor, \textbf{export to Blender} for desktop refinement of the staged semantic scene (glTF structural geometry, USDZ furniture, and placement manifests), and radiance-field benchmarks (Assets~B and~C) when photographic fidelity matters more than explicit connectivity, as discussed in Chapter~\ref{ch:theory2}. RoomPlan parametric boxes are not a substitute for CAD; Blender export packages the same staging state the editor uses rather than a raw dump of Apple's capture JSON alone.

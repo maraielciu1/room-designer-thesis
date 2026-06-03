@@ -1,0 +1,77 @@
+% ch5_dataflow.tex
+% fig:dataflow — swimlane data-flow: scan → persist → editor → relaunch
+% Usage: replace \thesisfig line with \input{tikz_diagrams/ch5_dataflow}
+
+\begin{tikzpicture}[
+  node distance=0.45cm and 0.7cm,
+  box/.style={rectangle, rounded corners=3pt, draw=black, fill=white,
+              minimum width=3.0cm, minimum height=0.78cm,
+              font=\small, align=center, line width=0.7pt},
+  lane/.style={rectangle, rounded corners=4pt, draw=black!40, fill=gray!5,
+               minimum height=1.3cm, inner sep=0pt},
+  arrow/.style={-{Stealth[length=5pt]}, thick},
+  darrow/.style={arrow, dashed, draw=gray},
+  lbl/.style={font=\footnotesize\itshape}
+]
+
+%%──── Swimlane headers ────
+\node[font=\small\bfseries, rotate=90] (sw1) at (-0.6, 2.0) {UI / View};
+\node[font=\small\bfseries, rotate=90] (sw2) at (-0.6, 0.0) {RoomManager};
+\node[font=\small\bfseries, rotate=90] (sw3) at (-0.6,-2.0) {File System};
+
+%%──── Swimlane backgrounds ────
+\fill[gray!6, rounded corners=4pt] (-0.1, 1.25) rectangle (14.2, 2.75);
+\fill[gray!12, rounded corners=4pt] (-0.1,-0.75) rectangle (14.2, 1.25);
+\fill[gray!20, rounded corners=4pt] (-0.1,-2.75) rectangle (14.2,-0.75);
+
+%%──── Step labels ────
+\node[font=\footnotesize\bfseries] at (1.5, 2.6)  {1. Capture};
+\node[font=\footnotesize\bfseries] at (4.2, 2.6)  {2. Commit};
+\node[font=\footnotesize\bfseries] at (7.0, 2.6)  {3. Open Editor};
+\node[font=\footnotesize\bfseries] at (10.0,2.6)  {4. Edit};
+\node[font=\footnotesize\bfseries] at (13.0,2.6)  {5. Relaunch};
+
+%%──── Row 1 (UI) ────
+\node[box, fill=gray!8] (scanV)  at (1.5, 2.0)  {\texttt{RoomScanView}\\runs session};
+\node[box]               (commitV) at (4.2, 2.0)  {User taps\\``Save''};
+\node[box]               (openV)   at (7.0, 2.0)  {\texttt{RoomDesignerView}\\loads scene};
+\node[box]               (editV)   at (10.0, 2.0) {Gesture /\\furniture pick};
+\node[box, fill=gray!8]  (relaunchV) at (13.0,2.0){\texttt{RoomListView}\\reloads};
+
+%%──── Row 2 (RoomManager) ────
+\node[box] (capturedR) at (1.5, 0.0)  {\texttt{CapturedRoom}\\received};
+\node[box] (createR)   at (4.2, 0.0)  {\texttt{createRoom()}\\persists metadata};
+\node[box] (getCR)     at (7.0, 0.0)  {\texttt{getCapturedRoom()}\\cache / disk};
+\node[box] (updateR)   at (10.0,0.0)  {\texttt{updateRoom()}\\writes changes};
+\node[box] (loadR)     at (13.0,0.0)  {\texttt{loadRooms()}\\restores list};
+
+%%──── Row 3 (File System) ────
+\node[box, fill=gray!20] (writeJSON) at (4.2,-2.0) {\texttt{RoomScans/}\\room + capturedRoom JSON};
+\node[box, fill=gray!20] (readJSON)  at (7.0,-2.0) {Read JSON\\from disk};
+\node[box, fill=gray!20] (writeBack) at (10.0,-2.0){Write back\\replacements};
+\node[box, fill=gray!20] (readAgain) at (13.0,-2.0){Read room list\\from UserDefaults};
+
+%%──── Arrows within rows ────
+\draw[arrow] (scanV)    -- (commitV);
+\draw[arrow] (commitV)  -- (openV);
+\draw[arrow] (openV)    -- (editV);
+\draw[arrow] (editV)    -- (relaunchV);
+
+\draw[arrow] (capturedR)-- (createR);
+\draw[arrow] (createR)  -- (getCR);
+\draw[arrow] (getCR)    -- (updateR);
+\draw[arrow] (updateR)  -- (loadR);
+
+%%──── Cross-lane arrows ────
+\draw[arrow] (scanV.south)    -- (capturedR.north);
+\draw[arrow] (commitV.south)  -- (createR.north);
+\draw[arrow] (createR.south)  -- (writeJSON.north);
+\draw[arrow] (writeJSON.north)-- (getCR.south);
+\draw[arrow] (readJSON.north) -- (openV.south);
+\draw[arrow] (getCR.south)    -- (readJSON.north);
+\draw[arrow] (editV.south)    -- (updateR.north);
+\draw[arrow] (updateR.south)  -- (writeBack.north);
+\draw[arrow] (relaunchV.south)-- (loadR.north);
+\draw[arrow] (loadR.south)    -- (readAgain.north);
+
+\end{tikzpicture}

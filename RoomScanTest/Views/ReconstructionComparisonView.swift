@@ -33,7 +33,7 @@ struct ReconstructionComparisonView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x0B0D17).ignoresSafeArea()
+            AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // ── Mode Picker ──
@@ -62,7 +62,7 @@ struct ReconstructionComparisonView: View {
         }
         .navigationTitle("Compare Methods")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+            .appNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -79,11 +79,13 @@ struct ReconstructionComparisonView: View {
                         Label("How to Train a Splat", systemImage: "questionmark.circle")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .tintedIcon()
+                    Image(systemName: "ellipsis")
+                        .appToolbarMenuLabel()
                 }
+                .menuStyle(.borderlessButton)
             }
         }
+        .tint(AppTheme.lightNeutral)
         .fileImporter(
             isPresented: $showImportSplat,
             allowedContentTypes: [.data],
@@ -114,14 +116,14 @@ struct ReconstructionComparisonView: View {
                 } label: {
                     Text(mode.rawValue)
                         .font(.caption.weight(.semibold))
-                        .foregroundColor(viewMode == mode ? .white :
+                        .foregroundColor(viewMode == mode ? AppTheme.primaryDark :
                                             isDisabled ? AppTheme.tertiaryText : AppTheme.secondaryText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
                             viewMode == mode
                             ? AnyShapeStyle(AppTheme.accentGradientInline)
-                            : AnyShapeStyle(Color.white.opacity(0.06))
+                            : AnyShapeStyle(AppTheme.secondaryTint.opacity(0.35))
                         )
                         .clipShape(Capsule())
                 }
@@ -212,7 +214,7 @@ struct ReconstructionComparisonView: View {
 
     private var statsBar: some View {
         VStack(spacing: 8) {
-            Divider().background(Color.white.opacity(0.1))
+            Divider().background(AppTheme.warmAccent.opacity(0.25))
 
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -269,7 +271,7 @@ struct ReconstructionComparisonView: View {
 
             Text("No Gaussian Splat Available")
                 .font(.title3.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
 
             Text("Export your scan images and train a\nGaussian Splat model externally, then\nimport the .ply file here.")
                 .font(.subheadline)
@@ -311,7 +313,7 @@ struct ReconstructionComparisonView: View {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(text)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundStyle(AppTheme.primaryText.opacity(0.9))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
@@ -370,7 +372,7 @@ struct ReconstructionComparisonView: View {
 
             // Copy to model directory
             let splatName = "\(furniture.id.uuidString)_splat.ply"
-            let destURL = ScannedFurnitureManager.modelDirectory
+            let destURL = scannedFurnitureManager.modelDirectory()
                 .appendingPathComponent(splatName)
 
             do {
@@ -419,7 +421,7 @@ struct ReconstructionComparisonView: View {
                     .scaleEffect(1.3)
                 Text(exportMessage)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(AppTheme.primaryText)
             }
             .padding(32)
             .glassCard(cornerRadius: 20)
@@ -440,7 +442,7 @@ struct USDZPreviewCard: View {
                     Circle().fill(Color.blue).frame(width: 6, height: 6)
                     Text(title)
                         .font(.caption2.weight(.semibold))
-                        .foregroundColor(.white.opacity(0.85))
+                        .foregroundStyle(AppTheme.primaryText.opacity(0.9))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -522,7 +524,7 @@ struct StatBadge: View {
                 .foregroundColor(color)
             Text(value)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundStyle(AppTheme.primaryText)
             Text(label)
                 .font(.system(size: 9))
                 .foregroundColor(AppTheme.tertiaryText)
