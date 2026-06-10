@@ -26,7 +26,7 @@
   \begin{tabular}{c}
     {\small\bfseries Managers (\texttt{ObservableObject})}\\[3pt]
     {\footnotesize \texttt{UserManager} · \texttt{AuthenticationManager} · \texttt{RoomManager}}\\
-    {\footnotesize \texttt{ProjectManager} · \texttt{FurnitureCatalogManager} · \texttt{ScannedFurnitureManager}}
+    {\footnotesize \texttt{ProjectManager} · \texttt{FurnitureCatalogManager} · \texttt{ScannedFurnitureManager} · \texttt{HistoryManager}}
   \end{tabular}
 };
 
@@ -42,7 +42,7 @@
 %% ── Layer 4: Frameworks ──
 \node[layer, fill=gray!18] (L4) at (0, -6.6) {
   \begin{tabular}{c}
-    {\small\bfseries Apple Frameworks}\\[3pt]
+    {\small\bfseries Apple Frameworks \& Third-Party SDKs}\\[3pt]
     {\footnotesize RoomPlan · Object Capture · RealityKit / ARKit · Metal · Google Sign-In SDK}
   \end{tabular}
 };
@@ -51,7 +51,7 @@
 \node[botlayer] (L5) at (0, -8.6) {
   \begin{tabular}{c}
     {\small\bfseries Persistence}\\[3pt]
-    {\footnotesize SwiftData DB (user accounts) · \texttt{Documents/users/<id>/} (rooms, USDZ, .ply)}\\
+    {\footnotesize SwiftData DB (user accounts) · \texttt{Documents/users/<id>/RoomScans/} (rooms, USDZ, .ply)}\\
     {\footnotesize Keychain (auth tokens) · UserDefaults (lightweight metadata)}
   \end{tabular}
 };

@@ -27,5 +27,8 @@ GoogleService-Info.plist
 # Backend (Python venv + job data)
 backend_3dgs/.venv/
 backend_3dgs/work/
-backend_3dgs/__pycacje__
+backend_3dgs/__pycache__
 .derivedData/
+
+
+.claude/

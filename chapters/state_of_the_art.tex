@@ -49,8 +49,8 @@ semantics to multi-room building scale. Apple's RoomPlan API~\cite{apple2024room
 brings a consumer subset of that capability to supported devices: a
 'CapturedRoom' with typed surfaces and object instances, produced
 on-device in typically 1-3 minutes during an interactive scan for
-average-sized rooms, from my personal experience (though larger or more complex spaces may require
-longer coverage), rather than through hours-long offline pipelines. This thesis treats RoomPlan as the
+average-sized rooms (though larger or more complex spaces may require longer
+coverage), rather than through hours-long offline pipelines. This thesis treats RoomPlan as the
 source of the metric, typed room model that anchors editing and export.
 
 % ------------------------------------------------------------------
@@ -68,9 +68,11 @@ capture large indoor datasets such as ScanNet~\cite{dai2017scannet}.
 
 All of these required a desktop computer tethered to the depth camera.
 ARKit moved equivalent tracking onto a phone by combining camera and
-inertial sensor data, a technique called visual-inertial odometry
-(VIO) ~\cite{CEG+21}. It works well in textured scenes but degrades under
-fast motion or on plain surfaces.
+inertial sensor data, a technique called visual-inertial odometry (VIO).
+Research systems such as ORB-SLAM3~\cite{CEG+21} demonstrate the maturity
+of feature-based VIO; ARKit provides a proprietary implementation of the
+same principle. It works well in textured scenes but degrades under fast
+motion or on plain surfaces.
 
 RoomPlan builds on ARKit's tracking but goes further: instead of raw
 geometry, it outputs a structured description of the room with named

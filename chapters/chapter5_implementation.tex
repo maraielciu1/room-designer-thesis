@@ -1,3 +1,703 @@
+% \chapter{System Architecture, Implementation and Evaluation}
+% \label{ch:implementation}
+
+% This chapter describes how Chapter~\ref{ch:requirements} is realised in software: architecture, persistence, data flow, key modules, evaluation, and testing.
+
+% \section{Architectural Overview}
+
+% The application entry point is a SwiftUI App type that configures core services and hosts a root view responsible for the local interior-design workflow, including room scanning, editing, and object capture.
+
+% Architecturally, the code follows patterns compatible with SwiftUI and MVVM: views observe reference-type 'ObservableObject' managers (e.g.\ RoomManager, FurnitureCatalogManager, ScannedFurnitureManager, ProjectManager) injected through the environment or passed as StateObject / ObservedObject. Long-running capture sessions (RoomPlan, Object Capture) live in dedicated views that bridge UIKit or system controllers where needed. Rendering uses RealityKit ('ARView' in non-AR camera mode) for the room editor and Metal via 'MTKView' for Gaussian splats.
+
+% The architecture is structured into four explicit layers, as shown in Figure~\ref{fig:architecture}:
+
+% \begin{enumerate}
+%     \item \textbf{SwiftUI Views} - declarative UI components such as 'MainTabBar', 'RoomDesignerView', 'ObjectScanView and many others.
+%     \item \textbf{Observable Managers} - 'ObservableObject' classes holding domain state ('RoomManager', 'ScannedFurnitureManager', 'ProjectManager' and so on), injected as environment objects or 'StateObject' references.
+%     \item \textbf{Services and Renderers} - stateless or singleton-style helpers: 'SHARPService' (HTTP client), 'GaussianSplatRenderer' (Metal GPU pipeline), 'SmartSuggestionsService', 'RoomColorCaptureService', and 'HistoryManager'.
+%     \item \textbf{Apple Frameworks and Storage} - RoomPlan, Object Capture, RealityKit, and Metal at the framework boundary, with persistent artefacts stored in the app's Documents directory.
+% \end{enumerate}
+
+% \begin{figure}[htbp]
+% \centering
+% \input{tikz_diagrams/ch5_arch_layers}
+% % \thesisfig{0.95\textwidth}{figures/ch5_arch_layers.png}
+% \caption{Layered application architecture: SwiftUI views observe injectable managers, which delegate to services and Apple frameworks and Storage artefacts (room JSON, USDZ, PLY) }
+% \label{fig:architecture}
+% \end{figure}
+
+% \section{Data Model and Persistence}
+% \label{sec:ch5_data_model}
+
+% \subsection{Room aggregate}
+
+% The domain type 'Room' (Swift struct, 'Codable') aggregates identity (id, userId), timestamps, a list of FurnitureReplacement records, optional RoomMaterials for wall/floor colours captured during scan, optional projectId, and legacy fields kept for backward compatibility. It does not embed the full 'CapturedRoom' inside the JSON that lists all rooms; instead, heavy scan data is stored \textbf{separately}.
+
+% \subsection{CapturedRoom storage}
+
+% Because each \texttt{CapturedRoom} JSON can reach several megabytes, reloading and decoding it on every navigation between the room list and editor would dominate latency; storage therefore separates a fast session cache from durable on-disk files.
+
+% An extension on 'Room' manages 'CapturedRoom' persistence:
+
+% \begin{itemize}
+%     \item \textbf{Directory.} Documents/RoomScans/ created on demand.
+
+%     \item \textbf{File naming.} One file per room, e.g.\ \{roomUUID\}.json, chosen so that renames or metadata updates do not collide with scan blobs.
+
+%     \item \textbf{In-memory cache.} A static dictionary maps room identifiers to loaded 'CapturedRoom' instances to avoid repeated disk I/O while editing.
+
+%     \item \textbf{API.} Callers use 'setCapturedRoom(\_:)', 'getCapturedRoom()', and helpers that check whether scan data exists.
+% \end{itemize}
+
+% 'RoomManager' owns the array of Room values, serialises it under a user-scoped key (e.g.\ 'saved\_rooms' combined with user identity), and exposes create/update/delete operations. Duplicate detection merges rapid double-submissions of the same room name.
+
+% \subsection{Four-layer persistence architecture}
+
+% The application uses four distinct storage layers, each matched to the size and
+% access pattern of the data it holds:
+
+% \begin{description}
+%     \item[SwiftData (SQLite).] User account records (AppUserEntity) are
+%     stored in a SwiftData-managed SQLite database. This layer is used exclusively
+%     for authentication data (email address, password salt and hash, Google user
+%     identifier, and auth provider) because login requires indexed lookup by email
+%     address, which SQLite handles efficiently. No room data is stored here.
+
+%     \item[UserDefaults (JSON-encoded, user-scoped).] Room list metadata,
+%     project records, scanned furniture catalogue entries, and the SHARP server
+%     URL are serialised with JSONEncoder and stored under user-scoped
+%     'UserDefaults' keys via
+%     'UserScopedStorage'. These payloads are small (typically 1-5\,KB
+%     per room entry) and require no relational queries beyond filtering by the
+%     current user identifier.
+
+%     \item[JSON files on disk (per-user directory).] Each room's
+%     'CapturedRoom', the heavy Apple framework object containing wall
+%     geometry, object transforms, and structural elements, is serialised to
+%     'Documents/RoomScans/\{userId\}/\{uuid\}.json'. Files are written
+%     atomically so a crash mid-write cannot
+%     corrupt a scan. 
+
+%     \item[In-memory cache.] A static dictionary keyed by room identifier holds
+%     any 'CapturedRoom' object that has been loaded or saved during the
+%     current session. Reads check this dictionary before touching the filesystem;
+%     writes go to both the cache and disk in the same operation. The effect is
+%     that opening the same room multiple times within one session (for example,
+%     switching between the room list and the editor) incurs the JSON decoding
+%     cost only once, regardless of how large the scan file is.
+% \end{description}
+
+
+
+% \subsection{Furniture replacement records}
+
+% FurnitureReplacement ties a RoomPlan object identifier (or equivalent key) to a USDZ resource name or path, plus transform overrides the editor applies. Persisting these records satisfies R-4 and R-5 together with the scan file.
+
+% Beyond direct USDZ replacement of RoomPlan-detected furniture,
+% \\ 
+% FurnitureReplacement supports three \emph{virtual decor} categories that are not necessarily tied to a physically detected object:
+
+% \begin{description}
+%     \item[Wall art.] WallArtPickerView lets the user select a frame style and size, and optionally provide a photo from the camera roll. The JPEG is saved to a per-app directory and referenced by filename in \\ wallArtImageFile. The RealityKit entity applies the image as a texture on a plane mesh sized to the chosen frame dimensions, anchored to the nearest detected wall surface.
+
+%     \item[Carpet.] CarpetPickerView exposes pattern, colour, and size presets plus a custom width/depth in centimetres. The entity is a flat rectangular mesh placed on the floor plane.
+
+%     \item[Lighting.] LightingPickerView maps to a RealityKit point or spot light, with RGB colour and luminous intensity in lumens. The entity is placed at a user-chosen ceiling or wall position and affects the PBR shading of other entities in the same scene.
+% \end{description}
+
+% All three categories share the same 'FurnitureReplacement' persistence path and re-materialise from stored field values on scene reload, discriminated by the originalCategory string ("wallArt", "carpet", "lighting").
+
+% The full domain model, types, fields, and storage relationships, is shown in Figure~\ref{fig:domain_model}.
+
+% \begin{figure}[H]
+% \centering
+% \input{tikz_diagrams/ch5_domain_model}
+% % \thesisfig{0.97\textwidth}{figures/ch5_domain_model.png}
+% \caption{Domain model: 'Room' aggregates 'FurnitureReplacement' records (including decor categories) and optionally references a Project. The heavy 'CapturedRoom' is stored separately on disk, keeping the in-memory room list lightweight.}
+% \label{fig:domain_model}
+% \end{figure}
+
+% \subsection{On-device storage layout}
+
+% Figure~\ref{fig:storage_layout} summarises the full file-system layout. The separation between lightweight metadata in UserDefaults and heavy scan artefacts in the Documents directory is the architectural decision that makes the room list load instantly regardless of the number or size of stored scans.
+
+% \begin{figure}[H]
+% \centering
+% \input{tikz_diagrams/ch5_storage_layout}
+% % \thesisfig{0.88\textwidth}{figures/ch5_storage_layout.png}
+% \caption{On-device storage layout. Binary files (room scan JSON, USDZ assets, wall art images, and SHARP PLY outputs) are segregated into typed subdirectories under the app's Documents folder. Lightweight per-user lists are encoded as JSON and persisted in UserDefaults. Registered user accounts, including password hashes and Google identifiers,  are stored in a SwiftData-managed SQLite database. Authentication tokens are kept separately in the system Keychain.}
+% \label{fig:storage_layout}
+% \end{figure}
+
+% \section{Data Flow: Scan to Editor}
+
+% Here is described the end-to-end data flow from the initial RoomPlan capture through persistence to the interactive editor session.
+
+% \begin{enumerate}
+%     \item \textbf{Capture.} 'RoomCaptureView' / session (RoomPlan) runs until the user finalises; the app receives a 'CapturedRoom'.
+
+%     \item \textbf{Commit.} 'RoomManager' stores the structure: 'Room' list saved, 'setCapturedRoom' writes JSON to 'RoomScans/'.
+
+%     \item \textbf{Open editor.} The designer view loads 'getCapturedRoom()', builds RealityKit entities for walls, floor, openings, and for each object either a placeholder or a resolved USDZ from replacement state.
+
+%     \item \textbf{Edit.} Gestures update entity transforms; changes write back to FurnitureReplacement and dirty the Room aggregate; RoomManager.updateRoom persists.
+
+%     \item \textbf{Relaunch.} RoomManager.loadRooms restores the catalogue; selecting a room reloads scan JSON from disk into the cache and reconstructs the scene.
+% \end{enumerate}
+
+% % \begin{figure}[H]
+% % \centering
+% % \thesisfig{0.97\textwidth}{figures/ch5_dataflow.png}
+% % \caption{Swimlane data-flow diagram: the scan captured in \texttt{RoomScanView} is handed off to \texttt{RoomManager} for persistence; the designer loads from disk or cache and writes back after each gesture or furniture replacement. The flow is a deliberate hand-off between Apple's capture session and the application's own RealityKit scene graph.}
+% % \label{fig:dataflow}
+% % \end{figure}
+
+% \section{Key Modules and Views}
+
+% \subsection{Navigation and tabs}
+
+% 'MainTabBar' provides primary navigation among high-level areas such as \textbf{Furniture}, \textbf{Rooms}, and \textbf{Projects}, using SwiftUI tab buttons styled for the application's theme. This separates catalogue browsing from per-room workflows.
+
+% \subsection{Room scanning UI}
+
+% Views such as 'RoomScanView' (and related flow coordinators) embed RoomPlan's capture experience, handle session lifecycle, and pass the resulting 'CapturedRoom' to room creation logic. The session is finalised by calling 'RoomCaptureSession .stop(pauseARSession: true)', which yields a complete 'CapturedRoom' instance containing typed structural geometry, object identifiers, and transforms ready for persistence.
+
+% \subsection{Room designer}
+
+% 'RoomDesignerView' is the largest single view module: it hosts the RealityKit 'ARView', configures lighting and non-AR camera behaviour, spawns entities for plan geometry, wires gesture recognisers for selection and manipulation, coordinates furniture picking from 'FurnitureCatalogManager' and scanned assets, and integrates optional features (materials, measurements, suggestions). Replacement logic aligns USDZ model bounds to RoomPlan dimensions using uniform scaling and grounding rules described in Section~\ref{sec:alignment}.
+
+% \subsection{Object Capture}
+
+% ObjectScanView drives ObjectCaptureSession, displays guidance, collects images, and runs 'PhotogrammetrySession' to produce USDZ. Completed models are registered through ScannedFurnitureManager so the designer can pick them like catalogue items.
+
+% \subsection{Gaussian splat pipeline}
+
+% 'GaussianSplatData.swift' parses binary or ASCII PLY layouts emitted by common 3DGS trainers, normalising property names (scales, quaternions). 'GaussianSplatRenderer.swift' uploads instances to GPU buffers, sorts by depth each frame, and issues draw calls with Metal shaders that approximate 2D Gaussian falloff and blending. GaussianSplatView wraps an 'MTKView' for SwiftUI presentation.
+
+% \subsection{SHARP single-image inference}
+% \label{sec:sharp_implementation}
+
+% SHARP (\emph{Sharp Monocular View Synthesis}~\cite{sharp-monocular-view}) is a monocular novel-view synthesis model that accepts a single JPEG image and returns a 3DGS '.ply' file in approximately 10\,s on a GPU-equipped Mac, or up to 2\,minutes on the first run while Metal shaders compile on the server (empirical measurements on Apple Silicon hardware during thesis development; not reported in~\cite{sharp-monocular-view}).
+
+% SHARPService is a pure-static Swift enum that encapsulates the HTTP client contract. Its design addresses three non-trivial constraints:
+
+% \begin{enumerate}
+%     \item \textbf{Timeout.} URLSession.shared caps at 60\,s regardless of the timeout interval. The service creates a dedicated URLSession with timeoutIntervalForRequest = 360\,s and timeoutIntervalForResource = 600\,s, isolating long inference requests from other app network activity (N-6).
+
+%     \item \textbf{Server configuration.} The base URL is stored in 'UserDefaults' under the key 'sharp\_server\_base\_url' and exposed through a text field in the capture UI. This avoids hardcoding a LAN address and lets the user reconfigure without rebuilding (R-10).
+
+%     \item \textbf{Health-check.} Before opening the camera, the app issues a 'GET /health' ping on a separate 4\,s-timeout session. A colour-coded indicator informs the user of reachability before they spend time composing the shot (R-10). If the ping fails, the capture button is disabled with an actionable error message.
+% \end{enumerate}
+
+% The inference path ('POST /sharp/infer') sends the JPEG body (92\,\% quality) and writes the raw response bytes as sharp\_\{timestamp\}.ply to the Documents directory, immediately openable in GaussianSplatView without any additional processing step. Error variants cover missing URL, JPEG encoding failure, non-200 HTTP responses, network errors, and disk write failure; all surfaced as localised alert strings without crashing (N-8).
+
+% % \begin{figure}[H]
+% % \centering
+% % \thesisfig{0.97\textwidth}{figures/ch5_sharp_pipeline.png}
+% % \caption{SHARP inference pipeline: the device captures a JPEG, posts it to the local SHARP server on the LAN, receives a \texttt{.ply}, and opens it in the Metal splat renderer. A health-check ping with a 4\,s timeout precedes each capture session to provide the reachability indicator.}
+% % \label{fig:sharp_pipeline}
+% % \end{figure}
+
+% \subsection{Supporting services}
+
+% DecorManager owns wall art and carpet asset directories; MeasurementService computes room dimensions from the 'CapturedRoom' geometry for the statistics overlay; SmartSuggestionsService proposes furniture placement hints; \\ RoomColorCaptureService samples ARKit frames during scanning to capture dominant wall and floor colours into RoomMaterials; ProjectManager groups multiple rooms into named projects. These sit alongside the core pipeline and may persist auxiliary JSON or asset references.
+
+% \section{USDZ Alignment Heuristics}
+% \label{sec:alignment}
+
+% When a replacement is first bound, the editor must align the USDZ asset to the RoomPlan-detected bounding volume without distorting the model. Two rules are applied:
+
+% \begin{enumerate}
+%     \item \textbf{Uniform scale.} The USDZ model's axis-aligned bounding box is computed in model space. The scale factor $s$ is:
+%     \[
+%         s = \min\!\left(\frac{d_x^{\mathrm{room}}}{d_x^{\mathrm{usdz}}},\;
+%                          \frac{d_y^{\mathrm{room}}}{d_y^{\mathrm{usdz}}},\;
+%                          \frac{d_z^{\mathrm{room}}}{d_z^{\mathrm{usdz}}}\right)
+%     \]
+%     This fits the largest dimension without exceeding the detected bounds on any axis while preserving the model's aspect ratio.
+
+%     \item \textbf{Floor grounding.} After scaling, the entity's local $y$-origin is translated so that the bottom face of the scaled model sits flush with the detected object's base plane (derived from the transform field of the 'CapturedRoom.Object').
+% \end{enumerate}
+
+% There exists a custom scale field in 'FurnitureReplacement' that stores an additional user-applied multiplier on top of this automatic fit, allowing fine-tuning after initial alignment without discarding the grounding state.
+
+% \section{Metal Gaussian Splatting: Rendering Pipeline}
+% \label{sec:splat_rendering}
+
+% The splat renderer implements the per-Gaussian projection and
+% alpha-compositing formulation from Kerbl et al.\ \cite{kerbl20233dgs},
+% adapted for iOS Metal. Unlike the original CUDA implementation, which
+% buckets Gaussians into screen-space tiles for parallel radix-sorted
+% rasterisation, this renderer uses a single-pass instanced draw call with
+% a CPU-side back-to-front sort, a simpler approach that trades the
+% tile-based parallelism for portability on Apple Silicon.
+% Figure~\ref{fig:splat_pipeline} shows the per-frame pipeline.
+
+% \begin{figure}[H]
+% \centering
+% \resizebox{0.92\textwidth}{!}{%
+% \input{tikz_diagrams/ch5_splat_pipeline}
+% }
+% % \thesisfig{0.55\textwidth}{figures/ch5_splat_pipeline.png}
+% \caption{Per-frame Metal Gaussian splatting pipeline (read top to bottom): orbit camera matrices are computed on CPU, Gaussians are sorted back-to-front by view-space depth, and a single instanced draw call executes the vertex and fragment shaders that project 3D covariance to 2D and evaluate the Gaussian falloff per pixel.}
+% \label{fig:splat_pipeline}
+% \end{figure}
+
+% \paragraph{3D covariance.}
+% Each Gaussian stores a unit quaternion $\mathbf{q}$ (converted to rotation matrix $\mathbf{R}$ via the 'quatToRotMat' Metal function) and a scale vector $\mathbf{s}$. The 3D covariance is:
+% \[
+%     \boldsymbol{\Sigma} = \mathbf{M}\mathbf{M}^\top,\quad
+%     \mathbf{M} = \mathbf{R}\,\mathrm{diag}(\mathbf{s})
+% \]
+
+% \paragraph{2D projection.}
+% Given the Jacobian $\mathbf{J}$ of perspective projection at the Gaussian centre (camera-space position $\mathbf{t}$, focal lengths $f_x, f_y$) and the view-space rotation $\mathbf{W}$, the screen-space covariance is:
+% \[
+%     \boldsymbol{\Sigma}' = \mathbf{T}\boldsymbol{\Sigma}\mathbf{T}^\top,\quad
+%     \mathbf{T} = \mathbf{J}\mathbf{W},\quad
+%     \mathbf{J} = \begin{pmatrix} f_x/d & 0 & f_x t_x/d^2 \\ 0 & f_y/d & f_y t_y/d^2 \\ 0 & 0 & 0 \end{pmatrix}
+% \]
+% where $d = -t_z$ is the positive depth. A low-pass isotropic filter (adding 0.3 to the diagonal of $\boldsymbol{\Sigma}'$) prevents sub-pixel Gaussians from flickering.
+
+% \paragraph{Quad sizing.}
+% The screen-space rendering quad's half-extent is $3\sqrt{\lambda_{\max}}$, where $\lambda_{\max}$ is the dominant eigenvalue of $\boldsymbol{\Sigma}'$, computed analytically from its trace and determinant to avoid a general eigensolver:
+% \[
+%     \lambda_{\max} = \frac{\mathrm{tr}}{2} + \sqrt{\left(\frac{\mathrm{tr}}{2}\right)^2 - \det(\boldsymbol{\Sigma}')}
+% \]
+
+% \paragraph{Fragment evaluation.}
+% Each fragment evaluates the 2D Gaussian exponent:
+% \[
+%     \alpha = \sigma \cdot \exp\!\left(-\tfrac{1}{2}\,
+%         \mathbf{d}^\top {\boldsymbol{\Sigma}'}^{-1} \mathbf{d}\right),\quad
+%     {\boldsymbol{\Sigma}'}^{-1} = \frac{1}{\det}\begin{pmatrix}c & -b \\ -b & a\end{pmatrix}
+% \]
+% where $\mathbf{d}$ is the pixel offset from the projected Gaussian centre, $\sigma$ is the per-Gaussian stored opacity, and $(a,b,c)$ are the elements of the 2D covariance passed from the vertex stage. Fragments with $\alpha < 1/255$ are discarded early; the remaining fragments use premultiplied-alpha blending.
+
+% \paragraph{Depth sorting.}
+% Per-frame back-to-front ordering is achieved by projecting each Gaussian centre onto the view-space $z$-axis (dot product with the third row of the view matrix) and sorting with Swift's Array.sort, running in $O(n \log n)$ on CPU. For budgets up to 300\,k Gaussians (the server-side pruning limit, N-1), this takes approximately 10–30\,ms on an A-series CPU, remaining within a 60\,Hz frame budget when combined with GPU draw time.
+
+% \section{On-Device versus Off-Device Processing}
+
+% RoomPlan scan interpretation, Object Capture reconstruction, and USDZ display are \textbf{on-device}. Training 3D Gaussian Splatting from many views is \textbf{off-device} in the shipped workflow: the user (or developer) runs external tooling, then imports '.ply' for R-7.
+
+% The SHARP path (R-9) is a hybrid: the device captures and sends a single image, but inference runs on a user-controlled Mac on the local network, not on a third-party cloud server, preserving the privacy guarantee of N-2.
+
+% \section{User Interface Walkthrough}
+
+% This section gives an engineering-oriented \textbf{end-to-end user walkthrough} aligned with the implementation: it supports laboratory demonstrations, requirement traceability, and onboarding documentation.
+
+% \subsection{End-to-end user walkthrough}
+
+% The core workflow proceeds in seven steps; steps 2--4 form the critical path from capture to persisted editing.
+
+% \begin{enumerate}
+%     \item \textbf{Start RoomPlan capture.} From the rooms list, the user starts
+%     a new scan and slowly walks around the room. Walls, openings, doors, and
+%     pieces of furniture appear incrementally in the live preview as the device
+%     builds up its understanding of the space.
+
+%     \item \textbf{Finalise scan.} Once the room feels sufficiently covered,
+%     the user taps \emph{Done}. The scan is processed into a complete room model
+%     with typed geometry — each wall, window, and furniture item labelled and
+%     positioned in metric space.
+
+%     \item \textbf{Persist and open editor.} The room is saved automatically.
+%     Opening it again brings up a three-dimensional editor the user can navigate
+%     freely without being in the physical room, rotating, zooming, and inspecting
+%     the space from any angle.
+
+%     \item \textbf{Replace furniture.} The user taps a detected piece of
+%     furniture and selects a replacement from the catalogue. The virtual model
+%     snaps into the position the original occupied, inheriting its scale and
+%     orientation. Handles allow fine adjustments through drag and rotation
+%     gestures. Every change is saved as part of the room's design state.
+
+%     \item \textbf{Add virtual decor.} Beyond furniture, the user can hang wall
+%     art, place a carpet on the floor, or adjust the room's ambient lighting,
+%     all within the same editor, anchored to real surfaces detected during the
+%     scan.
+
+%     \item \textbf{Optional: view a Gaussian splat.} For a photorealistic
+%     impression of a corner or object, the user can photograph it and send the
+%     image to a local inference server. Within seconds a volumetric reconstruction
+%     appears in the splat viewer, offering a different visual quality than the
+%     mesh-based editor.
+
+%     \item \textbf{Relaunch verification.} Closing and reopening the app
+%     restores the room exactly as it was left, scan geometry, furniture
+%     replacements, decor, and all adjustments intact.
+% \end{enumerate}
+
+% \subsection{Demonstration checklist}
+
+% \textbf{Core flow (required for full traceability):}
+% \begin{enumerate}
+%     \item \textbf{Launch and rooms.} Open the app; verify saved rooms and the action to start a new scan.
+
+%     \item \textbf{Capture and stop.} Complete a RoomPlan session; confirm the stop of the scanning session semantics (final result 'CapturedRoom').
+
+%     \item \textbf{Editor.} Orbit the scene; replace a detected item with USDZ; adjust with gizmo and gestures; relaunch to confirm R-2 and R-5.
+
+%     \item \textbf{Decor.} Add wall art, carpet, and lighting; confirm persistence after relaunch.
+
+%     \item \textbf{Room deletion (R-8).} Delete a room; confirm destructive-action alert.
+% \end{enumerate}
+
+% \textbf{Optional extensions (require additional hardware or server):}
+% \begin{enumerate}
+%     \item \textbf{Object Capture.} Complete a small-object scan; confirm USDZ appears in the picker (R-6).
+
+%     \item \textbf{SHARP path.} Configure server URL; confirm reachability indicator; capture image; receive and display '.ply' in splat viewer (R-9, R-10).
+
+%     \item \textbf{Splat comparison.} Import a '.ply' (or use the SHARP output above); orbit and compare visual quality with the mesh editor.
+% \end{enumerate}
+
+% \begin{figure}[H]
+% \centering
+% \begin{minipage}[t]{0.47\textwidth}
+%   \centering
+%   \thesisfig{\textwidth}{figures/ch5_ui_03_room_scan.png}
+%   \label{fig:ui_scan}
+% \end{minipage}
+% \hfill
+% \begin{minipage}[t]{0.47\textwidth}
+%   \centering
+%   \thesisfig{\textwidth}{figures/ch5_ui_04_editor.png}
+%   \label{fig:ui_editor}
+% \end{minipage}
+% \caption{App screenshots: RoomPlan capture: real-time wall and furniture detection. (left) and the non-AR room editor: orbit camera with USDZ replacements. (right).}
+% \label{fig:ui_scan_editor}
+% \end{figure}
+
+% \section{Testing}
+
+% \subsection{Functional tests}
+
+% Manual test cases map requirements to observable outcomes: successful save after scan (R-1, R-2), visible replacement mesh (R-3, R-4), gesture persistence after restart (R-5), completed USDZ from Object Capture (R-6), splat load without crash (R-7), room deletion with artefact cleanup (R-8), SHARP inference and PLY storage (R-9), and server reachability indicator (R-10).
+
+% \subsection{Unit tests}
+% Beyond manual requirement checks, an automated unit-test suite was added for deterministic, side-effect-free logic that supports several capture and design pipelines. Gaussian splat import is validated with a minimal fixture: vertex count, coordinate-frame conversion, and opacity remapping are checked so corrupted or mis-scaled splats cannot reach the viewer unnoticed. Room and furniture-replacement persistence is verified through encode–decode round-trips, guarding against silent data loss when stored fields or schema evolve. Uniform model scaling to a target bounding box, using the minimum axis-wise ratio with a safety margin, is tested with fixed dimensions, including edge cases such as degenerate extents. Orphaned room-scan files are removed while active scans and unrelated file types are left intact. Cloud-based splat training is tested at the contract level: REST endpoint paths and status-response parsing are validated without a live backend. Together, these sixteen automated tests complement the manual procedures in Table~\ref{tab:test_map} by locking down data transformations and storage invariants that device-bound AR and full network integration tests cannot isolate cleanly.
+
+% \subsection{Performance}
+
+% Informal measurement suffices for the thesis: note frame drops when many entities load; optionally record Instruments traces for Metal and RealityKit. The splat renderer should sustain 60\,fps for scenes up to 300\,k Gaussians on supported hardware (N-1).
+
+% \begin{table}[H]
+% \centering
+% \caption{Complete requirement-to-test mapping.}
+% \label{tab:test_map}
+% \begin{tabular}{|c|p{0.68\textwidth}|}
+% \hline
+% \textbf{Req.} & \textbf{Test procedure} \\
+% \hline
+% R-1, R-2 & Scan room; verify .json appears under 'Documents/RoomScans'. \\
+% \hline
+% R-3, R-4 & Open editor; confirm walls and at least one object mesh; bind a USDZ. \\
+% \hline
+% R-5 & Transform model; kill app; reopen; transforms preserved. \\
+% \hline
+% R-6 & Complete object scan; USDZ appears in furniture picker. \\
+% \hline
+% R-7 & Import known-good '.ply'; orbit without artefacts at 60\,fps. \\
+% \hline
+% R-8 & Delete a room; confirm alert; verify .json removed from disk; list updated. \\
+% \hline
+% R-9 & Configure server URL; capture photo; receive and display '.ply' in splat viewer. \\
+% \hline
+% R-10 & Stop server; reachability indicator turns red; capture button disabled with error. \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% \subsection{Quantitative evaluation: Object Scan}
+% \label{sec:object_scan_quant_eval}
+
+% To complement requirement-oriented functional checks, the Object Scan path (R-6) was evaluated on 72 captures with paired ground-truth dimensions. For each object, the mean absolute dimension error (MAE over width, height, depth), centroid error, and bounding-box IoU were computed from recorded trials.
+
+% \begin{table}[htbp]
+% \centering
+% \caption{Object Scan quantitative summary.}
+% \label{tab:object_scan_summary}
+% \small
+% \begin{tabular}{|l|c|}
+% \hline
+% \textbf{Metric} & \textbf{Value} \\
+% \hline
+% Number of evaluated captures & 72 \\
+% \hline
+% Mean absolute dimension error (mm) & 1.85 \\
+% \hline
+% 95th percentile dimension error (mm) & 3.72 \\
+% \hline
+% Mean centroid error (mm) & 1.57 \\
+% \hline
+% Mean bounding-box IoU & 0.814 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% \begin{table}[htbp]
+% \centering
+% \caption{Object Scan results by scene and material conditions.}
+% \label{tab:object_scan_conditions}
+% \small
+% \begin{tabular}{|l|c|c|c|}
+% \hline
+% \textbf{Condition} & \textbf{MAE (mm)} & \textbf{Centroid (mm)} & \textbf{IoU} \\
+% \hline
+% Plain background & 0.81 & 0.70 & 0.895 \\
+% \hline
+% Cluttered background & 2.89 & 2.44 & 0.732 \\
+% \hline
+% Opaque objects & 1.37 & 1.19 & 0.840 \\
+% \hline
+% Transparent objects & 2.84 & 2.39 & 0.749 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% Figure~\ref{fig:object_scan_condition_plot} shows the same trend visually: cluttered scenes and transparent materials produce substantially larger geometric errors than plain-background opaque objects. This is consistent with contour ambiguity and unstable silhouettes at object boundaries, especially when transparent surfaces coexist with background texture.
+
+% \begin{figure}[htbp]
+% \centering
+% \begin{tikzpicture}
+% \begin{axis}[
+%     width=0.88\textwidth,
+%     height=6.0cm,
+%     ybar,
+%     ymin=0,
+%     ymax=3.5,
+%     bar width=12pt,
+%     ylabel={Mean dimension MAE (mm)},
+%     symbolic x coords={bg:plain,bg:cluttered,mat:opaque,mat:transparent},
+%     xtick=data,
+%     x tick label style={rotate=15,anchor=east},
+%     nodes near coords,
+%     every node near coord/.append style={font=\scriptsize},
+%     grid=major
+% ]
+% \addplot[
+%     fill=blue!35,
+%     draw=blue!60!black
+% ] table[x=category,y=mean_mae_dim_mm,col sep=comma] {thesis_data/object_scan_summary_groups.csv};
+% \end{axis}
+% \end{tikzpicture}
+% \caption{Object Scan mean absolute dimension error by background and material condition. Cluttered backgrounds increase error roughly 3.6$\times$ relative to plain backgrounds (2.89\,mm vs.\ 0.81\,mm MAE); transparent materials increase error roughly 2.1$\times$ relative to opaque objects (2.84\,mm vs.\ 1.37\,mm MAE).}
+% \label{fig:object_scan_condition_plot}
+% \end{figure}
+
+% \subsection{Quantitative evaluation: Room Scan}
+% \label{sec:room_scan_quant_eval}
+
+% Room Scan was evaluated on 36 captures using paired ground-truth room dimensions and window counts from 'thesis\_data/room\_scan\_evaluation.csv'. Across all trials, geometric fidelity remains high: mean absolute error is 1.90\,cm on length, 1.90\,cm on width, and 1.10\,cm on height, with a combined mean of 1.63\,cm.
+
+% \begin{table}[htbp]
+% \centering
+% \caption{Room Scan dimension fidelity summary.}
+% \label{tab:room_scan_summary}
+% \small
+% \begin{tabular}{|l|c|}
+% \hline
+% \textbf{Metric} & \textbf{Value} \\
+% \hline
+% Number of evaluated rooms & 36 \\
+% \hline
+% Mean absolute length error (cm) & 1.90 \\
+% \hline
+% Mean absolute width error (cm) & 1.90 \\
+% \hline
+% Mean absolute height error (cm) & 1.10 \\
+% \hline
+% Mean absolute dimension error (cm) & 1.63 \\
+% \hline
+% 95th percentile dimension error (cm) & 2.27 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% \begin{table}[htbp]
+% \centering
+% \caption{Window detection by visibility condition.}
+% \label{tab:window_visibility}
+% \small
+% \begin{tabular}{|l|c|c|c|}
+% \hline
+% \textbf{Visibility condition} & \textbf{Trials} & \textbf{Detection success} & \textbf{Missed windows} \\
+% \hline
+% Clear view & 22 & 100\% & 0 \\
+% \hline
+% Curtains closed & 7 & 57.1\% & 4 \\
+% \hline
+% Partial drape coverage & 7 & 71.4\% & 3 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% The results support two key observations. First, metric room reconstruction quality is stable, with small absolute errors across all axes, indicating high dimension fidelity for room envelope estimation. Second, window detection degrades with occlusion but is not fully blocked: RoomPlan detects all windows under clear conditions (100\%), partially recovers under partial drape coverage (71.4\%), and is most affected by fully closed curtains (57.1\%), suggesting the model uses structural cues alongside visual ones.
+
+% \begin{figure}[htbp]
+% \centering
+% \begin{tikzpicture}
+% \begin{axis}[
+%     width=0.46\textwidth,
+%     height=5.8cm,
+%     ybar,
+%     ymin=0,
+%     ymax=2.2,
+%     ylabel={Mean absolute error (cm)},
+%     symbolic x coords={Length,Width,Height},
+%     xtick=data,
+%     nodes near coords,
+%     every node near coord/.append style={font=\scriptsize},
+%     bar width=14pt,
+%     grid=major
+% ]
+% \addplot[
+%     fill=teal!40,
+%     draw=teal!60!black
+% ] table[x=axis,y=mean_error_cm,col sep=comma] {thesis_data/room_dimension_error_summary.csv};
+% \end{axis}
+% \end{tikzpicture}
+% \hfill
+% \begin{tikzpicture}
+% \begin{axis}[
+%     width=0.46\textwidth,
+%     height=5.8cm,
+%     ybar,
+%     ymin=0,
+%     ymax=110,
+%     ylabel={Detection success (\%)},
+%     symbolic x coords={clear,curtains_closed,drapes_partial},
+%     xticklabels={clear,curtains\_closed,drapes\_partial},
+%     xtick=data,
+%     x tick label style={rotate=20,anchor=east},
+%     nodes near coords,
+%     every node near coord/.append style={font=\scriptsize},
+%     bar width=12pt,
+%     grid=major
+% ]
+% \addplot[
+%     fill=orange!55,
+%     draw=orange!80!black
+% ] table[x=window_visibility,y=success_rate_pct,col sep=comma] {thesis_data/room_window_visibility_summary.csv};
+% \end{axis}
+% \end{tikzpicture}
+% \caption{Room Scan quantitative results. \textbf{Left:} mean per-axis dimension error in centimetres (continuous metric). \textbf{Right:} window detection success rate in percent (binary outcome per trial: detected or missed). The dual-axis layout contrasts stable geometric fidelity with visibility-dependent semantic detection.}
+% \label{fig:room_scan_quant_plots}
+% \end{figure}
+
+% \subsection{Qualitative Reconstruction Comparison}
+
+% To complement the quantitative evaluation, we present a qualitative comparison 
+% between the two novel-view synthesis approaches: COLMAP\,+\,3DGS, built into 
+% the iOS scanning pipeline, and SHARP, which operates from a single input frame.
+
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.48\textwidth]{figures/sharp_render.png}
+%     \hfill
+%     \includegraphics[width=0.48\textwidth]{figures/3dgs_render.png}
+%     \caption{Novel-view synthesis of the same living room from a matching 
+%     viewpoint. \textbf{Left:} SHARP reconstruction from a single photograph. 
+%     \textbf{Right:} COLMAP\,+\,3DGS reconstruction trained on 23 frames 
+%     captured with the iOS application.}
+%     \label{fig:qual_comparison}
+% \end{figure}
+
+% Figure~\ref{fig:qual_comparison} illustrates the qualitative difference 
+% between the two methods on the same scene. The SHARP reconstruction 
+% (left) produces a sharp, photorealistic render of the room within the 
+% field of view of its single input frame. The sofa, wall painting, 
+% ceiling, and floor are rendered with high fidelity and natural 
+% lighting. However, the reconstruction is bounded by what the input 
+% image observed: the black region surrounding the scene marks the 
+% limit of SHARP's coverage, beyond which no geometry is inferred.
+
+% The 3DGS reconstruction (right) covers a wider field of view by 
+% virtue of having been trained on 23 frames. The central scene 
+% elements (sofa, cushions, and painting) are clearly 
+% reconstructed and spatially consistent. However, the render exhibits 
+% characteristic Gaussian floater artifacts at the image boundaries, 
+% appearing as blurred, semi-transparent streaks of colour. These 
+% arise when Gaussians are placed in regions of low multi-view 
+% overlap, where the training signal is insufficient to constrain 
+% their geometry ~\cite{kerbl20233dgs}.
+
+% The comparison reflects a fundamental trade-off between the two 
+% approaches. SHARP delivers near-photographic quality within the 
+% visible region of a single frame, making it well-suited for 
+% immediate, per-frame visualisation during a room scan. 3DGS 
+% produces a spatially complete reconstruction of the entire scanned 
+% area, suitable for free-viewpoint navigation and persistent scene 
+% storage, at the cost of a longer capture and processing pipeline. 
+% Rather than competing, the two methods serve complementary roles: 
+% SHARP provides instant visual feedback during capture, while 3DGS 
+% delivers the final room model once scanning is complete.
+
+% % \subsection{Efficient 3DGS experiment design under long render times}
+% % \label{sec:efficient_3dgs_design}
+
+% % For offline-trained 3DGS experiments, full training and rendering cycles routinely exceed 30\,minutes, so the evaluation protocol follows a minimal defensible design:
+% % \begin{enumerate}
+% %     \item \textbf{Representative subset first.} Candidate scenes are stratified by geometry complexity and texture richness, then a small representative subset is used for early rounds.
+% %     \item \textbf{Staged ablations.} Hyperparameter families (camera count, pruning thresholds, densification interval, and output resolution) are varied in stages instead of full-grid search.
+% %     \item \textbf{Early-stop rule.} Any run whose intermediate validation views stop improving or diverge in artefacts is terminated before full convergence.
+% %     \item \textbf{Confirmatory final pass.} Only the best staged configurations are rerun end-to-end on the full selected set.
+% % \end{enumerate}
+% % This procedure preserves methodological rigor while keeping total experimentation time feasible for a bachelor-scale development cycle.
+% \subsection{3DGS training time: frame count and capture pattern}
+% \label{sec:efficient_3dgs_design}
+
+% Full 3DGS training on a local workstation routinely exceeds 30\,minutes per
+% scene, making exhaustive hyperparameter search impractical within a
+% bachelor-scale development cycle. To characterise the trade-off between input
+% size and training cost, a set of timed experiments was conducted on the same
+% hardware using the msplat backend, varying both
+% frame count and capture pattern.
+
+% \begin{table}[htbp]
+% \centering
+% \caption{3DGS training time versus input frame count and capture pattern
+%          (same scene and hardware for all runs).}
+% \label{tab:3dgs_timing}
+% \begin{tabular}{ccc}
+% \toprule
+% \textbf{Input frames} & \textbf{Room traversal} & \textbf{Object orbit} \\
+% \midrule
+% 20 & 20\,min\,17\,s & 26\,min\,23\,s \\
+% 30 & 36\,min\,50\,s & 41\,min\,57\,s \\
+% 40 & 42\,min\,44\,s & 47\,min\,51\,s \\
+% 50 & 49\,min\,00\,s & 54\,min\,09\,s \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% \paragraph{Effect of frame count.}
+% Training time scales super-linearly at lower counts and flattens above
+% 40 frames, suggesting diminishing coverage returns beyond that threshold for
+% a single room. The jump from 20 to 30 frames (+16\,min\,33\,s) is
+% disproportionately large relative to the jump from 40 to 50 frames
+% (+6\,min\,16\,s), consistent with the densification phase requiring more
+% iterations when the initial sparse cloud is thin.
+
+% \paragraph{Effect of capture pattern.}
+% Object-orbit runs consistently require approximately 5-6\,minutes more than
+% room-traversal runs at every frame count. Although the number of input images
+% is identical, orbital captures concentrate views around a small volume,
+% producing a denser initial point cloud that increases the cost of the Gaussian
+% densification and pruning steps throughout training.
+
+% \paragraph{Implications for evaluation protocol.}
+% These results directly motivate the staged design described earlier: a full
+% grid search over frame counts and capture patterns would require several hours
+% per scene. The 20-frame room-traversal configuration was therefore used as the
+% representative baseline for comparative evaluations, with 40 frames reserved
+% for confirmatory final-pass runs where coverage completeness was the primary
+% concern.
+% \section{Summary}
+
+% The implementation binds Apple's high-level capture APIs to a persistent, editable RealityKit scene graph through explicit storage of 'CapturedRoom' data and replacement metadata. A two-level persistence cache balances load latency with durable atomic writes. The SHARP integration adds a local-network computational offload path that converts a single photo into a 3DGS scene without third-party cloud dependency. Optional Metal splatting demonstrates a second rendering paradigm, driven by differentiable Gaussian projection rather than mesh rasterisation, without compromising the mesh-based interaction model. Requirements R-1--R-10 and non-functional goals N-1--N-8 are all addressed in the design decisions documented above.
 \chapter{System Architecture, Implementation and Evaluation}
 \label{ch:implementation}
 
@@ -7,15 +707,15 @@ This chapter describes how Chapter~\ref{ch:requirements} is realised in software
 
 The application entry point is a SwiftUI App type that configures core services and hosts a root view responsible for the local interior-design workflow, including room scanning, editing, and object capture.
 
-Architecturally, the code follows patterns compatible with SwiftUI and MVVM: views observe reference-type 'ObservableObject' managers (e.g.\ RoomManager, FurnitureCatalogManager, ScannedFurnitureManager, ProjectManager) injected through the environment or passed as StateObject / ObservedObject. Long-running capture sessions (RoomPlan, Object Capture) live in dedicated views that bridge UIKit or system controllers where needed. Rendering uses RealityKit ('ARView' in non-AR camera mode) for the room editor and Metal via 'MTKView' for Gaussian splats.
+Architecturally, the code follows patterns compatible with SwiftUI and MVVM: views observe reference-type 'ObservableObject' managers (e.g.\ RoomManager, FurnitureCatalogManager, ScannedFurnitureManager, ProjectManager, HistoryManager) injected through the environment or passed as StateObject / ObservedObject. Long-running capture sessions (RoomPlan, Object Capture) live in dedicated views that bridge UIKit or system controllers where needed. Rendering uses RealityKit ('ARView' in non-AR camera mode) for the room editor and Metal via 'MTKView' for Gaussian splats.
 
 The architecture is structured into four explicit layers, as shown in Figure~\ref{fig:architecture}:
 
 \begin{enumerate}
-    \item \textbf{SwiftUI Views} - declarative UI components such as 'MainTabBar', 'RoomDesignerView', 'ObjectScanView and many others.
+    \item \textbf{SwiftUI Views} - declarative UI components such as 'MainTabBar', 'RoomDesignerView', 'ObjectScanView' and many others.
     \item \textbf{Observable Managers} - 'ObservableObject' classes holding domain state ('RoomManager', 'ScannedFurnitureManager', 'ProjectManager' and so on), injected as environment objects or 'StateObject' references.
     \item \textbf{Services and Renderers} - stateless or singleton-style helpers: 'SHARPService' (HTTP client), 'GaussianSplatRenderer' (Metal GPU pipeline), 'SmartSuggestionsService', 'RoomColorCaptureService', and 'HistoryManager'.
-    \item \textbf{Apple Frameworks and Storage} - RoomPlan, Object Capture, RealityKit, and Metal at the framework boundary, with persistent artefacts stored in the app's Documents directory.
+    \item \textbf{Apple Frameworks and Storage} - RoomPlan, Object Capture, RealityKit, Metal, and Google Sign-In SDK at the framework boundary, with persistent artefacts stored in the app's Documents directory.
 \end{enumerate}
 
 \begin{figure}[htbp]
@@ -29,30 +729,35 @@ The architecture is structured into four explicit layers, as shown in Figure~\re
 \section{Design Patterns}
 \label{sec:design_patterns}
 
-The architecture applies several well-known software design patterns, each chosen for a concrete reason rather than convention.
+The architecture applies several well-known software design patterns, each chosen for a concrete reason. \textit{Model-View-ViewModel (MVVM)} keeps views as pure declarative SwiftUI while all domain state lives in ObservableObject manager classes injected via @StateObject / @ObservedObject, allowing persistence and data-flow logic to be tested independently of the UI. The \textit{Observer} pattern is realised through @Published properties on each manager, so SwiftUI subscribes views automatically and downstream consumers react to changes without polling. \textit{Repository} is applied in 'RoomManager', which encapsulates all create, read, update, and delete operations for the 'Room' aggregate behind a stable interface, hiding whether data comes from the in-memory cache, 'UserDefaults', or a 'Documents/' JSON file. The \textit{Facade} pattern is used in 'SHARPService', which hides custom URLSession' configuration, timeout handling, health-check pinging, and response parsing behind two call sites: checkHealth() and runInference(). Stateless helpers such as 'GaussianSplatRenderer' and 'SmartSuggestionsService' follow the \textit{Singleton} pattern as shared environment objects, avoiding redundant GPU buffer allocations and session initialisation costs. Finally, the \textit{Strategy} pattern governs novel-view synthesis: the multi-frame 3DGS path and the single-image SHARP inference path are interchangeable strategies that both produce a '.ply' consumed by the same 'GaussianSplatView', leaving downstream rendering code unaffected by the choice.
 
-\begin{description}
-    \item[Model-View-ViewModel (MVVM).] Views (\texttt{RoomDesignerView}, \texttt{ObjectScanView}, etc.) are pure declarative SwiftUI; all domain state lives in \texttt{ObservableObject} manager classes (\texttt{RoomManager}, \texttt{FurnitureCatalogManager}, \texttt{ProjectManager}). Views observe managers via \texttt{@StateObject} / \texttt{@ObservedObject} and re-render only when published properties change. This separation makes it possible to test persistence and data-flow logic independently of the UI.
+% \section{Design Patterns}
+% \label{sec:design_patterns}
 
-    \item[Observer (Reactive updates via Combine / \texttt{@Published}).] Each manager exposes its state as \texttt{@Published} properties. SwiftUI's observation infrastructure subscribes views as observers automatically; downstream consumers (e.g.\ a statistics overlay reading room dimensions) react to changes without polling or explicit notification calls. This is the same Observer pattern described by the Gang of Four, realised through Swift's Observation model.
+% The architecture applies several well-known software design patterns, each chosen for a concrete reason rather than convention.
 
-    \item[Repository.] \texttt{RoomManager} encapsulates all create, read, update, and delete operations for the \texttt{Room} aggregate. Callers (views, services) interact through a stable interface without knowing whether data is in the in-memory cache, \texttt{UserDefaults}, or a \texttt{Documents/} JSON file. Swapping the persistence backend (e.g.\ migrating to CloudKit) requires changes only inside \texttt{RoomManager}, not across every view.
+% \begin{description}
+%     \item[Model-View-ViewModel (MVVM).] Views ('RoomDesignerView, 'ObjectScanView', etc.) are pure declarative SwiftUI; all domain state lives in ObservableObject manager classes ('RoomManager', 'ProjectManager'). Views observe managers via @StateObject / @ObservedObject and re-render only when published properties change. This separation makes it possible to test persistence and data-flow logic independently of the UI.
 
-    \item[Facade.] \texttt{SHARPService} (a pure-static Swift enum) hides the complexity of custom \texttt{URLSession} configuration, timeout handling, health-check pinging, JPEG encoding, and response parsing behind two simple call sites: \texttt{checkHealth()} and \texttt{runInference(\_:)}. Callers are shielded from the underlying HTTP contract and error taxonomy.
+%     \item[Observer (Reactive updates via Combine / @Published).] Each manager exposes its state as @Published properties. SwiftUI's observation infrastructure subscribes views as observers automatically; downstream consumers (e.g.\ a statistics overlay reading room dimensions) react to changes without polling or explicit notification calls. This is the same Observer pattern described by the Gang of Four, realised through Swift's Observation model.
 
-    \item[Singleton (shared service instances).] Stateless helpers such as \texttt{GaussianSplatRenderer}, \texttt{SmartSuggestionsService}, and \texttt{RoomColorCaptureService} are held as singleton-style environment objects or static references. Because these services carry no per-user state, a single shared instance avoids redundant GPU buffer allocations and session initialisation costs.
+%     \item[Repository.] 'RoomManager' encapsulates all create, read, update, and delete operations for the 'Room' aggregate. Callers (views, services) interact through a stable interface without knowing whether data is in the in-memory cache, 'UserDefaults', or a 'Documents/' JSON file. Swapping the persistence backend (e.g.\ migrating to CloudKit) requires changes only inside 'RoomManager', not across every view.
 
-    \item[Strategy (capture path selection).] The application supports two novel-view synthesis paths — multi-frame 3DGS via imported \texttt{.ply} (R-7) and single-image SHARP inference (R-9) — as interchangeable strategies that both produce a \texttt{.ply} consumed by the same \texttt{GaussianSplatView}. Selecting between them does not affect downstream rendering code, consistent with the Strategy pattern's intent of making algorithms interchangeable.
-\end{description}
+%     \item[Facade.] 'SHARPService' (a pure-static Swift enum) hides the complexity of custom \texttt{URLSession} configuration, timeout handling, health-check pinging, JPEG encoding, and response parsing behind two simple call sites: \texttt{checkHealth()} and \texttt{runInference(\_:)}. Callers are shielded from the underlying HTTP contract and error taxonomy.
+
+%     \item[Singleton (shared service instances).] Stateless helpers such as \texttt{GaussianSplatRenderer}, \texttt{SmartSuggestionsService}, and \texttt{RoomColorCaptureService} are held as singleton-style environment objects or static references. Because these services carry no per-user state, a single shared instance avoids redundant GPU buffer allocations and session initialisation costs.
+
+%     \item[Strategy (capture path selection).] The application supports two novel-view synthesis paths — multi-frame 3DGS via imported \texttt{.ply} (R-7) and single-image SHARP inference (R-9) — as interchangeable strategies that both produce a \texttt{.ply} consumed by the same \texttt{GaussianSplatView}. Selecting between them does not affect downstream rendering code, consistent with the Strategy pattern's intent of making algorithms interchangeable.
+% \end{description}
 
 \section{Validation and Security}
 \label{sec:validation_security}
 
-\paragraph{Input validation.} All user-facing entry points that touch persistent state validate their input before committing it. Room names are checked for emptiness and duplicate detection before a new \texttt{Room} is written. The SHARP server URL field validates that the entered string parses as a valid \texttt{URL} with an \texttt{http} or \texttt{https} scheme before it is stored or used for a health-check ping. Binary \texttt{.ply} files are validated for magic bytes, vertex-count headers, and expected property names; a typed parse error is surfaced as an alert rather than causing a crash (N-8a). Object Capture sessions enforce a minimum image count before reconstruction is allowed to proceed.
+\paragraph{Input validation.} All user-facing entry points that touch persistent state validate their input before committing it. Room names are checked for emptiness and duplicate detection before a new 'Room' is written. The SHARP server URL field validates that the entered string parses as a valid URL with an http or https scheme before it is stored or used for a health-check ping. Binary '.ply' files are validated for magic bytes, vertex-count headers, and expected property names; a typed parse error is surfaced as an alert rather than causing a crash. Object Capture sessions enforce a minimum image count before reconstruction is allowed to proceed.
 
 \paragraph{Error handling.} Non-functional requirement N-8 enumerates five crash-free error scenarios: corrupt PLY import, non-200 SHARP HTTP response, network timeout, cancelled Object Capture session, and attempt to delete a room currently open in the editor. Each is handled at the call site with a localised alert string and UI recovery (return to ready state, disable conflicting actions) without requiring an app restart.
 
-\paragraph{Security.} Authentication credentials are not stored in plaintext. User passwords are salted and hashed before storage in the SwiftData-managed SQLite database; the salt is generated per account using \texttt{SecRandomCopyBytes}. Authentication tokens are stored in the iOS system Keychain (not \texttt{UserDefaults} or the filesystem), ensuring they are excluded from unencrypted backups. Room scan data and USDZ assets are stored under the app's sandboxed \texttt{Documents/} directory, which is not accessible to other applications. SHARP inference traffic travels exclusively over the local network to a user-configured server; no scan data is transmitted to third-party cloud infrastructure (N-2).
+\paragraph{Security.} Authentication credentials are not stored in plaintext. User passwords are salted and hashed before storage in the SwiftData-managed SQLite database; the salt is generated per account using 'SecRandomCopyBytes'. Authentication tokens are stored in the iOS system Keychain (not UserDefaults or the filesystem), ensuring they are excluded from unencrypted backups. Room scan data and USDZ assets are stored under the app's sandboxed 'Documents/' directory, which is not accessible to other applications. SHARP inference traffic travels exclusively over the local network to a user-configured server; no scan data is transmitted to third-party cloud infrastructure.
 
 \section{Data Model and Persistence}
 \label{sec:ch5_data_model}
@@ -63,12 +768,12 @@ The domain type 'Room' (Swift struct, 'Codable') aggregates identity (id, userId
 
 \subsection{CapturedRoom storage}
 
-Because each \texttt{CapturedRoom} JSON can reach several megabytes, reloading and decoding it on every navigation between the room list and editor would dominate latency; storage therefore separates a fast session cache from durable on-disk files.
+Because each 'CapturedRoom' JSON can reach several megabytes, reloading and decoding it on every navigation between the room list and editor would dominate latency; storage therefore separates a fast session cache from durable on-disk files.
 
 An extension on 'Room' manages 'CapturedRoom' persistence:
 
 \begin{itemize}
-    \item \textbf{Directory.} Documents/RoomScans/ created on demand.
+    \item \textbf{Directory.} Documents/users/\{userId\}/RoomScans/ created on demand.
 
     \item \textbf{File naming.} One file per room, e.g.\ \{roomUUID\}.json, chosen so that renames or metadata updates do not collide with scan blobs.
 
@@ -102,7 +807,7 @@ access pattern of the data it holds:
     \item[JSON files on disk (per-user directory).] Each room's
     'CapturedRoom', the heavy Apple framework object containing wall
     geometry, object transforms, and structural elements, is serialised to
-    'Documents/RoomScans/\{userId\}/\{uuid\}.json'. Files are written
+    'Documents/users/\{userId\}/RoomScans/\{uuid\}.json'. Files are written
     atomically so a crash mid-write cannot
     corrupt a scan. 
 
@@ -164,7 +869,7 @@ Here is described the end-to-end data flow from the initial RoomPlan capture thr
 \begin{enumerate}
     \item \textbf{Capture.} 'RoomCaptureView' / session (RoomPlan) runs until the user finalises; the app receives a 'CapturedRoom'.
 
-    \item \textbf{Commit.} 'RoomManager' stores the structure: 'Room' list saved, 'setCapturedRoom' writes JSON to 'RoomScans/'.
+    \item \textbf{Commit.} 'RoomManager' stores the structure: 'Room' list saved, 'setCapturedRoom' writes the scan JSON to disk.
 
     \item \textbf{Open editor.} The designer view loads 'getCapturedRoom()', builds RealityKit entities for walls, floor, openings, and for each object either a placeholder or a resolved USDZ from replacement state.
 
@@ -210,7 +915,7 @@ SHARP (\emph{Sharp Monocular View Synthesis}~\cite{sharp-monocular-view}) is a m
 SHARPService is a pure-static Swift enum that encapsulates the HTTP client contract. Its design addresses three non-trivial constraints:
 
 \begin{enumerate}
-    \item \textbf{Timeout.} URLSession.shared caps at 60\,s regardless of the timeout interval. The service creates a dedicated URLSession with timeoutIntervalForRequest = 360\,s and timeoutIntervalForResource = 600\,s, isolating long inference requests from other app network activity (N-6).
+    \item \textbf{Timeout.} URLSession.shared cannot be configured and uses a default 60\,s request timeout. The service creates a dedicated URLSession with timeoutIntervalForRequest = 360\,s and timeoutIntervalForResource = 600\,s, isolating long inference requests from other app network activity (N-6).
 
     \item \textbf{Server configuration.} The base URL is stored in 'UserDefaults' under the key 'sharp\_server\_base\_url' and exposed through a text field in the capture UI. This avoids hardcoding a LAN address and lets the user reconfigure without rebuilding (R-10).
 
@@ -419,7 +1124,7 @@ Informal measurement suffices for the thesis: note frame drops when many entitie
 \hline
 \textbf{Req.} & \textbf{Test procedure} \\
 \hline
-R-1, R-2 & Scan room; verify .json appears under 'Documents/RoomScans'. \\
+R-1, R-2 & Scan room; verify scan JSON is saved to disk. \\
 \hline
 R-3, R-4 & Open editor; confirm walls and at least one object mesh; bind a USDZ. \\
 \hline
@@ -551,7 +1256,7 @@ Max observed dimension error (cm) & 3.10 \\
 \hline
 Clear view & 17 & 100\% & 0 \\
 \hline
-Curtains closed & 5 & 60\% & 3 \\
+Curtains closed & 5 & 60\% & 2 \\
 \hline
 Partial drape coverage & 6 & 83\% & 1 \\
 \hline
@@ -560,7 +1265,7 @@ Partial drape coverage & 6 & 83\% & 1 \\
 
 The results support two key observations. First, metric room reconstruction quality is stable, with small absolute errors across all axes, indicating high dimension fidelity for room envelope estimation. Height error is consistently lower than planar dimensions, likely because ceiling and floor surfaces provide strong parallel-plane constraints for the depth fusion algorithm. Second, window detection degrades with occlusion but is not fully blocked: RoomPlan detects all windows under clear conditions (100\%), achieves 83\% under partial drape coverage where the structural boundary remains partially visible, and drops to 60\% with fully closed curtains, suggesting the model uses structural geometry cues alongside visual ones even when the window surface itself is hidden.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
@@ -612,7 +1317,7 @@ The results support two key observations. First, metric room reconstruction qual
 \end{figure}
 
 \subsection{Qualitative Reconstruction Comparison}
-
+\label{sec:reconstruction_comparison}
 To complement the quantitative evaluation, we present a qualitative comparison 
 between the two novel-view synthesis approaches: COLMAP\,+\,3DGS, built into 
 the iOS scanning pipeline, and SHARP, which operates from a single input frame.
@@ -721,4 +1426,4 @@ for confirmatory final-pass runs where coverage completeness was the primary
 concern.
 \section{Summary}
 
-The implementation binds Apple's high-level capture APIs to a persistent, editable RealityKit scene graph through explicit storage of 'CapturedRoom' data and replacement metadata. A two-level persistence cache balances load latency with durable atomic writes. The SHARP integration adds a local-network computational offload path that converts a single photo into a 3DGS scene without third-party cloud dependency. Optional Metal splatting demonstrates a second rendering paradigm, driven by differentiable Gaussian projection rather than mesh rasterisation, without compromising the mesh-based interaction model. Requirements R-1--R-10 and non-functional goals N-1--N-8 are all addressed in the design decisions documented above.
+The implementation binds Apple's high-level capture APIs to a persistent, editable RealityKit scene graph through explicit storage of 'CapturedRoom' data and replacement metadata. A two-level persistence cache balances load latency with durable atomic writes. The SHARP integration adds a local-network computational offload path that converts a single photo into a 3DGS scene without third-party cloud dependency. Optional Metal splatting demonstrates a second rendering paradigm, driven by differentiable Gaussian projection rather than mesh rasterisation, without compromising the mesh-based interaction model. Requirements R-1--R-11 and non-functional goals N-1--N-8 are all addressed in the design decisions documented above.

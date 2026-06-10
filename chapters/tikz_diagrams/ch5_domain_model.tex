@@ -49,10 +49,10 @@
 
 \node[hdr]                 (fH) at (7.0, -5.0) {\texttt{FurnitureReplacement}};
 \node[row, below=0pt of fH] (f1)               {objectID: UUID};
-\node[row, below=0pt of f1] (f2)               {usdzURL: URL?};
+\node[row, below=0pt of f1] (f2)               {replacedWithUSDZ: String};
 \node[row, below=0pt of f2] (f3)               {category: DecorCategory?};
-\node[row, below=0pt of f3] (f4)               {customScale: Float};
-\node[row, below=0pt of f4] (f5)               {transform: simd\_float4x4};
+\node[row, below=0pt of f3] (f4)               {customScale: Double?};
+\node[row, below=0pt of f4] (f5)               {transform: [Double]};
 
 \node[hdr]                 (sH) at (7.0,-11.0) {\texttt{ScannedFurniture}};
 \node[row, below=0pt of sH] (s1)               {id: UUID};

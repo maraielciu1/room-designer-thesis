@@ -142,8 +142,8 @@ engineering-oriented, consistent with the scope of a bachelor project:
   \item \textbf{A Metal-based Gaussian splat renderer for iOS.}
     An implementation of the 3DGS rendering pipeline in Metal, capable of
     loading standard binary PLY files produced by common training frameworks
-    and rendering them at interactive frame rates via per-frame depth sorting
-    and tile-based alpha compositing, bridged into SwiftUI via
+    and rendering them at interactive frame rates via CPU-side back-to-front
+    depth sorting and instanced alpha blending, bridged into SwiftUI via
    'MTKView'.
 
     \item \textbf{A Blender-oriented export service} that packages the staged room as a
@@ -174,5 +174,5 @@ The primary deliverable is the iOS application itself, accompanied by a quantita
 
 Chapter~\ref{ch:soa} presents related work in mobile room capture and scene representation. Chapter~\ref{ch:theory1} covers photogrammetry, depth fusion, and the mapping to Object Capture and RoomPlan. Chapter~\ref{ch:theory2} introduces 3D Gaussian Splatting, differentiable splatting, and the mesh-versus-splat design choice. Chapter~\ref{ch:requirements} formalises functional and non-functional requirements and system constraints. Chapter~\ref{ch:implementation} describes architecture, data flow, implementation details, the user interface, and testing. Chapter~\ref{ch:conclusions} summarises results, limitations, and future work.
 
-\section{Declaration of Generative AI and AIassisted technologies in the writing process}
+\section{Declaration of Generative AI and AI assisted technologies in the writing process}
 During the preparation of this work the author used Claude Sonnet 4.6 in order to rephrase text, find synonyms, assist with debugging, and obtain suggestions for layout, styling, and component structure in the user interface. After using this tool/service, the author reviewed and edited the content as needed and takes full responsibility for the content of the thesis.

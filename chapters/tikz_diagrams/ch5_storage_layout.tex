@@ -22,16 +22,13 @@
 \node[dir, minimum width=5.0cm] (root) at (0,0) {App Sandbox / Documents/};
 
 %%──── Sub-directories (row 2)  centres at ±1.9, ±5.7
-\node[dir] (rs) at (-5.7,-3.0) {RoomScans/};
+\node[dir, text width=3.2cm] (rs) at (-5.7,-3.0) {\centering users/<id>/\\RoomScans/};
 \node[dir] (sf) at (-1.9,-3.0) {ScannedFurniture/};
 \node[dir] (wa) at ( 1.9,-3.0) {WallArt/};
 \node[dir] (sp) at ( 5.7,-3.0) {SplatClouds/};
 
 %%──── Files under each subdir ────
-\node[file, below=0.4cm of rs] (rsf) {%
-  \parbox[c]{3.6cm}{\centering
-    \texttt{<roomID>.json}\\[3pt]
-    \texttt{capturedRoom\_<id>.json}}};
+\node[file, below=0.4cm of rs] (rsf) {\texttt{<roomID>.json}};
 \node[lbl, below=0.12cm of rsf] {Room metadata +\\CapturedRoom};
 
 \node[file, below=0.4cm of sf] (sff) {\texttt{<name>.usdz}};
