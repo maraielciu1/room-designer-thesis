@@ -9,16 +9,15 @@ enabling high-quality view synthesis from posed
 images~\cite{mildenhall2020nerf}. Training required hours of GPU time and
 rendering was far from real-time, motivating the shift towards explicit,
 rasterisable representations. \textbf{3D Gaussian Splatting} (3DGS), introduced by Kerbl et al.\
-\cite{kerbl20233dgs}, replaces the neural field by a set of \textbf{explicit
-anisotropic Gaussians} in space. Kerbl et al.\ show that this representation delivers
-\textbf{high visual quality together with real-time rendering}: their method matches
+\cite{kerbl20233dgs}, replaces the neural field by a set of explicit
+anisotropic Gaussians in space. Kerbl et al.\ show that this representation delivers
+high visual quality together with real-time rendering: their method matches
 or exceeds prior radiance-field quality while running at interactive frame rates on
-desktop GPUs~\cite{kerbl20233dgs}. In this thesis, 3DGS is used as an \textbf{imported}
-representation (\texttt{.ply} files) rendered with a custom Metal pipeline for
-\textbf{comparison and viewing}; mesh-based USDZ assets remain the medium for
+desktop GPUs~\cite{kerbl20233dgs}. In this thesis, 3DGS is used as an imported
+representation ('.ply' files) rendered with a custom Metal pipeline for
+comparison and viewing; mesh-based USDZ assets remain the medium for
 interactive furniture editing.
 
-\paragraph{Chapter roadmap.}
 This chapter first explains what each Gaussian stores and how it is projected and
 composited into an image. It then outlines the differentiable training loop used in
 classical 3DGS, analyses why that loop is impractical for mobile capture, and contrasts
@@ -26,19 +25,19 @@ mesh-based and Gaussian-based assets in the application. Finally, it introduces 
 as a feedforward single-image alternative and describes how both splat paths are
 integrated on iOS.
 
-Figure~\ref{fig:ch3_nerf_pipeline} recalls the NeRF formulation that motivated later
-explicit real-time representations such as 3DGS.
+% Figure~\ref{fig:ch3_nerf_pipeline} recalls the NeRF formulation that motivated later
+% explicit real-time representations such as 3DGS.
 
-\begin{figure}[H]
-\centering
-\input{tikz_diagrams/fig3_1_nerf_overview}
-% \thesisfig{0.9\textwidth}{figures/fig3_1_nerf_overview.pdf}
-\caption{NeRF overview: sample points along camera rays are fed to a neural MLP
-$F_\Theta$ predicting colour $c$ and density $\sigma$; volume rendering accumulates
-pixel colours; a photometric $\mathcal{L}_2$ loss drives backpropagation to update
-network weights. (Adapted from~\cite{mildenhall2020nerf}.)}
-\label{fig:ch3_nerf_pipeline}
-\end{figure}
+% \begin{figure}[H]
+% \centering
+% \input{tikz_diagrams/fig3_1_nerf_overview}
+% % \thesisfig{0.9\textwidth}{figures/fig3_1_nerf_overview.pdf}
+% \caption{NeRF overview: sample points along camera rays are fed to a neural MLP
+% $F_\Theta$ predicting colour $c$ and density $\sigma$; volume rendering accumulates
+% pixel colours; a photometric $\mathcal{L}_2$ loss drives backpropagation to update
+% network weights. (Adapted from~\cite{mildenhall2020nerf}.)}
+% \label{fig:ch3_nerf_pipeline}
+% \end{figure}
 
 
 \section{Representation: 3D Gaussian Primitives}
@@ -122,7 +121,7 @@ ordered compositing follows the familiar over-operator,
 where $\mathbf{c}_{\mathrm{G}}$ is the Gaussian colour (possibly view-dependent),
 $\alpha$ is opacity after evaluating the projected footprint, and
 $\mathbf{c}_{\mathrm{in}}$ is the colour accumulated from Gaussians farther from the
-camera. In this application, imported \texttt{.ply} splats are rendered by a custom
+camera. In this application, imported '.ply' splats are rendered by a custom
 Metal orbit viewer; expensive training or feedforward inference remains outside the
 iOS runtime.
 
@@ -153,8 +152,8 @@ $\partial \mathcal{L}/\partial \mathbf{c}_{\mathrm{out}}$ propagate backwards th
 
 This is structurally analogous to other differentiable rendering pipelines:
 screen-space residuals are tied to 3D parameters through a projection map. Optimisation
-typically alternates gradient steps with \textbf{adaptive density control} (splitting
-large Gaussians, cloning under-reconstructed regions, culling near-transparent ones)~\cite{kerbl20233dgs}.
+typically alternates gradient steps with adaptive density control (splitting
+large Gaussians, cloning under-reconstructed regions, culling near-transparent ones) ~\cite{kerbl20233dgs}.
 Initialisation often starts from a sparse point cloud (e.g.\ from COLMAP
 structure-from-motion), linking 3DGS training to the same family of geometry
 estimation as photogrammetry-based capture.
@@ -171,7 +170,7 @@ estimation as photogrammetry-based capture.
 
 This loop yields high visual quality but requires many views, reliable calibration, and
 substantial GPU time. In the present thesis workflow, full optimisation is performed
-off-device; the mobile app consumes only resulting \texttt{.ply} assets. The next
+off-device; the mobile app consumes only resulting '.ply' assets. The next
 section explains why classical training is a poor match for user-initiated mobile
 capture.
 
@@ -180,7 +179,7 @@ capture.
 \label{sec:3dgs_limitations}
 
 Despite its visual quality and real-time \emph{rendering} speed, the original 3DGS
-pipeline~\cite{kerbl20233dgs} carries practical constraints that limit applicability in
+pipeline ~\cite{kerbl20233dgs} carries practical constraints that limit applicability in
 a mobile, user-facing scenario:
 
 \begin{itemize}
@@ -208,7 +207,7 @@ a mobile, user-facing scenario:
 
 These constraints collectively make the classical \emph{training} pipeline impractical
 for real-time, user-initiated mobile capture. They do not invalidate splats as a
-\textbf{viewing} medium: pre-trained or server-generated \texttt{.ply} files remain
+viewing medium: pre-trained or server-generated '.ply' files remain
 useful benchmarks. They motivate feedforward alternatives such as SHARP (Section~\ref{sec:sharp})
 and clarify why mesh-based USDZ assets remain the authoring substrate (next section).
 
@@ -217,9 +216,9 @@ and clarify why mesh-based USDZ assets remain the authoring substrate (next sect
 \label{sec:3dgs_vs_mesh}
 
 \textbf{Meshes (USDZ from Object Capture)} are products of an on-device pipeline
-analogous to multi-view stereo plus \textbf{surface reconstruction} (e.g.\ Poisson
-reconstruction~\cite{kazhdan2006poisson} in the classical photogrammetry literature).
-Such meshes expose \textbf{explicit connectivity}: faces can be clipped, simplified, or
+analogous to multi-view stereo plus surface reconstruction (e.g.\ Poisson
+reconstruction ~\cite{kazhdan2006poisson} in the classical photogrammetry literature).
+Such meshes expose {explicit connectivity: faces can be clipped, simplified, or
 rigged; axis-aligned bounding boxes align naturally with RoomPlan's boxy furniture
 detections; RealityKit loads USDZ natively. \textbf{3D Gaussians}~\cite{kerbl20233dgs}
 do not define a thin surface: ``moving'' an object means transforming thousands of
@@ -232,7 +231,7 @@ The product decision in this thesis is therefore:
 \begin{itemize}
     \item \textbf{Authoring and replacement}: USDZ meshes only.
 
-    \item \textbf{Visualisation and comparison}: optional \texttt{.ply} splats via
+    \item \textbf{Visualisation and comparison}: optional '.ply' splats via
     Metal, following the real-time splatting paradigm of Kerbl et al.~\cite{kerbl20233dgs}.
 
     \item \textbf{Training}: off-device in the current system; on-device or fast
@@ -247,7 +246,7 @@ Table~\ref{tab:mesh_vs_3dgs} summarises the contrasts.
 \label{tab:mesh_vs_3dgs}
 \begin{tabular}{|p{0.22\textwidth}|p{0.34\textwidth}|p{0.34\textwidth}|}
 \hline
-\textbf{Criterion} & \textbf{Mesh (USDZ)} & \textbf{3DGS (\texttt{.ply})} \\
+\textbf{Criterion} & \textbf{Mesh (USDZ)} & \textbf{3DGS (.ply)} \\
 \hline
 Geometry & Explicit triangles & Cloud of Gaussians \\
 \hline
@@ -260,9 +259,9 @@ Editing in app & Yes (replace, transform) & View / compare only \\
 \end{tabular}
 \end{table}
 
-Supporting both representations positions the thesis between \textbf{interactive
-CAD-like staging} (mesh assets) and \textbf{image-quality novel-view synthesis} at
-real-time rates~\cite{kerbl20233dgs}, without claiming that splats replace meshes for
+Supporting both representations positions the thesis between interactive
+CAD-like staging (mesh assets) and image-quality novel-view synthesis at
+real-time rates ~\cite{kerbl20233dgs}, without claiming that splats replace meshes for
 production editing workflows today.
 
 
@@ -273,48 +272,48 @@ production editing workflows today.
 method developed at Apple and presented at ICLR~2025. Given a \emph{single} RGB
 photograph, SHARP predicts the full set of 3D Gaussian parameters for the depicted
 scene in one forward pass through a neural network, with no iterative optimisation, no
-multi-view input, and no SfM preprocessing. The output is a standard \texttt{.ply} that
+multi-view input, and no SfM preprocessing. The output is a standard '.ply' that
 renders in real time via the same splatting pipeline as classical 3DGS
 (Equations~\ref{eq:3dgs_gaussian}--\ref{eq:3dgs_alpha_blend}). Inference takes under one
 second on a modern discrete GPU.
 
 The method builds on a pretrained monocular depth estimator (Depth
-Pro~\cite{BDGZ25}) to initialise $\approx 1.2\times10^6$ Gaussians from the predicted
+Pro  ~\cite{BDGZ25}) to initialise $\approx 1.2\times10^6$ Gaussians from the predicted
 metric depth map, then refines all Gaussian attributes through a learned decoder. This
 design yields three properties relevant to this thesis: (1)~real-time novel-view
 rendering via standard 3DGS rasterisation; (2)~absolute metric scale, enabling
 physically meaningful camera displacements compatible with AR sensors; and
-(3)~zero-shot generalisation across indoor and outdoor scenes, reducing LPIPS by
-25--34\% and DISTS by 21--43\% versus the best prior feedforward method on six
-benchmark datasets~\cite{sharp-monocular-view}.
+(3)~zero-shot generalisation across indoor and outdoor scenes
+% ,reducing LPIPS by
+% 25--34\% and DISTS by 21--43\% versus the best prior feedforward method on six
+% benchmark datasets~\cite{sharp-monocular-view}.
 
-Table~\ref{tab:sharp_bench} summarises zero-shot benchmark results.
 Table~\ref{tab:3dgs_vs_sharp} contrasts classical 3DGS with SHARP along dimensions
 most relevant to this application.
 
-\begin{table}[h]
-\centering
-\caption{Zero-shot novel-view synthesis: DISTS$\downarrow$ / LPIPS$\downarrow$.
-SHARP outperforms all prior methods on every dataset.
-Adapted from~\cite{sharp-monocular-view}.}
-\label{tab:sharp_bench}
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{lcccccc}
-\toprule
-\textbf{Method} & \textbf{Middlebury} & \textbf{Booster}
-    & \textbf{ScanNet++} & \textbf{WildRGBD}
-    & \textbf{Tanks\,\&\,T.} & \textbf{ETH3D} \\
-\midrule
-Flash3D & .359/.581 & .409/.370 & .374/.572 & .159/.345 & .382/.683 & .535/.651 \\
-TMPI    & .158/.436 & .232/.409 & .128/.309 & .114/.327 & .309/.693 & .396/.720 \\
-Gen3C   & .164/.545 & .207/.384 & .090/.227 & .106/.285 & .177/.566 & .408/.734 \\
-\midrule
-\textbf{SHARP}
- & \textbf{.097/.358} & \textbf{.119/.270} & \textbf{.071/.154}
- & \textbf{.069/.190} & \textbf{.122/.421} & \textbf{.258/.554} \\
-\bottomrule
-\end{tabular}
-\end{table}
+% \begin{table}[h]
+% \centering
+% \caption{Zero-shot novel-view synthesis: DISTS$\downarrow$ / LPIPS$\downarrow$.
+% SHARP outperforms all prior methods on every dataset.
+% Adapted from~\cite{sharp-monocular-view}.}
+% \label{tab:sharp_bench}
+% \setlength{\tabcolsep}{5pt}
+% \begin{tabular}{lcccccc}
+% \toprule
+% \textbf{Method} & \textbf{Middlebury} & \textbf{Booster}
+%     & \textbf{ScanNet++} & \textbf{WildRGBD}
+%     & \textbf{Tanks\,\&\,T.} & \textbf{ETH3D} \\
+% \midrule
+% Flash3D & .359/.581 & .409/.370 & .374/.572 & .159/.345 & .382/.683 & .535/.651 \\
+% TMPI    & .158/.436 & .232/.409 & .128/.309 & .114/.327 & .309/.693 & .396/.720 \\
+% Gen3C   & .164/.545 & .207/.384 & .090/.227 & .106/.285 & .177/.566 & .408/.734 \\
+% \midrule
+% \textbf{SHARP}
+%  & \textbf{.097/.358} & \textbf{.119/.270} & \textbf{.071/.154}
+%  & \textbf{.069/.190} & \textbf{.122/.421} & \textbf{.258/.554} \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
 
 \begin{table}[h]
 \centering
@@ -343,35 +342,32 @@ for radiance-style previews. The following section describes how both splat path
 wired into the iOS application.
 
 
-\subsection{Integration in This Application}
-\label{subsec:sharp_integration}
+SHARP is integrated as a supplementary capture mode alongside RoomPlan and 
+Object Capture, following a lightweight client--server architecture that keeps 
+the heavy neural inference off the device entirely.
 
-The application integrates SHARP as a supplementary capture mode alongside RoomPlan
-and Object Capture, using a client--server architecture:
+On the server side, a Flask application running on a Mac on the local network 
+loads the pretrained SHARP weights once at startup and waits for incoming 
+requests. When the iOS client posts a JPEG image, the server runs the SHARP 
+inference pipeline and applies an opacity-based pruning step before responding. 
+This pruning is necessary because the raw SHARP output contains approximately 
+$1.2 \times 10^6$ Gaussians, producing a file of around 66\,MB, far too 
+large for interactive depth-sorted rendering on a mobile device. By retaining 
+only the $3 \times 10^5$ Gaussians with the highest opacity scores, the server 
+reduces the payload to approximately 18\,MB while preserving the visually 
+significant structure of the scene.
 
-\begin{itemize}
-    \item \textbf{Server (Python/PyTorch).} A Flask server
-    (\texttt{sharp\_server.py}) runs on a Mac on the local network. It loads the
-    pretrained SHARP weights once at startup and exposes a \texttt{/sharp/infer}
-    endpoint. When a JPEG is posted, the server calls \texttt{predict\_image()},
-    applies opacity-based Gaussian pruning to reduce $\approx 1.2\times10^6$ to
-    $\approx 3\times10^5$ Gaussians for mobile rendering performance, and returns the
-    \texttt{.ply} file.
-
-    \item \textbf{Client (SwiftUI/iOS).} \texttt{SHARPCaptureView} lets the user
-    capture one frame via \texttt{UIImagePickerController}.
-    \texttt{SHARPService.infer(image:)} POSTs the JPEG using a custom
-    \texttt{URLSession} with a 360-second timeout (the default
-    \texttt{URLSession.shared} caps at 60\,s, insufficient for first-run Metal shader
-    compilation on the server), saves the returned \texttt{.ply}, and opens it in the
-    existing Metal orbit viewer shared with offline-trained splats.
-
-    \item \textbf{Gaussian pruning.} The full SHARP output produces a
-    $\approx 66$\,MB \texttt{.ply}. Per-frame depth sorting over $1.2\times10^6$
-    elements is too expensive for interactive rates on iPhone. The server therefore
-    retains the top $3\times10^5$ Gaussians by opacity score, reducing the file to
-    $\approx 18$\,MB and enabling smooth real-time viewing on device.
-\end{itemize}
+On the client side, a dedicated capture view allows the user to photograph 
+any scene using the standard iOS image picker. The selected frame is 
+compressed to JPEG and sent to the server over the local network. One 
+practical challenge during development was timeout handling: the default 
+iOS networking session imposes a 60-second limit on requests, which is 
+insufficient when the server must compile Metal shaders on first run. A 
+custom session configured with a 360-second timeout resolves this. Once 
+the server responds, the returned '.ply' file is saved to disk and 
+opened immediately in the same Metal-based orbit viewer used for 
+offline-trained Gaussian splats, so the experience is seamless to the user 
+regardless of which capture mode produced the scene.
 
 This positions the application to demonstrate the full reconstruction spectrum:
 \textbf{RoomPlan} (parametric, real-time) $\rightarrow$
@@ -381,7 +377,6 @@ This positions the application to demonstrate the full reconstruction spectrum:
 \textbf{Blender export} (staged mesh hand-off).
 
 
-\paragraph{Chapter takeaway.}
 3D Gaussian Splatting offers an efficient explicit radiance representation: each
 primitive is parameterised by $\boldsymbol{\mu}$, $\boldsymbol{\Sigma}$, $\alpha$, and
 appearance; projection via $\mathbf{J}$ and alpha compositing
@@ -389,5 +384,5 @@ appearance; projection via $\mathbf{J}$ and alpha compositing
 optimisation fits splats to multi-view photographs. Classical training nonetheless
 remains poorly matched to mobile, user-initiated capture because of data, pose, compute,
 and scale constraints. This thesis therefore keeps USDZ meshes for interactive room
-design and uses imported \texttt{.ply} splats, including SHARP outputs pruned for
+design and uses imported '.ply' splats, including SHARP outputs pruned for
 mobile performance, for visual comparison in a unified Metal viewer.

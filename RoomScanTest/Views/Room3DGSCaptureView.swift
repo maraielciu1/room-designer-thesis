@@ -53,6 +53,15 @@ struct Room3DGSCaptureView: View {
                 Button("Done") { dismiss() }
                     .fontWeight(.semibold)
             }
+            if phase == .done, let url = resultPlyURL {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: url, preview: SharePreview("3DGS Scene (.ply)", image: Image(systemName: "cube"))) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 17))
+                            .foregroundStyle(AppTheme.accentGradientInline)
+                    }
+                }
+            }
             if phase == .capture {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showURLEditor = true } label: {

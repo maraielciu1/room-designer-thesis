@@ -57,7 +57,7 @@ struct GaussianUniforms {
 /// Parses .ply files output by 3D Gaussian Splatting training.
 nonisolated enum PLYParser {
 
-    enum PLYError: LocalizedError {
+    enum PLYError: LocalizedError, Equatable {
         case invalidHeader
         case unsupportedFormat
         case missingProperties

@@ -17,19 +17,28 @@
 
 \begin{document}
 
-\specialization{Computer Science}	
+\specialization{COMPUTER SCIENCE IN ENGLISH}	
 \title{Augmented Reality-Based Interior Design: A Mobile Application for Parametric Room Scanning and Interactive 3D Scene Reconstruction}					   
 \author{Mara Ielciu}											
-\supervisor{Professor Dr. Darabant Sergiu Adrian}				
+\supervisor{Professor Dr. Darabant Sergiu Adrian}		
 				
 \maketitle
-
-
 \newpage
+
+
+\setbool{@eng}{false}
+\selectlanguage{romanian} 
+\specialization{INFORMATICĂ ENGLEZĂ}
+\title{Design Interior bazat pe Realitate Augmentată: O Aplicație Mobilă pentru Scanare Parametrică a Camerelor și Reconstrucție Interactivă a Scenelor 3D}
+
+\maketitle
+\newpage
+
 \thispagestyle{empty}
 \mbox{}
 \newpage
 \pagenumbering{roman} 
+\selectlanguage{english}
 
 \cleardoublepage
 ABSTRACT
@@ -37,11 +46,12 @@ ABSTRACT
 \hrule
 \vspace{0.5cm}	
 
-Interior design decisions are difficult to evaluate without spatially accurate visualisation of furniture and finishes in a real environment. Existing augmented reality solutions treat the room as a transiently detected floor plane, provide no persistent room model, and require the user to be physically present in the space for every design iteration. The result is a tool suited to a single in-store moment, not to the extended iterative process that characterises real interior redesign. This thesis addresses these limitations through five engineering contributions.
+Interior design decisions are difficult to evaluate without spatially accurate visualisation of furniture and finishes in a real environment. Existing augmented reality solutions treat the room as a transiently detected floor plane, provide no persistent room model, and require the user to be physically present in the space for every design iteration. The result is a tool suited to a single in-store moment, not to the extended iterative process that characterises real interior redesign. This thesis addresses these limitations through six engineering contributions.
 
-The primary contribution is a unified scan-to-edit pipeline for iOS that connects Apple's RoomPlan API, which produces a metric, semantically annotated digital twin of a room, to a RealityKit-based editor in which detected furniture instances can be replaced with virtual USDZ assets via gesture-based manipulation, with state persisted across sessions. The second is the integration of Object Capture for on-device photogrammetric asset authoring, eliminating any dependency on external tooling. The third is a Metal-based Gaussian splat renderer and SHARP client for interactive viewing of 3D Gaussian Splatting scenes and direct comparison with mesh-based representations. The fourth is a reference SwiftUI/MVVM architecture with a two-level persistence cache and a virtual decor extension covering wall art, carpet, and dynamic lighting. The fifth is a DCC export service: completed room designs can be exported as a shareable ZIP archive containing a glTF scene, USDZ furniture copies, JSON placement manifests, and a Blender Python helper script for further editing in desktop tools.
+The primary contribution is a unified scan-to-edit pipeline for iOS that connects Apple's RoomPlan API, which produces a metric, semantically annotated digital twin of a room, to a RealityKit-based editor in which detected furniture instances can be replaced with virtual USDZ assets via gesture-based manipulation, with state persisted across sessions. The second is the integration of Object Capture for on-device photogrammetric asset authoring, eliminating any dependency on external tooling. The third is a Metal-based Gaussian splat renderer and SHARP client for interactive viewing of 3D Gaussian Splatting scenes and direct comparison with mesh-based representations. The fourth is a reference SwiftUI/MVVM architecture that keeps room metadata responsive while storing heavy scan payloads on disk. The fifth is a virtual decor extension covering wall art, carpet, and dynamic lighting within the same editor workflow. The sixth is a DCC export service: completed room designs can be exported as a shareable ZIP archive containing a glTF scene, USDZ furniture copies, JSON placement manifests, and a Blender Python helper script for further editing in desktop tools.
 
-Chapter 2 grounds the work theoretically, mapping the classical photogrammetric chain and depth-fusion reconstruction to Apple's capture APIs. Chapter 3 introduces 3D Gaussian Splatting and presents SHARP as a feedforward single-image alternative to classical multi-view optimisation. Chapter 4 formalises functional and non-functional requirements. Chapter 5 describes the architecture, data flow, and implementation. Chapter 6 summarises results, limitations, and directions for future work.
+
+Chapter 2 presents related work. Chapter 3 grounds the work theoretically, mapping the classical photogrammetric chain and depth-fusion reconstruction to Apple's capture APIs. Chapter 4 introduces 3D Gaussian Splatting and presents SHARP as a feedforward single-image alternative to classical multi-view optimisation. Chapter 5 formalises functional and non-functional requirements. Chapter 6 describes the architecture, data flow, implementation and  results. Chapter 7 summarises limitations, and directions for future work.
 
 
 

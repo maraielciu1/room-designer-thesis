@@ -1,0 +1,10 @@
+trial_id,room_type,capture_mode,window_visibility,gt_length_m,gt_width_m,gt_height_m,measured_length_m,measured_width_m,measured_height_m,abs_length_error_m,abs_width_error_m,abs_height_error_m,gt_window_count,detected_window_count,window_detection_ok,scan_duration_s,notes
+ROOM-001,,,clear,,,,,,,,,,,,,,
+ROOM-002,,,clear,,,,,,,,,,,,,,
+ROOM-003,,,clear,,,,,,,,,,,,,,
+ROOM-004,,,clear,,,,,,,,,,,,,,
+ROOM-005,,,clear,,,,,,,,,,,,,,
+ROOM-006,,,curtains_closed,,,,,,,,,,,,,,
+ROOM-007,,,curtains_closed,,,,,,,,,,,,,,
+ROOM-008,,,drapes_partial,,,,,,,,,,,,,,
+ROOM-009,,,drapes_partial,,,,,,,,,,,,,,

@@ -35,7 +35,13 @@ def run_msplat_training(colmap_dir: str, output_ply_path: str, on_progress=None)
     if on_progress:
         on_progress(45, "Loading dataset…")
     dataset = msplat.load_dataset(colmap_dir, eval_mode=True)
-    cfg = msplat.TrainingConfig(iterations=7000, num_downscales=0)
+    cfg = msplat.TrainingConfig(
+        iterations=7000,
+        num_downscales=2,
+        downscale_factor=2.0,
+        densify_grad_thresh=0.0005,  # prevent Gaussian count explosion
+        stop_screen_size_at=3000,    # stop densification at step 3000
+    )
     trainer = msplat.GaussianTrainer(dataset, cfg)
 
     last_pct = [45]  # mutable so callback can update
@@ -54,6 +60,8 @@ def run_msplat_training(colmap_dir: str, output_ply_path: str, on_progress=None)
     if on_progress:
         on_progress(98, "Exporting .ply…")
     trainer.export_ply(output_ply_path)
+    checkpoint_path = os.path.splitext(output_ply_path)[0] + "_checkpoint.bin"
+    trainer.save_checkpoint(checkpoint_path)
 
 
 def run(images_dir: str, output_ply_path: str, on_progress=None) -> None:

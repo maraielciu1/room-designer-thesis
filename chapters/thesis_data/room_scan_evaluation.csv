@@ -1,0 +1,29 @@
+trial_id,room_type,capture_mode,window_visibility,gt_length_m,gt_width_m,gt_height_m,measured_length_m,measured_width_m,measured_height_m,abs_length_error_m,abs_width_error_m,abs_height_error_m,gt_window_count,detected_window_count,window_detection_ok,scan_duration_s,notes
+ROOM-001,bedroom,LiDAR+RGB,clear,3.42,3.18,2.48,3.428,3.172,2.486,0.008,0.008,0.006,1,1,true,78,all windows visible
+ROOM-002,living_room,LiDAR+RGB,clear,5.24,4.18,2.64,5.256,4.194,2.647,0.016,0.014,0.007,2,2,true,112,unobstructed rectangular layout
+ROOM-003,office,LiDAR+RGB,curtains_closed,3.68,2.94,2.58,3.701,2.928,2.591,0.021,0.012,0.011,1,1,true,95,curtains closed but structural window boundary detected
+ROOM-004,kitchen,LiDAR+RGB,clear,3.12,2.68,2.52,3.124,2.673,2.517,0.004,0.007,0.003,1,1,true,68,compact galley kitchen
+ROOM-005,bathroom,LiDAR+RGB,clear,2.14,1.86,2.38,2.148,1.854,2.385,0.008,0.006,0.005,0,0,true,52,no windows small ensuite
+ROOM-006,bedroom,LiDAR+RGB,drapes_partial,4.08,3.52,2.54,4.097,3.538,2.548,0.017,0.018,0.008,2,2,true,124,windows detected despite partial drape coverage
+ROOM-007,living_room,LiDAR+RGB,clear,6.12,4.86,2.72,6.139,4.871,2.728,0.019,0.011,0.008,3,3,true,156,large open plan with three windows
+ROOM-008,office,LiDAR+RGB,clear,2.86,2.64,2.56,2.874,2.633,2.564,0.014,0.007,0.004,1,1,true,71,home office alcove
+ROOM-009,kitchen,LiDAR+RGB,curtains_closed,4.26,3.14,2.48,4.278,3.152,2.487,0.018,0.012,0.007,2,0,false,98,window fully occluded by curtains
+ROOM-010,bedroom,LiDAR+RGB,clear,3.76,3.34,2.46,3.769,3.348,2.468,0.009,0.008,0.008,1,1,true,84,master bedroom single window
+ROOM-011,living_room,LiDAR+RGB,drapes_partial,4.52,3.98,2.58,4.548,4.011,2.592,0.028,0.031,0.012,2,2,true,118,windows identified with partial drape coverage
+ROOM-012,bathroom,LiDAR+RGB,clear,2.68,1.94,2.42,2.691,1.937,2.426,0.011,0.003,0.006,1,1,true,61,standard bathroom with frosted window
+ROOM-013,office,LiDAR+RGB,clear,4.14,3.22,2.62,4.152,3.211,2.629,0.012,0.009,0.009,2,2,true,102,corner office with two windows
+ROOM-014,kitchen,LiDAR+RGB,clear,3.84,2.96,2.54,3.848,2.971,2.546,0.008,0.011,0.006,1,1,true,89,L-shaped kitchen layout
+ROOM-015,bedroom,LiDAR+RGB,curtains_closed,3.28,2.92,2.52,3.304,2.908,2.531,0.024,0.012,0.011,1,0,false,108,window fully occluded by curtains
+ROOM-016,living_room,LiDAR+RGB,clear,4.88,4.12,2.66,4.907,4.136,2.672,0.027,0.016,0.012,2,2,true,134,furniture present but clear sightlines
+ROOM-017,office,LiDAR+RGB,drapes_partial,3.52,2.78,2.54,3.541,2.793,2.551,0.021,0.013,0.011,1,1,true,91,windows identified with partial drape coverage
+ROOM-018,kitchen,LiDAR+RGB,clear,2.94,2.44,2.46,2.951,2.436,2.468,0.011,0.004,0.008,0,0,true,58,interior kitchen no exterior wall
+ROOM-019,bedroom,LiDAR+RGB,clear,4.34,3.68,2.58,4.358,3.694,2.589,0.018,0.014,0.009,2,2,true,116,guest room dual aspect
+ROOM-020,bathroom,LiDAR+RGB,clear,1.92,1.72,2.36,1.929,1.715,2.367,0.009,0.005,0.007,0,0,true,48,compact powder room
+ROOM-021,living_room,LiDAR+RGB,drapes_partial,5.46,4.58,2.68,5.478,4.601,2.691,0.018,0.021,0.011,2,2,true,142,windows detected despite partial drape coverage
+ROOM-022,office,LiDAR+RGB,clear,3.94,3.08,2.6,3.951,3.097,2.608,0.011,0.017,0.008,1,1,true,88,open plan office nook
+ROOM-023,kitchen,LiDAR+RGB,drapes_partial,3.56,2.82,2.5,3.578,2.834,2.511,0.018,0.014,0.011,1,1,true,82,single window partial drape coverage
+ROOM-024,bedroom,LiDAR+RGB,clear,2.98,2.74,2.44,3.006,2.752,2.449,0.026,0.012,0.009,1,1,true,76,small single bedroom
+ROOM-025,living_room,LiDAR+RGB,clear,5.82,5.14,2.74,5.846,5.158,2.752,0.026,0.018,0.012,3,3,true,168,conservatory-style room three large windows
+ROOM-026,bedroom,LiDAR+RGB,curtains_closed,3.94,3.28,2.52,3.958,3.267,2.531,0.018,0.013,0.011,1,1,true,103,curtains closed but structural window boundary detected
+ROOM-027,office,LiDAR+RGB,curtains_closed,4.42,3.56,2.58,4.436,3.572,2.591,0.016,0.012,0.011,2,2,true,117,curtains closed but structural window boundary detected
+ROOM-028,living_room,LiDAR+RGB,drapes_partial,4.76,4.24,2.66,4.782,4.257,2.672,0.022,0.017,0.012,2,1,false,138,partial drape caused one pane to be missed

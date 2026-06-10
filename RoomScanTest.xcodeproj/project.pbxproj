@@ -10,14 +10,30 @@
 		9862A96E2FC6F9B500E6C9C6 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1F9E8012F6001008C4D220 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A2TEST042F6001008C4D221 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98B486022F4332A5008C4D22 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 98B486092F4332A5008C4D22;
+			remoteInfo = RoomScanTest;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		98B4860A2F4332A5008C4D22 /* RoomScanTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoomScanTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2TEST012F6001008C4D221 /* RoomScanTestTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RoomScanTestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		98B4860C2F4332A5008C4D22 /* RoomScanTest */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = RoomScanTest;
+			sourceTree = "<group>";
+		};
+		A2TEST022F6001008C4D221 /* RoomScanTestTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RoomScanTestTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +47,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A2TEST072F6001008C4D221 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -38,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				98B4860C2F4332A5008C4D22 /* RoomScanTest */,
+				A2TEST022F6001008C4D221 /* RoomScanTestTests */,
 				98B4860B2F4332A5008C4D22 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -46,6 +70,7 @@
 			isa = PBXGroup;
 			children = (
 				98B4860A2F4332A5008C4D22 /* RoomScanTest.app */,
+				A2TEST012F6001008C4D221 /* RoomScanTestTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,6 +101,27 @@
 			productReference = 98B4860A2F4332A5008C4D22 /* RoomScanTest.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A2TEST032F6001008C4D221 /* RoomScanTestTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2TEST092F6001008C4D221 /* Build configuration list for PBXNativeTarget "RoomScanTestTests" */;
+			buildPhases = (
+				A2TEST062F6001008C4D221 /* Sources */,
+				A2TEST072F6001008C4D221 /* Frameworks */,
+				A2TEST082F6001008C4D221 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2TEST052F6001008C4D221 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A2TEST022F6001008C4D221 /* RoomScanTestTests */,
+			);
+			name = RoomScanTestTests;
+			productName = RoomScanTestTests;
+			productReference = A2TEST012F6001008C4D221 /* RoomScanTestTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -88,6 +134,10 @@
 				TargetAttributes = {
 					98B486092F4332A5008C4D22 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					A2TEST032F6001008C4D221 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 98B486092F4332A5008C4D22;
 					};
 				};
 			};
@@ -109,12 +159,20 @@
 			projectRoot = "";
 			targets = (
 				98B486092F4332A5008C4D22 /* RoomScanTest */,
+				A2TEST032F6001008C4D221 /* RoomScanTestTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		98B486082F4332A5008C4D22 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2TEST082F6001008C4D221 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -131,7 +189,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A2TEST062F6001008C4D221 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A2TEST052F6001008C4D221 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 98B486092F4332A5008C4D22 /* RoomScanTest */;
+			targetProxy = A2TEST042F6001008C4D221 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		98B486132F4332A6008C4D22 /* Debug */ = {
@@ -309,6 +382,56 @@
 			};
 			name = Release;
 		};
+		A2TEST0A2F6001008C4D221 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BD964LNLQP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = MyClass.RoomScanTestTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RoomScanTest.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RoomScanTest";
+			};
+			name = Debug;
+		};
+		A2TEST0B2F6001008C4D221 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BD964LNLQP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = MyClass.RoomScanTestTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RoomScanTest.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RoomScanTest";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -326,6 +449,15 @@
 			buildConfigurations = (
 				98B486162F4332A6008C4D22 /* Debug */,
 				98B486172F4332A6008C4D22 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2TEST092F6001008C4D221 /* Build configuration list for PBXNativeTarget "RoomScanTestTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2TEST0A2F6001008C4D221 /* Debug */,
+				A2TEST0B2F6001008C4D221 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -119,7 +119,7 @@ enum AuthError: LocalizedError {
         case .invalidCredentials: return "Invalid email or password."
         case .weakPassword: return "Password must be at least 8 characters."
         case .invalidEmail: return "Please enter a valid email address."
-        case .googleSignInUnavailable: return "Google Sign-In is not configured. See AUTH_SETUP.md."
+        case .googleSignInUnavailable: return "Google Sign-In is not configured."
         case .googleSignInFailed(let msg): return msg
         }
     }

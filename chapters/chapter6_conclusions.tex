@@ -1,11 +1,25 @@
 \chapter{Conclusions}
 \label{ch:conclusions}
 
-This thesis investigated how a commodity iOS device can support \textbf{interior design preview} through \textbf{parametric room capture}, \textbf{mesh-based editing}, and optional \textbf{plenoptic visualisation}. The theoretical chapters argued that Apple's Object Capture instantiates a classical \textbf{photogrammetric} chain (features, SfM, MVS-class dense matching, Poisson-class surface reconstruction, texturing), whereas RoomPlan builds on \textbf{depth fusion} and learning to emit a structured \texttt{CapturedRoom}. The second theory chapter positioned \textbf{3D Gaussian Splatting} \cite{kerbl20233dgs} as a real-time differentiable alternative to meshes for \emph{viewing}, not for CAD-style furniture replacement.
+This thesis investigated how a commodity iOS device can support interior design preview through parametric room capture, mesh-based editing, and optional plenoptic visualisation. The theoretical chapters argued that Apple's Object Capture instantiates a classical photogrammetric chain (features, SfM, MVS-class dense matching, Poisson-class surface reconstruction, texturing), whereas RoomPlan builds on depth fusion and learning to emit a structured 'CapturedRoom'. The second theory chapter positioned 3D Gaussian Splatting \cite{kerbl20233dgs} as a real-time differentiable alternative to meshes for \emph{viewing}, not for CAD-style furniture replacement.
 
 \section{Summary of Results}
 
-The software artefact demonstrates a coherent pipeline: \textbf{RoomPlan} $\rightarrow$ serialised scan $\rightarrow$ \textbf{RealityKit} editor $\rightarrow$ USDZ replacements with gestures $\rightarrow$ persistence across sessions. \textbf{Object Capture} extends asset authoring; a \textbf{Metal} splat renderer implements R-7 for imported \texttt{.ply} data. The \textbf{SHARP} integration (R-9, R-10) closes the loop between on-device photography and Gaussian-field reconstruction via a local-network inference server, without third-party cloud dependency. Requirements R-1--R-10 (and associated non-functional goals N-1--N-8) are addressed at the design level in Chapter~\ref{ch:requirements} and at the code level in Chapter~\ref{ch:implementation}.
+The software artefact demonstrates a coherent pipeline: RoomPlan $\rightarrow$ serialised scan $\rightarrow$ RealityKit editor $\rightarrow$ USDZ replacements with gestures $\rightarrow$ persistence across sessions. Object Capture extends asset authoring; a Metal splat renderer implements R-7 for imported '.ply' data. The SHARP integration closes the loop between on-device photography and Gaussian-field reconstruction via a local-network inference server, without third-party cloud dependency. Requirements R-1 $\rightarrow$ R-10 (and associated non-functional goals N-1 $\rightarrow$ N-8) are addressed at the design level in Chapter~\ref{ch:requirements} and at the code level in Chapter~\ref{ch:implementation}.
+
+\subsection{Quantitative evaluation summary}
+
+Quantitative evaluation was conducted across two capture modalities. For \textbf{room scanning}, 28 room captures across five room types were measured against ground-truth tape-measure dimensions: mean absolute error was 1.64\,cm on length, 1.23\,cm on width, and 0.87\,cm on height, for a combined mean of 1.25\,cm (max observed: 3.10\,cm). Height error is consistently smaller than planar dimensions, consistent with strong floor/ceiling plane constraints in the depth fusion stage. Window detection under clear-view conditions achieved 100\,\%; partial drape coverage gave 83\,\% success (6 trials); fully closed curtains dropped to 60\,\% (5 trials), indicating the model uses structural geometry cues even when the window surface is visually occluded.
+
+For \textbf{object scanning}, 20 captures with ruler-measured ground-truth dimensions yielded a mean absolute dimension error of 3.44\,mm and mean bounding-box IoU of 0.796. Performance degrades predictably under cluttered backgrounds (MAE 4.92\,mm vs.\ 1.97\,mm on plain backgrounds) and transparent materials (MAE 5.51\,mm vs.\ 2.23\,mm for opaque objects), consistent with contour ambiguity at object boundaries.
+
+For the \textbf{Metal Gaussian splat renderer}, the CPU-side back-to-front sort for budgets up to 300\,k Gaussians completes in approximately 10--30\,ms on A-series hardware, remaining within a 60\,Hz frame budget. \textbf{3DGS training time} scales super-linearly at low frame counts and flattens above 40 frames: 20-frame room-traversal training takes 20\,min\,17\,s, while 40 frames require 42\,min\,44\,s on the same workstation hardware. Object-orbit captures require approximately 5--6\,minutes more than room-traversal runs at every frame count due to denser initial point clouds increasing the Gaussian densification cost.
+
+The qualitative SHARP-vs-3DGS comparison (Section~\ref{sec:room_scan_quant_eval}) confirms that SHARP delivers near-photographic quality within a single frame's field of view with a fast turnaround ($\approx$10\,s after first-run shader compilation), while multi-frame 3DGS provides spatially complete coverage suitable for free-viewpoint navigation at the cost of a longer capture and training pipeline. The two representations are complementary rather than competing: SHARP for immediate in-session feedback, 3DGS for the persistent room model.
+
+\subsection{Relation to the research gap}
+
+The gap identified in Section~\ref{sec:soa:gap} — no single consumer or research toolchain delivering metric room semantics, persistent off-site editing, on-device asset authoring, and Gaussian splat viewing on one mobile platform — is addressed by the delivered system. Each checkpoint listed there corresponds to a implemented and evaluated requirement (R-1 through R-11, N-1 through N-8).
 
 \section{Limitations}
 
@@ -16,7 +30,7 @@ Accuracy is bounded by RoomPlan detection quality, photogrammetry assumptions in
 Promising extensions include: formal user evaluation; tighter integration between
 exported scan images and external COLMAP/3DGS pipelines; level-of-detail rendering
 for large splat clouds; and semantic furniture suggestions informed by procedural
-layout systems such as K\'an et al.~\cite{kan2021ar}. Mithun et al.\
+layout systems such as K\'an et al.~\cite{kan2021ar}. Pugh et al.\
 \cite{Geo2023} demonstrate that synthetic datasets with rich semantic labels
 can substantially improve indoor scene understanding for AR applications, a
 direction complementary to the real-scan pipeline used here.

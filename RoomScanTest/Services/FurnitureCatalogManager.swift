@@ -217,11 +217,11 @@ class FurnitureCatalogManager: ObservableObject {
         }
         
         // ── 4. Calculate uniform scale = min(target / local) × 90% ──
-        let scaleX = targetDimensions.x / localExtents.x
-        let scaleY = targetDimensions.y / localExtents.y
-        let scaleZ = targetDimensions.z / localExtents.z
-        var uniformScale = min(scaleX, scaleY, scaleZ) * 0.90
-        uniformScale = max(uniformScale, 0.0001)
+        let uniformScale = USDFurnitureFitScale.uniformScale(
+            targetSize: targetDimensions,
+            modelSize: localExtents,
+            margin: 0.90
+        )
         
         // ── 5. Apply scale ──
         model.scale = SIMD3<Float>(repeating: uniformScale)

@@ -1,0 +1,11 @@
+trial_id,object_type,material_class,background_type,gt_width_mm,gt_height_mm,gt_depth_mm,measured_width_mm,measured_height_mm,measured_depth_mm,abs_width_error_mm,abs_height_error_mm,abs_depth_error_mm,bbox_iou,notes
+OBJ-001,,opaque,plain,,,,,,,,,,,
+OBJ-002,,opaque,plain,,,,,,,,,,,
+OBJ-003,,opaque,plain,,,,,,,,,,,
+OBJ-004,,opaque,cluttered,,,,,,,,,,,
+OBJ-005,,opaque,cluttered,,,,,,,,,,,
+OBJ-006,,opaque,cluttered,,,,,,,,,,,
+OBJ-007,,transparent,plain,,,,,,,,,,,
+OBJ-008,,transparent,plain,,,,,,,,,,,
+OBJ-009,,transparent,cluttered,,,,,,,,,,,
+OBJ-010,,transparent,cluttered,,,,,,,,,,,

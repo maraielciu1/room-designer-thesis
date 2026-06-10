@@ -41,6 +41,24 @@ enum GaussianSplatCloudConfig {
 /// - GET  /jobs/{id}/result                        → binary .ply (when status == completed)
 struct GaussianSplatCloudService {
 
+    // MARK: - Endpoint URLs (testable contract)
+
+    static func jobsURL(serverBaseURL: URL) -> URL {
+        serverBaseURL.appendingPathComponent("jobs")
+    }
+
+    static func jobStatusURL(serverBaseURL: URL, jobId: String) -> URL {
+        jobsURL(serverBaseURL: serverBaseURL)
+            .appendingPathComponent(jobId)
+            .appendingPathComponent("status")
+    }
+
+    static func jobResultURL(serverBaseURL: URL, jobId: String) -> URL {
+        jobsURL(serverBaseURL: serverBaseURL)
+            .appendingPathComponent(jobId)
+            .appendingPathComponent("result")
+    }
+
     /// Training + .ply download can take many minutes; use 2h so the app never times out during poll/download.
     private static let requestTimeout: TimeInterval = 7200
 
@@ -88,7 +106,7 @@ struct GaussianSplatCloudService {
 
     /// Upload zip of images and start training. Returns job ID.
     static func uploadAndSubmit(zipURL: URL, serverBaseURL: URL) async throws -> String {
-        let url = serverBaseURL.appendingPathComponent("jobs")
+        let url = jobsURL(serverBaseURL: serverBaseURL)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         let boundary = "Boundary-\(UUID().uuidString)"
@@ -117,7 +135,7 @@ struct GaussianSplatCloudService {
 
     /// Poll job status. Returns (status, progress 0–100, optional message).
     static func pollStatus(jobId: String, serverBaseURL: URL) async throws -> (CloudJobStatus, Int?, String?) {
-        let url = serverBaseURL.appendingPathComponent("jobs").appendingPathComponent(jobId).appendingPathComponent("status")
+        let url = jobStatusURL(serverBaseURL: serverBaseURL, jobId: jobId)
         var request = URLRequest(url: url)
         request.timeoutInterval = requestTimeout
         let (data, response) = try await longTimeoutSession.data(for: request)
@@ -130,7 +148,7 @@ struct GaussianSplatCloudService {
 
     /// Download the .ply result. Call only when status == .completed.
     static func downloadResult(jobId: String, serverBaseURL: URL) async throws -> Data {
-        let url = serverBaseURL.appendingPathComponent("jobs").appendingPathComponent(jobId).appendingPathComponent("result")
+        let url = jobResultURL(serverBaseURL: serverBaseURL, jobId: jobId)
         var request = URLRequest(url: url)
         request.timeoutInterval = requestTimeout
         let (data, response) = try await longTimeoutSession.data(for: request)
@@ -149,7 +167,7 @@ struct GaussianSplatCloudService {
 
     /// Returns `true` if the backend responds (GET `/jobs` on Flask returns 405).
     static func ping(serverBaseURL: URL) async -> Bool {
-        var request = URLRequest(url: serverBaseURL.appendingPathComponent("jobs"))
+        var request = URLRequest(url: jobsURL(serverBaseURL: serverBaseURL))
         request.httpMethod = "GET"
         do {
             let (_, response) = try await pingSession.data(for: request)

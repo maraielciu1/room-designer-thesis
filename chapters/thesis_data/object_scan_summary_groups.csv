@@ -1,5 +1,5 @@
-category,mean_mae_dim_mm,mean_centroid_error_mm,mean_bbox_iou,count
-bg:plain,0.811,0.704,0.895,36
-bg:cluttered,2.892,2.439,0.732,36
-mat:opaque,1.373,1.189,0.84,36
-mat:transparent,2.844,2.393,0.749,27
+category,mean_mae_dim_mm,mean_bbox_iou,count
+bg:plain,1.97,0.881,10
+bg:cluttered,4.92,0.710,10
+mat:opaque,2.23,0.819,10
+mat:transparent,5.51,0.741,8

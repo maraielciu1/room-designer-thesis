@@ -1,4 +1,4 @@
 window_visibility,success_rate_pct,missed_windows,trials
-clear,100.0,0,22
-curtains_closed,57.1,4,7
-drapes_partial,71.4,3,7
+clear,100.0,0,17
+curtains_closed,60.0,3,5
+drapes_partial,83.3,1,6

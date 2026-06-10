@@ -1,0 +1,21 @@
+trial_id,scene_id,object_type,material_class,background_type,gt_width_mm,gt_height_mm,gt_depth_mm,measured_width_mm,measured_height_mm,measured_depth_mm,abs_width_error_mm,abs_height_error_mm,abs_depth_error_mm,bbox_iou,reconstruction_quality,notes
+OBJ-001,S01,ceramic_vase,opaque,plain,118,245,118,118.42,244.18,118.65,0.42,0.82,0.65,0.941,excellent,stable capture on plain backdrop
+OBJ-002,S01,wooden_chair,opaque,plain,452,876,498,451.28,877.14,496.75,0.72,1.14,1.25,0.928,excellent,stable capture on plain backdrop
+OBJ-003,S02,metal_lamp,reflective,plain,185,412,185,184.05,413.58,186.18,0.95,1.58,1.18,0.904,excellent,specular highlights but stable geometry on plain backdrop
+OBJ-004,S01,plastic_container,opaque,cluttered,156,89,134,159.18,86.52,136.76,3.18,2.48,2.76,0.758,acceptable,background confusion around silhouette
+OBJ-005,S01,toy_robot,opaque,cluttered,142,198,76,138.87,200.28,73.58,3.13,2.28,2.42,0.742,acceptable,background confusion around silhouette
+OBJ-006,S02,wooden_chair,opaque,cluttered,468,892,512,464.25,896.73,508.32,3.75,4.73,3.68,0.731,acceptable,background confusion around silhouette
+OBJ-007,S02,glass_bottle,transparent,plain,72,285,72,68.48,290.15,75.32,3.52,5.15,3.32,0.816,acceptable,refraction induced slight contour drift
+OBJ-008,S02,wine_glass,transparent,plain,68,178,68,71.18,174.58,65.74,3.18,3.42,2.26,0.829,acceptable,refraction induced slight contour drift
+OBJ-009,S01,acrylic_box,transparent,cluttered,210,145,118,216.82,138.16,125.38,6.82,6.84,7.38,0.672,degraded,edge bleed from clutter and refraction
+OBJ-010,S02,wine_glass,transparent,cluttered,71,182,71,78.36,172.94,79.18,7.36,9.06,8.18,0.658,degraded,edge bleed from clutter and refraction
+OBJ-011,S03,ceramic_vase,opaque,plain,124,238,124,124.38,237.42,124.71,0.38,0.58,0.71,0.938,excellent,stable capture on plain backdrop
+OBJ-012,S04,wooden_chair,opaque,plain,438,861,486,437.52,862.38,484.88,0.48,1.38,1.12,0.925,excellent,stable capture on plain backdrop
+OBJ-013,S05,metal_lamp,reflective,plain,192,425,192,191.12,426.74,193.05,0.88,1.74,1.05,0.898,excellent,specular highlights but stable geometry on plain backdrop
+OBJ-014,S03,plastic_container,opaque,cluttered,148,94,128,151.24,91.38,130.52,3.24,2.62,2.52,0.751,acceptable,background confusion around silhouette
+OBJ-015,S04,toy_robot,opaque,cluttered,135,205,82,131.94,207.62,79.28,3.06,2.62,2.72,0.748,acceptable,background confusion around silhouette
+OBJ-016,S06,wooden_chair,opaque,cluttered,461,885,518,457.38,890.15,514.62,3.62,5.15,3.38,0.726,acceptable,background confusion around silhouette
+OBJ-017,S03,glass_bottle,transparent,plain,68,278,68,64.85,283.42,71.58,3.15,5.42,3.58,0.812,acceptable,refraction induced slight contour drift
+OBJ-018,S06,wine_glass,transparent,plain,65,172,65,68.24,168.85,62.38,3.24,3.15,2.62,0.824,acceptable,refraction induced slight contour drift
+OBJ-019,S04,acrylic_box,transparent,cluttered,205,138,115,212.48,131.72,122.36,7.48,6.28,7.36,0.665,degraded,edge bleed from clutter and refraction
+OBJ-020,S06,wine_glass,transparent,cluttered,74,188,74,81.52,179.38,81.24,7.52,8.62,7.24,0.651,degraded,edge bleed from clutter and refraction

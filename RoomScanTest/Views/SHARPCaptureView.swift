@@ -50,6 +50,15 @@ struct SHARPCaptureView: View {
                 Button("Done") { dismiss() }
                     .fontWeight(.semibold)
             }
+            if phase == .done, let url = resultPlyURL {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: url, preview: SharePreview("SHARP Scene (.ply)", image: Image(systemName: "cube"))) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 17))
+                            .foregroundStyle(AppTheme.accentGradientInline)
+                    }
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showURLEditor = true

@@ -141,9 +141,8 @@ extension Room {
 
     // ── Maintenance ─────────────────────────────────────────────
 
-    /// Remove orphaned scan files that no longer have a matching Room
-    static func cleanOrphanedScanFiles(userId: UUID, existingRoomIds: Set<UUID>) {
-        let directories = [UserStoragePaths.roomScans(userId: userId), UserStoragePaths.legacyRoomScans]
+    /// Remove orphaned scan JSON files under the given directories.
+    static func cleanOrphanedScanFiles(in directories: [URL], existingRoomIds: Set<UUID>) {
         for directory in directories {
             guard FileManager.default.fileExists(atPath: directory.path),
                   let files = try? FileManager.default.contentsOfDirectory(
@@ -158,5 +157,13 @@ extension Room {
                 }
             }
         }
+    }
+
+    /// Remove orphaned scan files that no longer have a matching Room
+    static func cleanOrphanedScanFiles(userId: UUID, existingRoomIds: Set<UUID>) {
+        cleanOrphanedScanFiles(
+            in: [UserStoragePaths.roomScans(userId: userId), UserStoragePaths.legacyRoomScans],
+            existingRoomIds: existingRoomIds
+        )
     }
 }
