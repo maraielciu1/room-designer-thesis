@@ -16,7 +16,7 @@ final class USDFurnitureFitScaleTests: XCTestCase {
             modelSize: model,
             margin: 1.0
         )
-        // Ratios: 2, 2, 0.5 → min = 0.5
+        // Ratios: 2, 2, 0.5 -> min = 0.5
         XCTAssertEqual(scale, 0.5, accuracy: 1e-5)
     }
 
