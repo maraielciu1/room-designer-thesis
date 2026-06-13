@@ -13,22 +13,22 @@ import SwiftUI
 struct CarpetPickerView: View {
     @Environment(\.dismiss) var dismiss
 
-    // ── Size ──
+    // Size
     @State private var selectedSize: CarpetSize = .medium160x230
     @State private var customWidthCm: String = "150"
     @State private var customDepthCm: String = "200"
 
-    // ── Colour ──
+    // Colour
     @State private var carpetColor: Color = Color(red: 0.55, green: 0.40, blue: 0.30)
 
-    // ── Pattern ──
+    // Pattern
     @State private var selectedPattern: CarpetPattern = .solid
 
-    /// Called when the user confirms — passes size enum, actual width/depth in metres,
+    /// Called when the user confirms - passes size enum, actual width/depth in metres,
     /// colour, and pattern.
     let onAdd: (CarpetSize, Float, Float, UIColor, CarpetPattern) -> Void
 
-    // ── Resolved dimensions (accounts for custom input) ──
+    // Resolved dimensions (accounts for custom input) 
     private var resolvedWidthM: Float {
         if selectedSize == .custom,
            let cm = Float(customWidthCm), cm > 0 {

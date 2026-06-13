@@ -3,11 +3,11 @@
 //  RoomScanTest
 //
 //  Exports a saved room as a .zip for Blender / other DCC tools:
-//  • room_scene.gltf + room_scene.bin — walls, floors, doors, windows, placeholders
-//  • textures/ — procedural wall/floor patterns when used
-//  • furniture/*.usdz — copies of replacement models
-//  • wall_art/*.jpg — wall art source images
-//  • README.txt — import hints
+//  - room_scene.gltf + room_scene.bin — walls, floors, doors, windows, placeholders
+//  - textures/ — procedural wall/floor patterns when used
+//  - furniture/*.usdz — copies of replacement models
+//  - wall_art/*.jpg — wall art source images
+//  - README.txt — import hints
 //
 
 import Foundation
@@ -67,7 +67,7 @@ enum RoomBlenderExportService {
         let arResolver = ExportPoseResolver(catalog: catalog)
         let markerColor = SIMD4<Float>(0.2, 0.92, 0.45, 0.12)
 
-        // ── Structure: walls ──
+        // Structure: walls
         for (i, wall) in capturedRoom.walls.enumerated() {
             let d = clampDims(wall.dimensions)
             let texRel: String?
@@ -93,7 +93,7 @@ enum RoomBlenderExportService {
             )
         }
 
-        // ── Floors ──
+        // Floors
         for (i, floor) in capturedRoom.floors.enumerated() {
             let d = clampDims(floor.dimensions)
             let texRel: String?
@@ -119,7 +119,7 @@ enum RoomBlenderExportService {
             )
         }
 
-        // ── Doors / windows (semi-transparent in editor) ──
+        // Doors / windows (semi-transparent in editor)
         for (i, door) in capturedRoom.doors.enumerated() {
             let d = clampDims(door.dimensions)
             let c = UIColor(red: 0.3, green: 0.5, blue: 0.9, alpha: 0.25)
@@ -145,7 +145,7 @@ enum RoomBlenderExportService {
             )
         }
 
-        // ── Scanned furniture: replaced (USDZ) vs wireframe placeholder ──
+        // Scanned furniture: replaced (USDZ) vs wireframe placeholder
         for (index, object) in capturedRoom.objects.enumerated() {
             guard isFurnitureObject(object) else { continue }
             let target = clampDims(object.dimensions)
@@ -186,7 +186,7 @@ enum RoomBlenderExportService {
             }
         }
 
-        // ── Free-placed furniture (originalCategory == "added") ──
+        // Free-placed furniture (originalCategory == "added")
         for rep in room.furnitureReplacements where rep.originalCategory == "added" {
             guard let xform = rep.getTransformMatrix(),
                   let srcURL = catalog.modelFileURL(for: rep.replacedWithUSDZ)
@@ -218,7 +218,7 @@ enum RoomBlenderExportService {
             }
         }
 
-        // ── Wall art: textured plane in glTF + copy JPEG ──
+        // Wall art: textured plane in glTF + copy JPEG
         for rep in room.furnitureReplacements where rep.isWallArt {
             guard let xform = rep.getTransformMatrix(),
                   let imageFile = rep.wallArtImageFile,
@@ -252,7 +252,7 @@ enum RoomBlenderExportService {
             }
         }
 
-        // ── Lighting: placeholder box + manifest for Blender lights / simple fixture mesh ──
+        // Lighting: placeholder box + manifest for Blender lights / simple fixture mesh
         for rep in room.furnitureReplacements where rep.isLighting {
             guard let xform = rep.getTransformMatrix(),
                   let fixtureRaw = rep.lightFixtureType,
@@ -1133,7 +1133,7 @@ private final class ExportPoseResolver {
 
     /// World matrix and half-extents for decor (lighting, carpet).
     /// Translation is taken from world-space `visualBounds.center` so floor-anchored items
-    /// (carpet, floor lamp) are not shifted — the stored transform is often at floor level
+    /// (carpet, floor lamp) are not shifted -- the stored transform is often at floor level
     /// while the mesh extends upward.
     func worldMatrixAndHalfExtentsForDecor(
         transform: simd_float4x4,

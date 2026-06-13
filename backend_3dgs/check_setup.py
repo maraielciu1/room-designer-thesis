@@ -84,9 +84,9 @@ def main():
                     print("Use this Server URL in the app (same Wi‑Fi):")
                     print(f"  \033[1mhttp://{ip}:{config.PORT}\033[0m")
                 else:
-                    print("Could not detect Wi‑Fi IP. Find it in System Settings → Wi‑Fi → your network.")
+                    print("Could not detect Wi‑Fi IP. Find it in System Settings -> Wi‑Fi -> your network.")
         except Exception:
-            print("Could not detect Wi‑Fi IP. Find it in System Settings → Wi‑Fi → your network.")
+            print("Could not detect Wi‑Fi IP. Find it in System Settings -> Wi‑Fi -> your network.")
     print()
     print("Ready. Start the backend with: python app.py")
 

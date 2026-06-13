@@ -20,7 +20,7 @@ import config
 from run_pipeline import check_colmap_ready
 ok, err = check_colmap_ready()
 if not ok:
-    print("\n*** COLMAP check failed — pipeline would fail on first job ***")
+    print("\n*** COLMAP check failed - pipeline would fail on first job ***")
     print(err)
     print("Fix the issue above, then restart the server.\n")
     sys.exit(1)

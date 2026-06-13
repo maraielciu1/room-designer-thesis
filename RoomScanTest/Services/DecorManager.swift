@@ -14,9 +14,7 @@ import RealityKit
 
 enum DecorManager {
 
-    // ═══════════════════════════════════════════════════════════════
     // MARK: - Wall Art — Image I/O
-    // ═══════════════════════════════════════════════════════════════
 
     static var wallArtDirectory: URL {
         let dir = FileManager.default
@@ -68,9 +66,7 @@ enum DecorManager {
         try? FileManager.default.removeItem(at: url)
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // MARK: - Wall Art — Entity Builder
-    // ═══════════════════════════════════════════════════════════════
 
     /// Returns a RealityKit entity tree: frame (box) + canvas (plane with photo).
     static func createWallArtEntity(
@@ -123,7 +119,7 @@ enum DecorManager {
             container.addChild(frameEntity)
         }
 
-        // ── Canvas (photo texture on a vertical plane) ──
+        // Canvas (photo texture on a vertical plane)
         let canvasMesh = MeshResource.generatePlane(
             width: artW, height: artH)
 
@@ -142,9 +138,7 @@ enum DecorManager {
         return container
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // MARK: - Lighting — Entity Builder
-    // ═══════════════════════════════════════════════════════════════
 
     static func createLightFixture(
         type: LightFixtureType,
@@ -161,7 +155,7 @@ enum DecorManager {
         }
     }
 
-    // ── Pendant Globe ──────────────────────────────────────────
+    // Pendant Globe
 
     private static func pendantGlobe(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -197,7 +191,7 @@ enum DecorManager {
         return root
     }
 
-    // ── Pendant Drum ───────────────────────────────────────────
+    // Pendant Drum
 
     private static func pendantDrum(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -216,7 +210,7 @@ enum DecorManager {
         rod.position.y = -0.135
         root.addChild(rod)
 
-        // Drum shade (short fat cylinder)
+        // Drum shade (short cylinder)
         let shadeMat = SimpleMaterial(
             color: color.withAlphaComponent(0.85), isMetallic: false)
         let shade = ModelEntity(
@@ -234,7 +228,7 @@ enum DecorManager {
         return root
     }
 
-    // ── Chandelier ─────────────────────────────────────────────
+    // Chandelier
 
     private static func chandelier(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -298,7 +292,7 @@ enum DecorManager {
         return root
     }
 
-    // ── Ceiling Flush ──────────────────────────────────────────
+    //  Ceiling Flush
 
     private static func ceilingFlush(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -325,7 +319,7 @@ enum DecorManager {
         return root
     }
 
-    // ── Wall Sconce ────────────────────────────────────────────
+    // Wall Sconce
 
     private static func wallSconce(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -360,7 +354,7 @@ enum DecorManager {
         return root
     }
 
-    // ── Floor Lamp ─────────────────────────────────────────────
+    // Floor Lamp
 
     private static func floorLamp(color: UIColor, intensity: Float) -> Entity {
         let root = Entity(); root.name = "__lighting__"
@@ -398,9 +392,7 @@ enum DecorManager {
         return root
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // MARK: - Carpet / Rug — Entity Builder
-    // ═══════════════════════════════════════════════════════════════
 
     /// Returns a carpet entity: a flat box (or cylinder for round) textured with the chosen colour & pattern.
     static func createCarpetEntity(
@@ -547,7 +539,7 @@ enum DecorManager {
         }
     }
 
-    // ── PointLight helper ──────────────────────────────────────
+    // PointLight helper 
 
     private static func pointLight(
         color: UIColor, intensity: Float

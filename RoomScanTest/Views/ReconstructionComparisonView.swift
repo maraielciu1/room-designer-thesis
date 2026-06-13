@@ -36,12 +36,12 @@ struct ReconstructionComparisonView: View {
             AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Mode Picker ──
+                //  Mode Picker 
                 modePicker
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
-                // ── Content ──
+                //  Content 
                 switch viewMode {
                 case .objectCapture:
                     objectCapturePanel
@@ -54,7 +54,7 @@ struct ReconstructionComparisonView: View {
                         .transition(.opacity)
                 }
 
-                // ── Stats Bar ──
+                //  Stats Bar 
                 statsBar
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)

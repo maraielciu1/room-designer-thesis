@@ -18,28 +18,28 @@ import simd
 
 class GaussianSplatRenderer: NSObject {
 
-    // ── Metal state ──
+    // Metal state
     let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLRenderPipelineState
 
-    // ── Buffers ──
+    // Buffers
     private var gaussianBuffer: MTLBuffer?
     private var indexBuffer: MTLBuffer?
 
-    // ── Scene ──
+    // Scene
     private(set) var gaussianCount: Int = 0
     private var gpuGaussians: [GaussianGPU] = []
     private var scene: GaussianSplatScene?
     private var sortedIndices: [UInt32] = []
 
-    // ── Camera ──
+    // Camera
     var orbitTheta: Float = 0                       // azimuth (radians)
     var orbitPhi: Float = Float.pi / 6              // elevation (radians)
     var orbitDistance: Float = 2.0                   // distance from center
     var orbitCenter: SIMD3<Float> = .zero            // look-at target
 
-    // ── Performance ──
+    // Performance
     private(set) var lastFrameTime: CFTimeInterval = 0
     private var lastTimestamp: CFTimeInterval = 0
 
@@ -152,7 +152,7 @@ class GaussianSplatRenderer: NSObject {
         let drawableSize = view.drawableSize
         let aspect = Float(drawableSize.width / drawableSize.height)
 
-        // ── Compute camera matrices ──
+        // Compute camera matrices
         let viewMatrix = Self.lookAt(
             eye: cameraPosition, center: orbitCenter, up: SIMD3<Float>(0, 1, 0)
         )
@@ -160,21 +160,21 @@ class GaussianSplatRenderer: NSObject {
             fovY: Float.pi / 3, aspect: aspect, near: 0.01, far: 200.0
         )
 
-        // ── Sort Gaussians back-to-front ──
+        // Sort Gaussians back-to-front
         sortGaussians(viewMatrix: viewMatrix)
 
-        // ── Upload sorted indices ──
+        //  Upload sorted indices
         let idxPtr = indexBuffer.contents().bindMemory(to: UInt32.self, capacity: sortedIndices.count)
         for i in 0..<sortedIndices.count { idxPtr[i] = sortedIndices[i] }
 
-        // ── Uniforms ──
+        // Uniforms
         var uniforms = GaussianUniforms(
             viewMatrix: viewMatrix,
             projectionMatrix: projMatrix,
             viewport: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
         )
 
-        // ── Render ──
+        // Render
         passDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.04, green: 0.05, blue: 0.09, alpha: 1)
         passDescriptor.colorAttachments[0].loadAction = .clear
         passDescriptor.colorAttachments[0].storeAction = .store
@@ -266,7 +266,7 @@ class GaussianSplatRenderer: NSObject {
     #include <metal_stdlib>
     using namespace metal;
 
-    // ── GPU data structures (must match Swift GaussianGPU / GaussianUniforms) ──
+    // GPU data structures (must match Swift GaussianGPU / GaussianUniforms) 
 
     struct GaussianGPU {
         packed_float3 position;   // 12 B
@@ -291,7 +291,7 @@ class GaussianSplatRenderer: NSObject {
         float3 cov2D;            // (a, b, c)  of  [[a,b],[b,c]]
     };
 
-    // ── Quaternion → rotation matrix ──
+    // Quaternion -> rotation matrix 
 
     float3x3 quatToRotMat(float4 q) {
         float w = q.x, x = q.y, y = q.z, z = q.w;
@@ -302,7 +302,7 @@ class GaussianSplatRenderer: NSObject {
         );
     }
 
-    // ── Vertex shader: project Gaussians and compute 2D covariance ──
+    //  Vertex shader: project Gaussians and compute 2D covariance
 
     vertex VertexOut gaussianVertex(
         uint vertexID   [[vertex_id]],
@@ -318,7 +318,7 @@ class GaussianSplatRenderer: NSObject {
         float2 corners[4] = { float2(-1,-1), float2(1,-1), float2(-1,1), float2(1,1) };
         float2 corner = corners[vertexID];
 
-        // ── World → camera ──
+        // World -> camera 
         float3 worldPos = float3(g.position);
         float4 camPos   = uniforms.viewMatrix * float4(worldPos, 1.0);
 
@@ -330,35 +330,35 @@ class GaussianSplatRenderer: NSObject {
             return out;
         }
 
-        // ── 3D covariance  Σ = R·S·Sᵀ·Rᵀ ──
+        // 3D covariance  E = R * S * S^T * R^T 
         float3x3 R = quatToRotMat(float4(g.rotation));
         float3 s   = float3(g.scale);
         float3x3 S = float3x3(float3(s.x,0,0), float3(0,s.y,0), float3(0,0,s.z));
         float3x3 M = R * S;
         float3x3 cov3D = M * transpose(M);
 
-        // ── Focal lengths in pixels ──
+        // Focal lengths in pixels 
         float fx = uniforms.projectionMatrix[0][0] * uniforms.viewport.x * 0.5;
         float fy = uniforms.projectionMatrix[1][1] * uniforms.viewport.y * 0.5;
 
         float d  = -camPos.z;   // positive depth
         float d2 = d * d;
 
-        // ── Jacobian of projection (3×3 padded) ──
+        //  Jacobian of projection (3 x 3 padded) 
         float3x3 J = float3x3(
             float3(fx/d, 0, 0),
             float3(0, fy/d, 0),
             float3(fx*camPos.x/d2, fy*camPos.y/d2, 0)
         );
 
-        // ── View rotation (3×3 part of view matrix) ──
+        // View rotation (3 x 3 part of view matrix)
         float3x3 W = float3x3(
             uniforms.viewMatrix[0].xyz,
             uniforms.viewMatrix[1].xyz,
             uniforms.viewMatrix[2].xyz
         );
 
-        // ── 2D covariance ──
+        // 2D covariance 
         float3x3 T   = J * W;
         float3x3 cov = T * cov3D * transpose(T);
 
@@ -366,7 +366,7 @@ class GaussianSplatRenderer: NSObject {
         float b = cov[0][1];
         float c = cov[1][1] + 0.3;
 
-        // ── Eigenvalues → quad radius (3σ) ──
+        // Eigenvalues -> quad radius (3 sig) 
         float det  = a * c - b * b;
         if (det <= 0) det = 0.0001;
         float tr   = a + c;
@@ -374,11 +374,11 @@ class GaussianSplatRenderer: NSObject {
         float lam  = max(0.1, tr * 0.5 + sqrt(disc));
         float radius = clamp(ceil(3.0 * sqrt(lam)), 1.0, 2048.0);
 
-        // ── Project center → clip / NDC ──
+        // Project center -> clip / NDC 
         float4 clip = uniforms.projectionMatrix * camPos;
         float2 ndc  = clip.xy / clip.w;
 
-        // ── Quad vertex position ──
+        // Quad vertex position 
         float2 pxOff  = corner * radius;
         float2 ndcOff = pxOff / (uniforms.viewport * 0.5);
 
@@ -391,7 +391,7 @@ class GaussianSplatRenderer: NSObject {
         return out;
     }
 
-    // ── Fragment shader: evaluate 2D Gaussian ──
+    // Fragment shader: evaluate 2D Gaussian 
 
     fragment float4 gaussianFragment(VertexOut in [[stage_in]]) {
         float a = in.cov2D.x;
@@ -404,7 +404,7 @@ class GaussianSplatRenderer: NSObject {
         float invDet = 1.0 / det;
         float2 d = in.pixelOffset;
 
-        // x^T Σ^{-1} x  for  Σ^{-1} = (1/det)·[[c, -b], [-b, a]]
+        // x^T E^{-1} x  for  E^{-1} = (1/det)·[[c, -b], [-b, a]]
         float power = -0.5 * (d.x*d.x*c*invDet - 2.0*d.x*d.y*b*invDet + d.y*d.y*a*invDet);
 
         if (power > 0.0) discard_fragment();

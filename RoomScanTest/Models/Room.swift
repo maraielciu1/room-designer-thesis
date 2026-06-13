@@ -14,7 +14,7 @@ struct Room: Identifiable, Codable {
     var userId: UUID
     var createdAt: Date
     var updatedAt: Date
-    var capturedRoomExportURL: String? // Legacy — kept for backward compat
+    var capturedRoomExportURL: String? // Legacy - kept for backward compat
     var furnitureReplacements: [FurnitureReplacement]
     
     /// Wall / floor colours captured from ARKit frames during the RoomPlan scan.

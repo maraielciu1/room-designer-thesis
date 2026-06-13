@@ -225,7 +225,7 @@ struct RoomDesignerView: View {
                     }
                 }
 
-                // ── Overlay UI ──
+                //  Overlay UI 
                 VStack(spacing: 0) {
                     Spacer()
 
@@ -455,7 +455,7 @@ struct RoomDesignerView: View {
             .animation(.easeInOut(duration: 0.25), value: selectedObject?.stableId)
         } else {
             VStack(spacing: 0) {
-                // ── Collapsible header ──
+                //  Collapsible header 
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         editorHintsExpanded.toggle()
@@ -485,7 +485,7 @@ struct RoomDesignerView: View {
                 }
                 .buttonStyle(.plain)
 
-                // ── Expandable content ──
+                //  Expandable content 
                 if editorHintsExpanded {
                     VStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
@@ -496,7 +496,7 @@ struct RoomDesignerView: View {
                             hintRow(icon: "rotate.right", text: "Twist to rotate selected")
                         }
 
-                        // ── Room Materials ──
+                        //  Room Materials 
                         VStack(spacing: 0) {
                             Divider().background(DesignerPalette.warmAccent.opacity(0.25))
                                 .padding(.bottom, 10)
@@ -512,7 +512,7 @@ struct RoomDesignerView: View {
                             }
                             .padding(.bottom, 8)
 
-                            // ── Walls ──
+                            //  Walls 
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(spacing: 8) {
                                     RoundedRectangle(cornerRadius: 5)
@@ -534,7 +534,7 @@ struct RoomDesignerView: View {
                             }
                             .padding(.bottom, 10)
 
-                            // ── Floors ──
+                            //  Floors 
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(spacing: 8) {
                                     RoundedRectangle(cornerRadius: 5)
@@ -556,7 +556,7 @@ struct RoomDesignerView: View {
                             }
                         }
 
-                        // ── Add Buttons ──
+                        //  Add Buttons 
                         VStack(spacing: 8) {
                             Button(action: { showAddFurnitureCatalog = true }) {
                                 Label("Add Furniture", systemImage: "plus.circle.fill")
@@ -669,7 +669,7 @@ struct RoomDesignerView: View {
                 }
             }
 
-            // ── Object dimensions ──
+            //  Object dimensions 
             let objDims = MeasurementService.measureScannedObject(
                 dimensions: object.dimensions, category: object.categoryDescription)
             HStack(spacing: 12) {
@@ -682,7 +682,7 @@ struct RoomDesignerView: View {
                 Spacer()
             }
 
-            // ── Axis legend + actions ──
+            //  Axis legend + actions 
             HStack(spacing: 10) {
                 // Axis colour key
                 HStack(spacing: 8) {
@@ -1171,7 +1171,7 @@ struct RoomModelSceneView: UIViewRepresentable {
     let colorTrigger: Int
     let refreshTrigger: Int
 
-    // ── makeUIView ────────────────────────────────────────────────
+    //  makeUIView 
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
@@ -1199,7 +1199,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         return view
     }
 
-    // ── updateUIView ──────────────────────────────────────────────
+    //  updateUIView 
 
     func updateUIView(_ uiView: ARView, context: Context) {
         let coord = context.coordinator
@@ -1238,7 +1238,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         rebuildFurniture(in: uiView, context: context)
     }
 
-    // ── computeRoomBounds ─────────────────────────────────────────
+    //  computeRoomBounds ─
 
     private func computeRoomBounds(context: Context) {
         var mn = SIMD3<Float>(repeating:  Float.greatestFiniteMagnitude)
@@ -1304,7 +1304,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         coord.orbitCenter = (mn + mx) / 2
     }
 
-    // ── buildScene — full scene construction ──────────────────────
+    //  buildScene — full scene construction 
 
     private func buildScene(in view: ARView, context: Context) {
         // Remove everything except the camera anchor
@@ -1348,7 +1348,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         coord.updateSelectionHighlight()
     }
 
-    // ── addLighting ───────────────────────────────────────────────
+    //  addLighting ─
 
     private func addLighting(to view: ARView, context: Context) {
         let c = context.coordinator.orbitCenter
@@ -1382,7 +1382,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
     }
 
-    // ── addGroundPlane ────────────────────────────────────────────
+    //  addGroundPlane 
 
     private func addGroundPlane(to view: ARView, context: Context) {
         let coord = context.coordinator
@@ -1409,7 +1409,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
     }
 
-    // ── addRoomStructure — walls, floors, doors, windows ──────────
+    //  addRoomStructure — walls, floors, doors, windows 
 
     private func addRoomStructure(to view: ARView) {
         // Use the user-chosen colours (from colour picker / captured scan)
@@ -1429,7 +1429,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         let wallOpacity:  Float = 1.0
         let floorOpacity: Float = 1.0
 
-        // ── Walls ──
+        //  Walls 
         for wall in capturedRoom.walls {
             addStructuralElement(
                 to: view,
@@ -1443,7 +1443,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             )
         }
 
-        // ── Floors ──
+        //  Floors 
         for floor in capturedRoom.floors {
             addStructuralElement(
                 to: view,
@@ -1457,7 +1457,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             )
         }
 
-        // ── Doors ──
+        //  Doors 
         for door in capturedRoom.doors {
             addStructuralElement(
                 to: view,
@@ -1470,7 +1470,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             )
         }
 
-        // ── Windows ──
+        //  Windows 
         for window in capturedRoom.windows {
             addStructuralElement(
                 to: view,
@@ -1585,7 +1585,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
     }
 
-    // ── addFurniture ──────────────────────────────────────────────
+    //  addFurniture 
 
     private func addFurniture(to view: ARView, context: Context) {
         let coord = context.coordinator
@@ -1634,7 +1634,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                     max(dims.x, 0.1), max(dims.y, 0.1), max(dims.z, 0.1)
                 )
 
-                // ── Choose loading strategy ──
+                //  Choose loading strategy 
                 // Scanned models are at real-world scale (1 unit = 1 m).
                 // Built-in catalogue models need to be scaled to fit the target box.
                 let modelName = replacement.replacedWithUSDZ
@@ -1747,7 +1747,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             )
             coord.allObjectMap[key] = addedObj
 
-            // ── Load model ──
+            //  Load model 
             let modelName = rep.replacedWithUSDZ
             let defaultDims = SIMD3<Float>(0.5, 0.5, 0.5)
             let useRealScale = catMgr.isScannedModel(modelName)
@@ -2029,7 +2029,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         }
     }
 
-    // ── setupCamera ───────────────────────────────────────────────
+    //  setupCamera ─
 
     private func setupCamera(in view: ARView, context: Context) {
         let coord = context.coordinator
@@ -2051,7 +2051,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         coord.updateCameraTransform()
     }
 
-    // ── setupGestures ─────────────────────────────────────────────
+    //  setupGestures ─
 
     private func setupGestures(on view: ARView, coordinator: Coordinator) {
         view.gestureRecognizers?.forEach { view.removeGestureRecognizer($0) }
@@ -2104,7 +2104,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         view.addGestureRecognizer(rotation)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
+    //  Helpers ─
 
     static func wireframeColor(for category: String) -> UIColor {
         if category.contains("chair")   { return .systemTeal }
@@ -2139,7 +2139,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         return container
     }
 
-    // ── makeCoordinator ───────────────────────────────────────────
+    //  makeCoordinator ─
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -2157,14 +2157,14 @@ struct RoomModelSceneView: UIViewRepresentable {
 
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
 
-        // ── SwiftUI bindings ──
+        //  SwiftUI bindings 
         @Binding var selectedObject: ScannedObject?
         @Binding var showFullCatalog: Bool
         @Binding var isManipulating: Bool
         var roomBinding: Binding<Room>
         let capturedRoom: CapturedRoom
 
-        // ── External references ──
+        //  External references 
         var view: ARView?
         var catalogManager: FurnitureCatalogManager?
         var roomManager: RoomManager?
@@ -2172,7 +2172,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         var lastResetSignal: Bool = false
         var lastColorTrigger: Int = 0
 
-        // ── Camera state (orbit) ──
+        //  Camera state (orbit) 
         var cameraEntity: PerspectiveCamera?
         var cameraAnchor: AnchorEntity?
         var orbitCenter: SIMD3<Float> = .zero
@@ -2184,14 +2184,14 @@ struct RoomModelSceneView: UIViewRepresentable {
         var floorY: Float = 0
         var lastHeightSignal: Int = 0
 
-        // ── Camera state (first-person / in-room) ──
+        //  Camera state (first-person / in-room) 
         var isFirstPerson: Bool = false
         var fpYaw: Float = 0            // horizontal look angle (radians)
         var fpPitch: Float = 0          // vertical look angle (clamped)
         var fpPosition: SIMD3<Float> = .zero   // eye position in world space
         private var cameraModeObserver: NSObjectProtocol?
 
-        // ── Object maps ──
+        //  Object maps 
         var allObjectMap:        [String: ScannedObject] = [:]
         var anchorMap:           [String: AnchorEntity]  = [:]   // scene-level anchors (fixed)
         var moverMap:            [String: Entity]        = [:]   // movable containers (moved by drag)
@@ -2199,11 +2199,11 @@ struct RoomModelSceneView: UIViewRepresentable {
         var wireframeContentMap: [String: Entity]        = [:]
         var initialScaleMap:     [String: Float]         = [:]
 
-        // ── Selection ──
+        //  Selection 
         var selectedKey: String?
         var selectionHighlight: Entity?
 
-        // ── Gizmo (axis arrows) ──
+        //  Gizmo (axis arrows) 
         var gizmoAnchor: AnchorEntity?
 
         enum DragMode {
@@ -2212,7 +2212,7 @@ struct RoomModelSceneView: UIViewRepresentable {
         }
         var activeDragMode: DragMode?
 
-        // ── Gesture state ──
+        //  Gesture state 
         var panRightDir: SIMD3<Float> = .zero     // locked at pan start (freeXZ)
         var panForwardDir: SIMD3<Float> = .zero   // locked at pan start (freeXZ)
         var panMetersPerPixel: Float = 0           // locked at pan start
@@ -2255,7 +2255,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── First-Person Mode Toggle ────────────────────────────────
+        //  First-Person Mode Toggle 
 
         func setFirstPerson(_ enabled: Bool) {
             isFirstPerson = enabled
@@ -2272,7 +2272,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             updateCameraTransform()
         }
 
-        // ── Camera Transform ─────────────────────────────────────
+        //  Camera Transform ─
 
         func updateCameraTransform() {
             guard let cam = cameraEntity else { return }
@@ -2292,7 +2292,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── Hit Testing ──────────────────────────────────────────
+        //  Hit Testing 
 
         private func findClosestObjectKey(at point: CGPoint) -> String? {
             guard let view = view else { return nil }
@@ -2314,7 +2314,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             return bestKey
         }
 
-        // ── Tap → select / deselect ──────────────────────────────
+        //  Tap → select / deselect 
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             let loc = gesture.location(in: view)
@@ -2330,7 +2330,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             updateSelectionHighlight()
         }
 
-        // ── Long Press → full catalog ────────────────────────────
+        //  Long Press → full catalog 
 
         @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
             guard gesture.state == .began else { return }
@@ -2342,7 +2342,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── Camera Orbit (two-finger pan) ────────────────────────
+        //  Camera Orbit (two-finger pan) 
 
         @objc func handleCameraOrbit(_ gesture: UIPanGestureRecognizer) {
             guard gesture.state == .changed else { return }
@@ -2362,7 +2362,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             updateCameraTransform()
         }
 
-        // ── Zoom (pinch) ─────────────────────────────────────────
+        //  Zoom (pinch) ─
 
         @objc func handleZoom(_ gesture: UIPinchGestureRecognizer) {
             guard gesture.state == .changed else { return }
@@ -2388,13 +2388,13 @@ struct RoomModelSceneView: UIViewRepresentable {
             updateCameraTransform()
         }
 
-        // ── Object Move (one-finger pan — gizmo or free XZ) ──────
+        //  Object Move (one-finger pan — gizmo or free XZ) 
 
         @objc func handleObjectPan(_ gesture: UIPanGestureRecognizer) {
             guard let key = selectedKey,
                   let mover = moverMap[key] else { return }
 
-            // ── Chase speed ──
+            //  Chase speed 
             // How fast the object catches the target each frame.
             // 0.18 = silky smooth, 0.4 = responsive, 1.0 = instant.
             let chase: Float = 0.18
@@ -2458,7 +2458,7 @@ struct RoomModelSceneView: UIViewRepresentable {
                 let translation = gesture.translation(in: view)
                 gesture.setTranslation(.zero, in: view)
 
-                // ── 1. Compute raw delta from finger movement ──
+                //  1. Compute raw delta from finger movement 
                 var rawDelta: SIMD3<Float> = .zero
 
                 switch mode {
@@ -2484,10 +2484,10 @@ struct RoomModelSceneView: UIViewRepresentable {
                     rawDelta = SIMD3<Float>(d.x, 0, d.z)
                 }
 
-                // ── 2. Advance the TARGET by raw delta ──
+                //  2. Advance the TARGET by raw delta 
                 targetDragPos += rawDelta
 
-                // ── 3. Clamp TARGET to room bounds (5 cm inset) ──
+                //  3. Clamp TARGET to room bounds (5 cm inset) 
                 let inset: Float = 0.05
                 targetDragPos.x = max(roomBoundsMin.x + inset,
                                       min(roomBoundsMax.x - inset, targetDragPos.x))
@@ -2496,14 +2496,14 @@ struct RoomModelSceneView: UIViewRepresentable {
                 targetDragPos.y = max(floorY,
                                       min(roomBoundsMax.y, targetDragPos.y))
 
-                // ── 4. Clamp TARGET total distance from start (2.5 m) ──
+                //  4. Clamp TARGET total distance from start (2.5 m) 
                 let fromStart = targetDragPos - dragStartPos
                 let totalDist = simd_length(fromStart)
                 if totalDist > 2.5 {
                     targetDragPos = dragStartPos + simd_normalize(fromStart) * 2.5
                 }
 
-                // ── 5. Smoothly chase the target (lerp — can NEVER overshoot) ──
+                //  5. Smoothly chase the target (lerp — can NEVER overshoot) 
                 let curPos = mover.position(relativeTo: nil)
                 let newPos = simd_mix(curPos, targetDragPos,
                                       SIMD3<Float>(repeating: chase))
@@ -2534,7 +2534,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── Object Rotation (two-finger twist) ───────────────────
+        //  Object Rotation (two-finger twist) ─
 
         @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
             guard let key = selectedKey else { return }
@@ -2560,7 +2560,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── Persist Manipulation ─────────────────────────────────
+        //  Persist Manipulation ─
 
         func saveManipulation(for key: String) {
             guard let obj = allObjectMap[key],
@@ -2605,7 +2605,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             roomManager?.updateRoom(roomBinding.wrappedValue)
         }
 
-        // ── Reset ────────────────────────────────────────────────
+        //  Reset 
 
         func resetSelectedEntity() {
             guard let key = selectedKey,
@@ -2630,7 +2630,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             rotationStart = nil
         }
 
-        // ── Height adjustment (Y-axis) — kept as programmatic API ──
+        //  Height adjustment (Y-axis) — kept as programmatic API 
 
         func adjustHeight(by delta: Float) {
             guard let key = selectedKey,
@@ -2649,7 +2649,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             }
         }
 
-        // ── Gizmo: create axis arrows ────────────────────────────
+        //  Gizmo: create axis arrows 
 
         /// Builds the 3-axis gizmo (red=X, green=Y, blue=Z) at a world position.
         func showGizmo(at worldPos: SIMD3<Float>) {
@@ -2771,7 +2771,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             return bestMode
         }
 
-        // ── Selection Highlight + Gizmo ─────────────────────────────
+        //  Selection Highlight + Gizmo ─
 
         func updateSelectionHighlight() {
             selectionHighlight?.removeFromParent()
@@ -2805,7 +2805,7 @@ struct RoomModelSceneView: UIViewRepresentable {
             showGizmo(at: worldPos)
         }
 
-        // ── UIGestureRecognizerDelegate ──────────────────────────
+        //  UIGestureRecognizerDelegate 
 
         /// Only allow the one-finger pan when the touch starts on a
         /// gizmo arrow or near the selected object's center.

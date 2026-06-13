@@ -137,7 +137,7 @@ struct ProjectListView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AppTheme.primaryText)
 
-            Text("Create a project to group multiple room scans together — perfect for planning an entire home or workspace.")
+            Text("Create a project to group multiple room scans together, perfect for planning an entire home or workspace.")
                 .font(.subheadline)
                 .foregroundColor(AppTheme.secondaryText)
                 .multilineTextAlignment(.center)

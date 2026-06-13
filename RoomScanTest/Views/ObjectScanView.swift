@@ -6,7 +6,7 @@
 //  Object Capture API (iOS 17+), reconstructs a USDZ model on-device,
 //  and saves it to the user's personal furniture library.
 //
-//  IMPORTANT — ObjectCaptureView's built-in buttons (Continue, Start
+//  IMPORTANT - ObjectCaptureView's built-in buttons (Continue, Start
 //  Capture, Done) are unreliable when presented inside .fullScreenCover.
 //  We provide our OWN buttons for every session-state transition.
 //
@@ -76,16 +76,16 @@ struct ObjectScanView: View {
     var body: some View {
         if phase == .capturing, let session = captureSession {
             // ═══════════════════════════════════════════════════════
-            //  CAPTURING — camera feed + our custom controls
+            //  CAPTURING - camera feed + our custom controls
             // ═══════════════════════════════════════════════════════
             ZStack {
-                // Layer 1 — Apple's camera + visual guides
+                // Layer 1 - Apple's camera + visual guides
                 ObjectCaptureView(session: session)
                     .ignoresSafeArea()
 
-                // Layer 2 — Our buttons (transparent background lets camera show)
+                // Layer 2 - Our buttons (transparent background lets camera show)
                 VStack(spacing: 0) {
-                    // ── Top bar: Cancel + State badge ──
+                    //  Top bar: Cancel + State badge 
                     HStack(alignment: .top) {
                         Button(action: { cleanupAndReset() }) {
                             HStack(spacing: 5) {
@@ -135,7 +135,7 @@ struct ObjectScanView: View {
                     .padding(.top, 60)
                     .padding(.horizontal, 16)
 
-                    // ── Instructions — pinned just below the top bar ──
+                    //  Instructions - pinned just below the top bar 
                     Text(currentInstructions)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(AppTheme.primaryText)
@@ -149,7 +149,7 @@ struct ObjectScanView: View {
 
                     Spacer()
 
-                    // ── Bottom: Action button only ──
+                    //  Bottom: Action button only 
                     if !sessionState.contains("Finishing") &&
                        !sessionState.contains("Completed") {
                         Button(action: { handlePrimaryAction(session) }) {
@@ -496,7 +496,7 @@ struct ObjectScanView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
-            // ── Gaussian Splatting export option ──
+            //  Gaussian Splatting export option 
             VStack(spacing: 12) {
                 Divider()
                     .background(AppTheme.warmAccent.opacity(0.25))
@@ -524,7 +524,7 @@ struct ObjectScanView: View {
                     .padding(.horizontal, 24)
                 }
 
-                // ── Train in Cloud (server runs 3DGS, then app downloads .ply) ──
+                //  Train in Cloud (server runs 3DGS, then app downloads .ply) 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Server URL (your backend that runs 3DGS)")
                         .font(.caption2)
@@ -630,13 +630,12 @@ struct ObjectScanView: View {
 
             print("[ObjectScan] Session started")
 
-            // ╔════════════════════════════════════════════════════════╗
-            // ║  CRITICAL: set sessionState BEFORE changing phase.    ║
-            // ║  If we leave it empty, the bottom controls show       ║
-            // ║  EmptyView because the .task that monitors state      ║
-            // ║  starts AFTER the view appears and misses the         ║
-            // ║  initial .ready event from the AsyncStream.           ║
-            // ╚════════════════════════════════════════════════════════╝
+            
+            //   CRITICAL: set sessionState BEFORE changing phase.
+            //   If we leave it empty, the bottom controls show
+            //   EmptyView because the .task that monitors state
+            //   starts AFTER the view appears and misses the
+            //   initial .ready event from the AsyncStream.
             captureSession = session
             sessionState = "Ready"
             phase = .capturing
@@ -660,19 +659,19 @@ struct ObjectScanView: View {
                     sessionState = "Initializing…"
                 case .ready:
                     sessionState = "Ready"
-                    print("[ObjectScan] ✅ Ready — point camera at object, tap Continue")
+                    print("[ObjectScan] ✅ Ready - point camera at object, tap Continue")
                 case .detecting:
                     sessionState = "Detecting"
-                    print("[ObjectScan] ✅ Detecting — position the bounding box")
+                    print("[ObjectScan] ✅ Detecting - position the bounding box")
                 case .capturing:
                     sessionState = "Capturing"
                     numberOfShotsTaken = 0
-                    print("[ObjectScan] ✅ Capturing — walk around the object")
+                    print("[ObjectScan] ✅ Capturing - walk around the object")
                 case .finishing:
                     sessionState = "Finishing…"
                 case .completed:
                     sessionState = "Completed"
-                    print("[ObjectScan] ✅ Completed — starting reconstruction")
+                    print("[ObjectScan] ✅ Completed - starting reconstruction")
                     phase = .reconstructing
                     // Start reconstruction outside MainActor.run (it's async)
                     Task { await startReconstruction() }
@@ -722,7 +721,7 @@ struct ObjectScanView: View {
             return
         }
 
-        // ── Validate that we have enough captured images ──
+        //  Validate that we have enough captured images 
         let imageCount = countCapturedImages(in: imagesDir)
         print("[ObjectScan] Found \(imageCount) captured images in \(imagesDir.lastPathComponent)")
 
@@ -751,7 +750,7 @@ struct ObjectScanView: View {
         print("[ObjectScan] Starting reconstruction (\(imageCount) images) → \(outputURL.lastPathComponent)")
 
         do {
-            // ── Configure session with checkpoint + sequential ordering ──
+            //  Configure session with checkpoint + sequential ordering 
             var configuration = PhotogrammetrySession.Configuration()
             configuration.sampleOrdering = .sequential
             configuration.featureSensitivity = .normal
@@ -808,7 +807,7 @@ struct ObjectScanView: View {
             • Walk a full circle (or two) around the object
             • Make sure the object has visible texture/pattern
             • Avoid shiny, reflective, or transparent surfaces
-            • Use good, even lighting — avoid harsh shadows
+            • Use good, even lighting - avoid harsh shadows
             """
         }
 
@@ -842,7 +841,7 @@ struct ObjectScanView: View {
             usdzURL: modelURL
         )
 
-        // NOTE: Do NOT clean up session files here — the user may still want
+        // NOTE: Do NOT clean up session files here - the user may still want
         // to export the captured images for Gaussian Splatting training from
         // the "done" screen. Cleanup happens when the user taps "Done".
         phase = .done

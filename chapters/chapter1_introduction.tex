@@ -1,3 +1,181 @@
+% \chapter{Introduction}
+% \label{ch:introduction}
+
+% \section{Motivation and Objectives}
+% \label{sec:intro:motivation}
+
+% The problem addressed by this thesis arises at the intersection of two
+% well-documented shortcomings in current practice. On one side, conventional
+% interior design tools, whether two-dimensional floor plans, printed catalogues,
+% or digital product configurators, present furniture and spatial layouts as
+% abstractions that strip away the perceptual properties that ultimately determine
+% whether a redesign succeeds: how an object occludes a window, whether a sofa
+% visually dominates a narrow corridor, or how a chosen material interacts with
+% the room's natural light. On the other side, consumer augmented reality
+% applications that \emph{do} allow virtual objects to be previewed in a live
+% camera feed share a structural limitation identified empirically by
+% Kandil~et~al.~\cite{kandil2021ux}: they treat the room as a transiently
+% detected floor plane, provide no persistent room model, and require the user
+% to be physically present in the space for every design iteration. The result
+% is a tool that is useful for a single in-store moment but not for the extended,
+% iterative process that characterises real interior redesign decisions.
+
+% A more principled approach is to treat the room scan itself as the primary
+% artefact of the workflow. If the real room is captured once as a metric,
+% semantically annotated three-dimensional model, a \emph{digital twin}, subsequent
+% design iterations can be performed at any time and from any location without
+% requiring the user to return to the physical space. Indoor scene understanding
+% research has demonstrated that this level of structure is achievable at scale
+% on consumer hardware: ScanNet~\cite{dai2017scannet} showed that richly annotated
+% RGB-D reconstructions with per-instance semantic labels support a wide range of
+% downstream tasks, and Matterport3D~\cite{CAS+17} extended that work to
+% building-scale scenes with 40-category instance labels. Apple's RoomPlan
+% API~\cite{apple2024roomplan2} brings a real-time, on-device subset of this
+% capability to supported iPhones and iPads, outputting a parametric
+% 'CapturedRoom' whose typed structural surfaces and classified furniture
+% instances reflect the same conceptual taxonomy that these research datasets
+% made trainable.
+
+% A second motivation concerns the asset authoring bottleneck. Replacing a
+% detected furniture item with a virtual equivalent requires a three-dimensional
+% model of that item. Static libraries cover a limited catalogue and exclude
+% bespoke or non-commercial pieces. Object Capture~\cite{apple2024roomplan2}
+% enables the user to scan a physical object with the same device and obtain a
+% USDZ mesh through an on-device photogrammetric pipeline, closing the loop
+% between room capture and asset creation without any external tooling. This
+% symmetry, scan the room with one API, scan replacement assets with another,
+% edit and persist entirely on device, is a defining characteristic of the
+% system developed here. RoomPlan boxes are not CAD; users who need renders, lighting tweaks, or mesh cleanup benefit from exporting the same staged scene the editor uses (not raw `CapturedRoom` JSON alone).
+
+% A third motivation arises from the rapidly evolving landscape of scene
+% representations. 3D Gaussian Splatting~\cite{kerbl20233dgs}, introduced in
+% 2023, achieves real-time rendering quality competitive with neural radiance
+% fields while running at interactive frame rates. Incorporating a viewer for
+% pretrained Gaussian splat data serves two purposes: it allows direct visual
+% comparison between mesh-based and splat-based representations of the same
+% space, and it positions the application as a platform that can be extended
+% when on-device Gaussian training matures~\cite{Guo26}: a path that is
+% architecturally prepared but not yet within the practical constraints of
+% mobile hardware.
+
+% The work pursues the following objectives, each directly justified by the
+% gaps identified above:
+
+% \begin{enumerate}
+%   \item \textbf{Room-scale semantic capture.}
+%     Integrate RoomPlan so that a scan yields a 'CapturedRoom' containing
+%     typed structural elements (walls, floors, ceilings, doors, windows) and
+%     classified furniture instances with metric transforms and bounding dimensions. Without a persistent, semantically structured room
+%     model, furniture replacement cannot be grounded to real geometry. Placing a
+%     virtual sofa ``somewhere on the floor'' is categorically different from
+%     substituting a detected 2.1\,m $\times$ 0.9\,m sofa instance at its
+%     recorded position.
+
+%   \item \textbf{Persistent virtual staging.}
+%     Provide a non-AR three-dimensional editor with orbit-style navigation and
+%     gesture-based manipulation (translation, rotation, scale), with state
+%     persisted across application launches. Kandil~et~al.~\cite{kandil2021ux} found that
+%     requiring physical presence was a primary usability barrier in existing
+%     AR interior apps, and that absence of session persistence was explicitly
+%     noted by participants as a missing feature. The non-AR editor directly
+%     addresses both findings.
+
+%   \item \textbf{Object-scale asset authoring.}
+%     Integrate Object Capture for guided multi-view photogrammetric
+%     reconstruction into USDZ, extending the furniture library beyond static
+%     catalogue content.
+%     A user who owns a non-standard or bespoke piece of
+%     furniture has no catalogue entry to select; the only way to include it in
+%     the design is to scan it. On-device reconstruction removes the dependency
+%     on external photogrammetry software and keeps the entire workflow
+%     self-contained.
+
+%   \item \textbf{Alternative scene representation.}
+%     Support import and interactive viewing of 3D Gaussian Splatting
+%     data~\cite{kerbl20233dgs} via a Metal-based renderer, to contrast implicit rendering with explicit mesh-based staging.
+%     As on-device Gaussian training becomes
+%     practical~\cite{Guo26}, the splat representation could replace or
+%     supplement the photogrammetric asset authoring step. The viewer
+%     infrastructure provides the rendering foundation for that extension while
+%     already delivering a meaningful comparison between representations in the
+%     current application.
+
+%     \item \textbf{DCC export.}
+%     Export the staged room as a self-contained ZIP archive containing a glTF scene
+%     (in metres, with furniture-placement markers), copies of USDZ assets and wall-art
+%     images, JSON manifests, and a blender helper script.
+%     RoomPlan boxes are not CAD; users who need higher-fidelity
+%     renders, custom lighting, or mesh cleanup benefit from handing off the same staged
+%     scene to a desktop DCC tool such as Blender without manually reassembling it.
+% \end{enumerate}
+
+
+% \section{Contributions and Scope}
+% \label{sec:intro:contributions}
+
+% The contributions of this thesis are primarily integrative and
+% engineering-oriented, consistent with the scope of a bachelor project:
+
+% \begin{itemize}
+%   \item \textbf{A unified scan-to-edit pipeline.}
+%     A complete iOS application connecting RoomPlan capture to a serialised
+%     room data model, to a RealityKit scene graph, and to furniture replacement
+%     with persistence across application launches. Each stage is documented in
+%     the requirements and implementation chapters, and the interfaces between
+%     stages are made explicit through Swift domain types.
+
+%   \item \textbf{Theoretical framing of Apple's capture APIs within the
+%     academic literature.}
+%     A structured account of how Object Capture instantiates the classical
+%     photogrammetric chain, feature detection and
+%     matching~\cite{lowe2004sift}, Structure from Motion, Multi-View
+%     Stereo~\cite{furukawa2010pmvs}, Poisson surface
+%     reconstruction~\cite{kazhdan2006poisson}, and how RoomPlan builds on
+%     depth fusion in the TSDF family~\cite{newcombe2011kinectfusion} augmented
+%     by learned structure and semantics. This framing positions the
+%     application's technology choices within the lineage of systems from
+%     KinectFusion~\cite{newcombe2011kinectfusion} through
+%     BundleFusion~\cite{DAN+17} to ARKit-class on-device capture, and supports
+%     a principled comparison with the 3D Gaussian Splatting rendering
+%     path~\cite{kerbl20233dgs}.
+
+%   \item \textbf{A Metal-based Gaussian splat renderer for iOS.}
+%     An implementation of the 3DGS rendering pipeline in Metal, capable of
+%     loading standard binary PLY files produced by common training frameworks
+%     and rendering them at interactive frame rates via CPU-side back-to-front
+%     depth sorting and instanced alpha blending, bridged into SwiftUI via
+%    'MTKView'.
+
+%     \item \textbf{A Blender-oriented export service} that packages the staged room as a
+%     shareable ZIP containing a glTF scene, USDZ furniture copies, wall-art images,
+%     JSON manifests, and a Python helper script for automated Blender import.
+
+%   \item \textbf{A reference architecture for SwiftUI-based spatial apps.}
+%     An application structure following observable patterns (managers injected
+%     as environment objects; clean separation of views, services, and domain
+%     types) that can serve as a baseline for future formal usability
+%     studies~\cite{kandil2021ux}.
+% \end{itemize}
+
+% The thesis focuses on software architecture, core algorithms at a conceptual
+% level, and the iOS platform. It does not contribute novel learning
+% architectures for room understanding: RoomPlan's neural models are Apple's
+% proprietary intellectual property. 3DGS training is assumed to run off-device
+% in the current system; on-device splat training remains
+% research-grade~\cite{Guo26}. Full LiDAR-quality RoomPlan output requires
+% iPhone~12~Pro or later, or a LiDAR-equipped iPad~Pro; the application
+% degrades gracefully on non-LiDAR devices where Apple's API permits.
+
+% The primary deliverable is the iOS application itself, accompanied by a quantitative evaluation (20 object-scan trials and 28 room-scan trials with ground-truth measurements) that characterises the accuracy and failure modes of each capture path. The source code, evaluation data, and Blender export helper script constitute the practical contribution of the work.
+
+
+
+% \section{Thesis Structure}
+
+% Chapter~\ref{ch:soa} presents related work in mobile room capture and scene representation. Chapter~\ref{ch:theory1} covers photogrammetry, depth fusion, and the mapping to Object Capture and RoomPlan. Chapter~\ref{ch:theory2} introduces 3D Gaussian Splatting, differentiable splatting, and the mesh-versus-splat design choice. Chapter~\ref{ch:requirements} formalises functional and non-functional requirements and system constraints. Chapter~\ref{ch:implementation} describes architecture, data flow, implementation details, the user interface, and testing. Chapter~\ref{ch:conclusions} summarises results, limitations, and future work.
+
+% \section{Declaration of Generative AI and AI assisted technologies in the writing process}
+% During the preparation of this work the author used Claude Sonnet 4.6 in order to rephrase text, find synonyms, assist with debugging, and obtain suggestions for layout, styling, and component structure in the user interface. After using this tool/service, the author reviewed and edited the content as needed and takes full responsibility for the content of the thesis.
 \chapter{Introduction}
 \label{ch:introduction}
 
@@ -74,11 +252,12 @@ gaps identified above:
   \item \textbf{Persistent virtual staging.}
     Provide a non-AR three-dimensional editor with orbit-style navigation and
     gesture-based manipulation (translation, rotation, scale), with state
-    persisted across application launches. Kandil~et~al.~\cite{kandil2021ux} found that
-    requiring physical presence was a primary usability barrier in existing
-    AR interior apps, and that absence of session persistence was explicitly
-    noted by participants as a missing feature. The non-AR editor directly
-    addresses both findings.
+    persisted across application launches. Kandil~et~al.~\cite{kandil2021ux},
+    whose findings directly motivate this design choice, identified requiring
+    physical presence as a primary usability barrier in existing AR interior
+    apps, and noted that absence of session persistence was explicitly flagged
+    by participants as a missing feature. The non-AR editor directly addresses
+    both findings.
 
   \item \textbf{Object-scale asset authoring.}
     Integrate Object Capture for guided multi-view photogrammetric
@@ -146,7 +325,14 @@ engineering-oriented, consistent with the scope of a bachelor project:
     depth sorting and instanced alpha blending, bridged into SwiftUI via
    'MTKView'.
 
-    \item \textbf{A Blender-oriented export service} that packages the staged room as a
+  \item \textbf{A virtual decor extension.}
+    Implementation of wall art, carpet, and dynamic lighting as virtual decor
+    categories within the same 'FurnitureReplacement' persistence path, re-materialised
+    on scene reload from stored field values and discriminated by the
+    'originalCategory' string. This extends the editor beyond furniture
+    substitution to full room staging without additional scan sessions.
+
+  \item \textbf{A Blender-oriented export service} that packages the staged room as a
     shareable ZIP containing a glTF scene, USDZ furniture copies, wall-art images,
     JSON manifests, and a Python helper script for automated Blender import.
 

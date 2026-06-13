@@ -28,7 +28,7 @@ struct AppSplashView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                // ── Logo ─────────────────────────────────────────────────────
+                // Logo
                 ZStack {
                     // Outer ring
                     Circle()
@@ -89,7 +89,7 @@ struct AppSplashView: View {
 
                 Spacer().frame(height: 36)
 
-                // ── App name + tagline ────────────────────────────────────────
+                // App name + tagline
                 VStack(spacing: 10) {
                     Text("Room Designer")
                         .font(.system(size: 38, weight: .bold, design: .rounded))
@@ -105,7 +105,7 @@ struct AppSplashView: View {
 
                 Spacer()
 
-                // ── CTA ───────────────────────────────────────────────────────
+                // CTA
                 Button(action: onFinish) {
                     HStack(spacing: 10) {
                         Text("Get Started")

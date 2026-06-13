@@ -14,7 +14,7 @@
 % \begin{enumerate}
 %     \item \textbf{SwiftUI Views} - declarative UI components such as 'MainTabBar', 'RoomDesignerView', 'ObjectScanView and many others.
 %     \item \textbf{Observable Managers} - 'ObservableObject' classes holding domain state ('RoomManager', 'ScannedFurnitureManager', 'ProjectManager' and so on), injected as environment objects or 'StateObject' references.
-%     \item \textbf{Services and Renderers} - stateless or singleton-style helpers: 'SHARPService' (HTTP client), 'GaussianSplatRenderer' (Metal GPU pipeline), 'SmartSuggestionsService', 'RoomColorCaptureService', and 'HistoryManager'.
+%     \item \textbf{Services and Renderers} - stateless or singleton-style helpers: 'SHARPService' (HTTP client), 'GaussianSplatRenderer' (Metal GPU pipeline), 'SmartSuggestionsService', and 'RoomColorCaptureService'.
 %     \item \textbf{Apple Frameworks and Storage} - RoomPlan, Object Capture, RealityKit, and Metal at the framework boundary, with persistent artefacts stored in the app's Documents directory.
 % \end{enumerate}
 
@@ -713,8 +713,8 @@ The architecture is structured into four explicit layers, as shown in Figure~\re
 
 \begin{enumerate}
     \item \textbf{SwiftUI Views} - declarative UI components such as 'MainTabBar', 'RoomDesignerView', 'ObjectScanView' and many others.
-    \item \textbf{Observable Managers} - 'ObservableObject' classes holding domain state ('RoomManager', 'ScannedFurnitureManager', 'ProjectManager' and so on), injected as environment objects or 'StateObject' references.
-    \item \textbf{Services and Renderers} - stateless or singleton-style helpers: 'SHARPService' (HTTP client), 'GaussianSplatRenderer' (Metal GPU pipeline), 'SmartSuggestionsService', 'RoomColorCaptureService', and 'HistoryManager'.
+    \item \textbf{Observable Managers} - 'ObservableObject' classes holding domain state ('RoomManager', 'ScannedFurnitureManager', 'ProjectManager', 'HistoryManager' and so on), injected as environment objects or 'StateObject' references.
+    \item \textbf{Services and Renderers} - stateless utilities and instance-based rendering components: 'SHARPService' (stateless HTTP client), 'GaussianSplatRenderer' (stateful Metal GPU pipeline, instantiated per view), 'SmartSuggestionsService', and 'RoomColorCaptureService'.
     \item \textbf{Apple Frameworks and Storage} - RoomPlan, Object Capture, RealityKit, Metal, and Google Sign-In SDK at the framework boundary, with persistent artefacts stored in the app's Documents directory.
 \end{enumerate}
 
@@ -729,7 +729,7 @@ The architecture is structured into four explicit layers, as shown in Figure~\re
 \section{Design Patterns}
 \label{sec:design_patterns}
 
-The architecture applies several well-known software design patterns, each chosen for a concrete reason. \textit{Model-View-ViewModel (MVVM)} keeps views as pure declarative SwiftUI while all domain state lives in ObservableObject manager classes injected via @StateObject / @ObservedObject, allowing persistence and data-flow logic to be tested independently of the UI. The \textit{Observer} pattern is realised through @Published properties on each manager, so SwiftUI subscribes views automatically and downstream consumers react to changes without polling. \textit{Repository} is applied in 'RoomManager', which encapsulates all create, read, update, and delete operations for the 'Room' aggregate behind a stable interface, hiding whether data comes from the in-memory cache, 'UserDefaults', or a 'Documents/' JSON file. The \textit{Facade} pattern is used in 'SHARPService', which hides custom URLSession' configuration, timeout handling, health-check pinging, and response parsing behind two call sites: checkHealth() and runInference(). Stateless helpers such as 'GaussianSplatRenderer' and 'SmartSuggestionsService' follow the \textit{Singleton} pattern as shared environment objects, avoiding redundant GPU buffer allocations and session initialisation costs. Finally, the \textit{Strategy} pattern governs novel-view synthesis: the multi-frame 3DGS path and the single-image SHARP inference path are interchangeable strategies that both produce a '.ply' consumed by the same 'GaussianSplatView', leaving downstream rendering code unaffected by the choice.
+The architecture applies several well-known software design patterns, each chosen for a concrete reason. \textit{Model-View-ViewModel (MVVM)} keeps views as pure declarative SwiftUI while all domain state lives in ObservableObject manager classes injected via @StateObject / @ObservedObject, allowing persistence and data-flow logic to be tested independently of the UI. The \textit{Observer} pattern is realised through @Published properties on each manager, so SwiftUI subscribes views automatically and downstream consumers react to changes without polling. \textit{Repository} is applied in 'RoomManager', which encapsulates all create, read, update, and delete operations for the 'Room' aggregate behind a stable interface, hiding whether data comes from the in-memory cache, 'UserDefaults', or a 'Documents/' JSON file. The \textit{Facade} pattern is used in 'SHARPService', which hides custom URLSession' configuration, timeout handling, health-check pinging, and response parsing behind two call sites: checkHealth() and runInference(). 'SmartSuggestionsService' and similar stateless helpers follow the \textit{Singleton} pattern as shared environment objects. 'GaussianSplatRenderer', by contrast, is an instance-based rendering component: it owns mutable Metal GPU state (command queue, pipeline, vertex buffers) and is instantiated once per 'GaussianSplatView', avoiding redundant GPU buffer allocations. Finally, the \textit{Strategy} pattern governs novel-view synthesis: the multi-frame 3DGS path and the single-image SHARP inference path are interchangeable strategies that both produce a '.ply' consumed by the same 'GaussianSplatView', leaving downstream rendering code unaffected by the choice.
 
 % \section{Design Patterns}
 % \label{sec:design_patterns}
@@ -781,6 +781,8 @@ An extension on 'Room' manages 'CapturedRoom' persistence:
 
     \item \textbf{API.} Callers use 'setCapturedRoom(\_:)', 'getCapturedRoom()', and helpers that check whether scan data exists.
 \end{itemize}
+
+Together, these mechanisms implement the fast-load/atomic-write contract described in Section~\ref{sec:system_spec}.
 
 'RoomManager' owns the array of Room values, serialises it under a user-scoped key (e.g.\ 'saved\_rooms' combined with user identity), and exposes create/update/delete operations. Duplicate detection merges rapid double-submissions of the same room name.
 
@@ -1020,9 +1022,7 @@ The SHARP path (R-9) is a hybrid: the device captures and sends a single image, 
 
 This section gives an engineering-oriented \textbf{end-to-end user walkthrough} aligned with the implementation: it supports laboratory demonstrations, requirement traceability, and onboarding documentation.
 
-\subsection{End-to-end user walkthrough}
-
-The core workflow proceeds in seven steps; steps 2--4 form the critical path from capture to persisted editing.
+The core workflow proceeds in seven steps; steps 2-4 form the critical path from capture to persisted editing.
 
 \begin{enumerate}
     \item \textbf{Start RoomPlan capture.} From the rooms list, the user starts
@@ -1062,30 +1062,6 @@ The core workflow proceeds in seven steps; steps 2--4 form the critical path fro
     replacements, decor, and all adjustments intact.
 \end{enumerate}
 
-\subsection{Demonstration checklist}
-
-\textbf{Core flow (required for full traceability):}
-\begin{enumerate}
-    \item \textbf{Launch and rooms.} Open the app; verify saved rooms and the action to start a new scan.
-
-    \item \textbf{Capture and stop.} Complete a RoomPlan session; confirm the stop of the scanning session semantics (final result 'CapturedRoom').
-
-    \item \textbf{Editor.} Orbit the scene; replace a detected item with USDZ; adjust with gizmo and gestures; relaunch to confirm R-2 and R-5.
-
-    \item \textbf{Decor.} Add wall art, carpet, and lighting; confirm persistence after relaunch.
-
-    \item \textbf{Room deletion (R-8).} Delete a room; confirm destructive-action alert.
-\end{enumerate}
-
-\textbf{Optional extensions (require additional hardware or server):}
-\begin{enumerate}
-    \item \textbf{Object Capture.} Complete a small-object scan; confirm USDZ appears in the picker (R-6).
-
-    \item \textbf{SHARP path.} Configure server URL; confirm reachability indicator; capture image; receive and display '.ply' in splat viewer (R-9, R-10).
-
-    \item \textbf{Splat comparison.} Import a '.ply' (or use the SHARP output above); orbit and compare visual quality with the mesh editor.
-\end{enumerate}
-
 \begin{figure}[H]
 \centering
 \begin{minipage}[t]{0.47\textwidth}
@@ -1112,9 +1088,9 @@ Manual test cases map requirements to observable outcomes: successful save after
 \subsection{Unit tests}
 Beyond manual requirement checks, an automated unit-test suite was added for deterministic, side-effect-free logic that supports several capture and design pipelines. Gaussian splat import is validated with a minimal fixture: vertex count, coordinate-frame conversion, and opacity remapping are checked so corrupted or mis-scaled splats cannot reach the viewer unnoticed. Room and furniture-replacement persistence is verified through encode–decode round-trips, guarding against silent data loss when stored fields or schema evolve. Uniform model scaling to a target bounding box, using the minimum axis-wise ratio with a safety margin, is tested with fixed dimensions, including edge cases such as degenerate extents. Orphaned room-scan files are removed while active scans and unrelated file types are left intact. Cloud-based splat training is tested at the contract level: REST endpoint paths and status-response parsing are validated without a live backend. Together, these sixteen automated tests complement the manual procedures in Table~\ref{tab:test_map} by locking down data transformations and storage invariants that device-bound AR and full network integration tests cannot isolate cleanly.
 
-\subsection{Performance}
+% \subsection{Performance}
 
-Informal measurement suffices for the thesis: note frame drops when many entities load; optionally record Instruments traces for Metal and RealityKit. The splat renderer should sustain 60\,fps for scenes up to 300\,k Gaussians on supported hardware (N-1).
+% Informal measurement suffices for the thesis: note frame drops when many entities load; optionally record Instruments traces for Metal and RealityKit. The splat renderer should sustain 60\,fps for scenes up to 300\,k Gaussians on supported hardware (N-1).
 
 \begin{table}[H]
 \centering
@@ -1139,6 +1115,8 @@ R-8 & Delete a room; confirm alert; verify .json removed from disk; list updated
 R-9 & Configure server URL; capture photo; receive and display '.ply' in splat viewer. \\
 \hline
 R-10 & Stop server; reachability indicator turns red; capture button disabled with error. \\
+\hline
+R-11 & Trigger Blender export for a saved room; verify ZIP download contains \texttt{room\_scene.gltf}, at least one \texttt{.usdz}, and \texttt{blender\_import.py}. \\
 \hline
 \end{tabular}
 \end{table}
@@ -1175,13 +1153,13 @@ Mean bounding-box IoU & 0.796 \\
 \hline
 \textbf{Condition} & \textbf{MAE (mm)} & \textbf{IoU} \\
 \hline
-Plain background & 1.97 & 0.884 \\
+Plain background & 1.97 & 0.881 \\
 \hline
-Cluttered background & 4.94 & 0.712 \\
+Cluttered background & 4.92 & 0.710 \\
 \hline
-Opaque objects & 2.23 & 0.820 \\
+Opaque objects & 2.23 & 0.819 \\
 \hline
-Transparent objects & 5.54 & 0.744 \\
+Transparent objects & 5.51 & 0.741 \\
 \hline
 \end{tabular}
 \end{table}
@@ -1212,7 +1190,7 @@ Figure~\ref{fig:object_scan_condition_plot} shows the same trend visually: clutt
 ] table[x=category,y=mean_mae_dim_mm,col sep=comma] {thesis_data/object_scan_summary_groups.csv};
 \end{axis}
 \end{tikzpicture}
-\caption{Object Scan mean absolute dimension error by background and material condition. Cluttered backgrounds increase error roughly 2.5$\times$ relative to plain backgrounds (4.94\,mm vs.\ 1.97\,mm MAE); transparent materials increase error roughly 2.5$\times$ relative to opaque objects (5.54\,mm vs.\ 2.23\,mm MAE).}
+\caption{Object Scan mean absolute dimension error by background and material condition. Cluttered backgrounds increase error roughly 2.5$\times$ relative to plain backgrounds (4.92\,mm vs.\ 1.97\,mm MAE); transparent materials increase error roughly 2.5$\times$ relative to opaque objects (5.51\,mm vs.\ 2.23\,mm MAE).}
 \label{fig:object_scan_condition_plot}
 \end{figure}
 
@@ -1378,8 +1356,9 @@ delivers the final room model once scanning is complete.
 \subsection{3DGS training time: frame count and capture pattern}
 \label{sec:efficient_3dgs_design}
 
-Full 3DGS training on a local workstation routinely exceeds 30\,minutes per
-scene, making exhaustive hyperparameter search impractical within a
+Full 3DGS training on a local workstation ranges from approximately 20\,minutes
+(20 input frames) to nearly 50\,minutes (50 input frames) in the experiments
+conducted here, making exhaustive hyperparameter search impractical within a
 bachelor-scale development cycle. To characterise the trade-off between input
 size and training cost, a set of timed experiments was conducted on the same
 hardware using the msplat backend, varying both

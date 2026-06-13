@@ -39,7 +39,7 @@ struct HistoryView: View {
             AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // ── Custom segmented picker ──
+                //  Custom segmented picker 
                 HStack(spacing: 6) {
                     ForEach(HistoryFilter.allCases, id: \.self) { filter in
                         Button(action: { withAnimation(.easeInOut(duration: 0.2)) { selectedFilter = filter } }) {
@@ -86,7 +86,7 @@ struct HistoryView: View {
                     ScrollView {
                         LazyVStack(spacing: 8) {
                             ForEach(groupedHistory.keys.sorted(by: >), id: \.self) { date in
-                                // ── Date section header ──
+                                //  Date section header 
                                 ThemeSectionHeader(title: formatDate(date), icon: "calendar")
                                     .padding(.horizontal, 20)
                                     .padding(.top, 12)

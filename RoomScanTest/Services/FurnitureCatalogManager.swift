@@ -145,7 +145,7 @@ class FurnitureCatalogManager: ObservableObject {
             + "y=\(String(format: "%.3f", ext.y))m  "
             + "z=\(String(format: "%.3f", ext.z))m")
 
-        // ─ No scaling - keep the model at 1:1 real-world size ─
+        // No scaling - keep the model at 1:1 real-world size
         // model.scale stays at whatever the USDZ file defines (typically 1,1,1)
 
         // Wrap in a container and CENTER the model
@@ -197,36 +197,36 @@ class FurnitureCatalogManager: ObservableObject {
             return nil
         }
         
-        // ── 1. Log the model's original scale from the USDZ ──
+        // 1. Log the model's original scale from the USDZ
         let originalScale = model.scale
         print("SCALE [\(fileName)]:")
         print("  USDZ root scale: (\(String(format: "%.4f", originalScale.x)), \(String(format: "%.4f", originalScale.y)), \(String(format: "%.4f", originalScale.z)))")
         
-        // ── 2. Get bounds in model's LOCAL space (before model.scale) ──
+        // 2. Get bounds in model's LOCAL space (before model.scale)
         let bounds = model.visualBounds(relativeTo: model)
         let localExtents = bounds.extents
         
         print("  Local extents: x=\(String(format: "%.3f", localExtents.x))  y=\(String(format: "%.3f", localExtents.y))  z=\(String(format: "%.3f", localExtents.z))")
         print("  Target dims:   x=\(String(format: "%.3f", targetDimensions.x))  y=\(String(format: "%.3f", targetDimensions.y))  z=\(String(format: "%.3f", targetDimensions.z))")
         
-        // ── 3. Validate bounds ──
+        // 3. Validate bounds
         guard localExtents.x > 0.001, localExtents.y > 0.001, localExtents.z > 0.001 else {
             print("  WARNING: Bounds are zero/tiny — using fallback scale 0.01")
             model.scale = SIMD3<Float>(repeating: 0.01)
             return model
         }
         
-        // ── 4. Calculate uniform scale = min(target / local) × 90% ──
+        // 4. Calculate uniform scale = min(target / local) × 90%
         let uniformScale = USDFurnitureFitScale.uniformScale(
             targetSize: targetDimensions,
             modelSize: localExtents,
             margin: 0.90
         )
         
-        // ── 5. Apply scale ──
+        //  5. Apply scale
         model.scale = SIMD3<Float>(repeating: uniformScale)
         
-        // ── 6. Wrap in a container and CENTER the model ──
+        // 6. Wrap in a container and CENTER the model
         // USDZ models often have their origin at an arbitrary point (foot, corner, etc.).
         // We shift the model so its visual center aligns with (0,0,0) — the anchor point.
         let container = Entity()
@@ -236,7 +236,7 @@ class FurnitureCatalogManager: ObservableObject {
         let visualCenter = scaledBounds.center
         model.position = SIMD3<Float>(-visualCenter.x, -visualCenter.y, -visualCenter.z)
         
-        // ── 7. GROUND ALIGNMENT ──
+        // 7. GROUND ALIGNMENT
         // RoomPlan's anchor is at the center of the detected object volume.
         // Furniture should sit on the floor, so we align the model's bottom
         // with the scanned object's bottom (= −targetDimensions.y / 2).
@@ -245,7 +245,7 @@ class FurnitureCatalogManager: ObservableObject {
         let targetBottom = -targetDimensions.y / 2.0    // scanned object's bottom
         model.position.y += (targetBottom - modelBottom)
         
-        // ── 8. Verify ──
+        // 8. Verify 
         let finalBounds = model.visualBounds(relativeTo: container)
         let finalSize = finalBounds.extents
         print("  Uniform scale:  \(String(format: "%.6f", uniformScale))")

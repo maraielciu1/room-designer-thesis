@@ -41,7 +41,7 @@ struct RoomMeasurements {
     let windowCount: Int
     let objectCount: Int
 
-    // ── Formatted helpers ──
+    // Formatted helpers
 
     var formattedWidth: String { String(format: "%.2f m", width) }
     var formattedHeight: String { String(format: "%.2f m", height) }
@@ -107,20 +107,20 @@ enum MeasurementService {
         let height = maxB.y - minB.y
         let depth  = maxB.z - minB.z
 
-        // Floor area — sum each floor surface
+        // Floor area - sum each floor surface
         let floorArea: Float = capturedRoom.floors.reduce(0) { sum, floor in
             sum + floor.dimensions.x * floor.dimensions.z
         }
 
-        // Wall area — sum each wall surface
+        // Wall area - sum each wall surface
         let wallArea: Float = capturedRoom.walls.reduce(0) { sum, wall in
             sum + wall.dimensions.x * wall.dimensions.y
         }
 
-        // Perimeter — sum of wall widths
+        // Perimeter - sum of wall widths
         let perimeter: Float = capturedRoom.walls.reduce(0) { $0 + $1.dimensions.x }
 
-        // Volume — floor area × height (approximation for non-rectangular rooms)
+        // Volume - floor area × height (approximation for non-rectangular rooms)
         let effectiveFloorArea = floorArea > 0 ? floorArea : (width * depth)
         let volume = effectiveFloorArea * height
 
@@ -184,7 +184,7 @@ enum MeasurementService {
         let windowArea: Float = Float(windowCount) * 1.5 // ~1.0m × 1.5m standard window
         let paintableWallArea = max(measurements.wallArea - doorArea - windowArea, 0)
 
-        // Paint: ~10 m² per litre, two coats
+        // Paint: ~10 m^2 per litre, two coats
         let paintLitres = (paintableWallArea / 10.0) * 2.0
 
         // Flooring: floor area + 10% waste

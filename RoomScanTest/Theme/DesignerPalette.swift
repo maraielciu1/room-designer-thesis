@@ -2,7 +2,7 @@
 //  DesignerPalette.swift
 //  RoomScanTest
 //
-//  Compatibility aliases — canonical tokens live in AppTheme.
+//  Compatibility aliases - canonical tokens live in AppTheme.
 //
 
 import SwiftUI

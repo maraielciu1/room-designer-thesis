@@ -30,7 +30,7 @@ struct GaussianSplatView: View {
                 GaussianSplatMetalView(renderer: renderer)
                     .ignoresSafeArea()
 
-                // ── HUD overlay ──
+                //  HUD overlay 
                 VStack {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
@@ -55,7 +55,7 @@ struct GaussianSplatView: View {
 
                     Spacer()
 
-                    // ── Controls hint ──
+                    //  Controls hint 
                     HStack(spacing: 16) {
                         Label("Drag to orbit", systemImage: "hand.draw")
                         Label("Pinch to zoom", systemImage: "arrow.up.left.and.arrow.down.right")
@@ -179,7 +179,7 @@ struct GaussianSplatMetalView: UIViewRepresentable {
             super.init()
         }
 
-        // ── MTKViewDelegate ──
+        //  MTKViewDelegate 
 
         nonisolated func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { }
 
@@ -189,7 +189,7 @@ struct GaussianSplatMetalView: UIViewRepresentable {
             }
         }
 
-        // ── Gesture Handlers ──
+        //  Gesture Handlers 
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
             let translation = gesture.translation(in: gesture.view)

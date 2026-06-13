@@ -4,8 +4,8 @@
 //
 //  Created by Mara Ielciu on 10.03.2026.
 //
-//  Manages multi-room projects — CRUD operations, persistence,
-//  and room ↔ project relationships.
+//  Manages multi-room projects - CRUD operations, persistence,
+//  and room <=> project relationships.
 //
 
 import Foundation
@@ -73,7 +73,7 @@ class ProjectManager: ObservableObject {
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
-    // MARK: - Room ↔ Project Relationships
+    // MARK: - Room <=> Project Relationships
 
     /// Add a room to a project.
     func addRoom(_ room: Room, to project: Project) {

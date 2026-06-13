@@ -14,15 +14,15 @@ import PhotosUI
 struct WallArtPickerView: View {
     @Environment(\.dismiss) var dismiss
 
-    // ── Photo selection ──
+    //  Photo selection 
     @State private var pickerItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
 
-    // ── Frame options ──
+    //  Frame options 
     @State private var frameSize: FrameSize   = .a4
     @State private var frameStyle: FrameStyle = .thinBlack
 
-    /// Called when the user confirms — passes the chosen image, size and style.
+    /// Called when the user confirms - passes the chosen image, size and style.
     let onAdd: (UIImage, FrameSize, FrameStyle) -> Void
 
     var body: some View {
@@ -33,7 +33,7 @@ struct WallArtPickerView: View {
                 ScrollView {
                     VStack(spacing: 24) {
 
-                        // ── Photo Picker ──
+                        //  Photo Picker 
                         VStack(spacing: 10) {
                             ThemeSectionHeader(title: "Choose Artwork",
                                                icon: "photo.on.rectangle.angled")
@@ -73,7 +73,7 @@ struct WallArtPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Frame Size ──
+                        //  Frame Size 
                         VStack(spacing: 10) {
                             ThemeSectionHeader(title: "Frame Size",
                                                icon: "aspectratio")
@@ -120,7 +120,7 @@ struct WallArtPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Frame Style ──
+                        //  Frame Style 
                         VStack(spacing: 10) {
                             ThemeSectionHeader(title: "Frame Style",
                                                icon: "square.on.square")
@@ -178,7 +178,7 @@ struct WallArtPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Live Preview ──
+                        //  Live Preview 
                         if let img = selectedImage {
                             VStack(spacing: 8) {
                                 ThemeSectionHeader(title: "Preview", icon: "eye.fill")
@@ -187,7 +187,7 @@ struct WallArtPickerView: View {
                             .padding(.horizontal, 16)
                         }
 
-                        // ── Add Button ──
+                        //  Add Button 
                         Button {
                             if let img = selectedImage {
                                 onAdd(img, frameSize, frameStyle)
@@ -227,7 +227,7 @@ struct WallArtPickerView: View {
         .appSheetBackground()
     }
 
-    // ── Preview card with frame + image ──
+    //  Preview card with frame + image 
 
     @ViewBuilder
     private func artPreview(image: UIImage) -> some View {

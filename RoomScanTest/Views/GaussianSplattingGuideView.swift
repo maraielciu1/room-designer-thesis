@@ -53,13 +53,13 @@ struct GaussianSplattingGuideView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
 
-                        // ── Header ──
+                        // Header
                         headerSection
 
-                        // ── Overview pipeline ──
+                        //  Overview pipeline 
                         pipelineOverview
 
-                        // ── Step 1: Export from App ──
+                        //  Step 1: Export from App 
                         stepCard(
                             number: 1,
                             title: "Export Images from the App",
@@ -70,7 +70,7 @@ struct GaussianSplattingGuideView: View {
                             }
                         )
 
-                        // ── Step 2: Transfer to Computer ──
+                        //  Step 2: Transfer to Computer 
                         stepCard(
                             number: 2,
                             title: "Transfer to Your Computer",
@@ -81,7 +81,7 @@ struct GaussianSplattingGuideView: View {
                             }
                         )
 
-                        // ── Step 3: Train the Gaussian Splat ──
+                        //  Step 3: Train the Gaussian Splat 
                         stepCard(
                             number: 3,
                             title: "Train the Gaussian Splat",
@@ -92,7 +92,7 @@ struct GaussianSplattingGuideView: View {
                             }
                         )
 
-                        // ── Step 4: Transfer .ply Back ──
+                        //  Step 4: Transfer .ply Back 
                         stepCard(
                             number: 4,
                             title: "Get the .ply File to iPhone",
@@ -103,7 +103,7 @@ struct GaussianSplattingGuideView: View {
                             }
                         )
 
-                        // ── Step 5: Import into App ──
+                        //  Step 5: Import into App 
                         stepCard(
                             number: 5,
                             title: "Import into the App",
@@ -114,7 +114,7 @@ struct GaussianSplattingGuideView: View {
                             }
                         )
 
-                        // ── Tips ──
+                        //  Tips 
                         tipsSection
 
                         Spacer(minLength: 40)
@@ -266,7 +266,7 @@ struct GaussianSplattingGuideView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 transferOption(icon: "airplayaudio", name: "AirDrop", detail: "Instant transfer to a Mac")
-                transferOption(icon: "icloud", name: "iCloud Drive", detail: "Save to Files → access from any device")
+                transferOption(icon: "icloud", name: "iCloud Drive", detail: "Save to Files -> access from any device")
                 transferOption(icon: "envelope", name: "Email / Messages", detail: "Send to yourself")
                 transferOption(icon: "cable.connector", name: "USB Cable", detail: "Connect iPhone to Mac, use Finder")
             }
@@ -395,9 +395,9 @@ struct GaussianSplattingGuideView: View {
             guideText("Get the **.ply** file from your computer to your iPhone:")
 
             VStack(alignment: .leading, spacing: 6) {
-                transferOption(icon: "airplayaudio", name: "AirDrop", detail: "Fastest — right-click the .ply → AirDrop → your iPhone")
-                transferOption(icon: "icloud", name: "iCloud Drive", detail: "Save to iCloud → open Files app on iPhone")
-                transferOption(icon: "envelope", name: "Email", detail: "Email the .ply to yourself → open on iPhone")
+                transferOption(icon: "airplayaudio", name: "AirDrop", detail: "Fastest — right-click the .ply -> AirDrop -> your iPhone")
+                transferOption(icon: "icloud", name: "iCloud Drive", detail: "Save to iCloud -> open Files app on iPhone")
+                transferOption(icon: "envelope", name: "Email", detail: "Email the .ply to yourself -> open on iPhone")
                 transferOption(icon: "externaldrive.connected.to.line.below", name: "Direct download", detail: "If using Luma AI, download directly in Safari on iPhone")
             }
 
@@ -414,11 +414,11 @@ struct GaussianSplattingGuideView: View {
             VStack(alignment: .leading, spacing: 10) {
                 importOption(
                     title: "From the Furniture Library",
-                    detail: "Tap the ✨ sparkle button on any scanned object → select your .ply file"
+                    detail: "Tap the ✨ sparkle button on any scanned object -> select your .ply file"
                 )
                 importOption(
                     title: "From the Comparison View",
-                    detail: "Open a scanned object → tap ⋯ menu → \"Import .ply Splat\""
+                    detail: "Open a scanned object -> tap ⋯ menu -> \"Import .ply Splat\""
                 )
             }
 

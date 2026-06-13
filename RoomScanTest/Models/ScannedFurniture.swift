@@ -14,7 +14,7 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
     var name: String
     var userId: UUID
     var usdzFileName: String          // e.g. "<uuid>.usdz" inside ScannedFurniture/
-    var category: String              // user-chosen: "chair", "table", "sofa", …
+    var category: String              // user-chosen: "chair", "table", "sofa"
     var createdAt: Date
     var fileSizeBytes: Int64?
 
@@ -24,7 +24,7 @@ struct ScannedFurniture: Identifiable, Codable, Hashable {
     /// values correspond directly to the physical object's size.
     var realWorldDimensions: [Double]?
 
-    // ── Gaussian Splatting ──
+    // Gaussian Splatting
 
     /// File name of the associated .ply Gaussian Splat (nil if none imported).
     var splatFileName: String?

@@ -36,9 +36,9 @@ enum GaussianSplatCloudConfig {
 // MARK: - API Contract
 
 /// Backend must implement:
-/// - POST /jobs  (multipart/form-data: file = zip)  → { "jobId": "uuid" }
-/// - GET  /jobs/{id}/status                        → { "status": "pending"|"processing"|"completed"|"failed", "progress": 0-100? }
-/// - GET  /jobs/{id}/result                        → binary .ply (when status == completed)
+/// POST /jobs  (multipart/form-data: file = zip)  -> { "jobId": "uuid" }
+/// GET  /jobs/{id}/status                       ->  { "status": "pending"|"processing"|"completed"|"failed", "progress": 0-100? }
+/// GET  /jobs/{id}/result                        ->  binary .ply (when status == completed)
 struct GaussianSplatCloudService {
 
     // MARK: - Endpoint URLs (testable contract)

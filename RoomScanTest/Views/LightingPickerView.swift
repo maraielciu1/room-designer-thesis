@@ -28,7 +28,7 @@ struct LightingPickerView: View {
                 ScrollView {
                     VStack(spacing: 24) {
 
-                        // ── Fixture Type ──
+                        //  Fixture Type 
                         VStack(spacing: 10) {
                             ThemeSectionHeader(title: "Fixture Type",
                                                icon: "lightbulb.fill")
@@ -48,7 +48,7 @@ struct LightingPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Light Colour ──
+                        //  Light Colour 
                         VStack(spacing: 10) {
                             ThemeSectionHeader(title: "Light Colour",
                                                icon: "paintpalette.fill")
@@ -79,7 +79,7 @@ struct LightingPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Intensity ──
+                        //  Intensity 
                         VStack(spacing: 8) {
                             ThemeSectionHeader(title: "Intensity",
                                                icon: "sun.max.fill")
@@ -103,11 +103,11 @@ struct LightingPickerView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        // ── Preview ──
+                        //  Preview 
                         fixturePreview
                             .padding(.horizontal, 16)
 
-                        // ── Add Button ──
+                        //  Add Button 
                         Button {
                             onAdd(selectedType,
                                   UIColor(lightColor),
@@ -137,7 +137,7 @@ struct LightingPickerView: View {
         .appSheetBackground()
     }
 
-    // ── Fixture card ──
+    //  Fixture card 
 
     @ViewBuilder
     private func fixtureCard(_ fixture: LightFixtureType) -> some View {
@@ -197,7 +197,7 @@ struct LightingPickerView: View {
                     : AppTheme.warmAccent.opacity(0.2), lineWidth: 1)
     }
 
-    // ── Visual preview ──
+    //  Visual preview 
 
     private var fixturePreview: some View {
         VStack(spacing: 8) {
@@ -226,7 +226,7 @@ struct LightingPickerView: View {
         }
     }
 
-    // ── Colour presets ──
+    //  Colour presets 
 
     private var colorPresets: [(name: String, color: Color)] {
         [

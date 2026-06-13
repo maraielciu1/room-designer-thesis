@@ -8,13 +8,13 @@ Local Flask server that wraps Apple's SHARP model for single-image
 Reference:
   Mescheder et al., "SHARP: Sharp Monocular View Synthesis", ICLR 2025
   https://machinelearning.apple.com/research/sharp-monocular-view
-  https://github.com/apple/ml-sharp   ← clone this first
+  https://github.com/apple/ml-sharp   <- clone this first
 
 Usage:
   1.  Follow the STEP-BY-STEP section in this file.
   2.  conda activate sharp_env   (or: source .venv/bin/activate)
   3.  python sharp_server.py
-  4.  In the app: My Furniture → + → SHARP — one photo splat → ⚙ → your Mac IP:
+  4.  In the app: My Furniture -> + -> SHARP — one photo splat -> ⚙ -> your Mac IP:
         http://<your-mac-local-ip>:8765
 
 The iOS app sends:
@@ -61,7 +61,7 @@ The server replies with a raw binary .ply file (3DGS scene).
 #    sharp/ Python package), OR set SHARP_ROOT below to the absolute path.
 #
 # 6. FIND YOUR MAC'S LOCAL IP ADDRESS
-#    System Settings → Wi-Fi → Details → IP Address
+#    System Settings -> Wi-Fi -> Details -> IP Address
 #    Or run in Terminal:  ipconfig getifaddr en0
 #
 # 7. RUN THE SERVER
@@ -80,7 +80,7 @@ The server replies with a raw binary .ply file (3DGS scene).
 #
 # 8. CONFIGURE THE APP
 #    In the iPhone app:
-#      Rooms tab → ✦ button → ⚙ gear icon
+#      Rooms tab -> ✦ button -> ⚙ gear icon
 #      Enter:  http://192.168.x.x:8765
 #      Tap "Save & Check" — the badge should turn green.
 #

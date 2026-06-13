@@ -117,7 +117,7 @@ enum SmartSuggestionsService {
             ? Float(totalFurniture) / measurements.floorArea
             : 0
 
-        // Lighting adequacy (rule of thumb: ~1 fixture per 4 m²)
+        // Lighting adequacy (rule of thumb: ~1 fixture per 4 m^2)
         let recommendedLights = max(1, Int(measurements.floorArea / 4))
         let adequacy: RoomStatistics.LightingAdequacy
         if lightingCount == 0 {
@@ -153,7 +153,7 @@ enum SmartSuggestionsService {
     ) -> [RoomSuggestion] {
         var suggestions: [RoomSuggestion] = []
 
-        // ── Lighting suggestions ──
+        //  Lighting suggestions
 
         if statistics.lightingCount == 0 {
             suggestions.append(RoomSuggestion(
@@ -185,7 +185,7 @@ enum SmartSuggestionsService {
             ))
         }
 
-        // ── Wall art suggestions ──
+        // Wall art suggestions
 
         if statistics.wallArtCount == 0 && measurements.wallArea > 8 {
             suggestions.append(RoomSuggestion(
@@ -210,7 +210,7 @@ enum SmartSuggestionsService {
             ))
         }
 
-        // ── Carpet / rug suggestions ──
+        // Carpet / rug suggestions
 
         if statistics.carpetCount == 0 && measurements.floorArea > 6 {
             suggestions.append(RoomSuggestion(
@@ -232,7 +232,7 @@ enum SmartSuggestionsService {
             ))
         }
 
-        // ── Furniture / space suggestions ──
+        // Furniture / space suggestions
 
         if statistics.furnitureDensity > 2.5 {
             suggestions.append(RoomSuggestion(
@@ -252,7 +252,7 @@ enum SmartSuggestionsService {
             ))
         }
 
-        // ── Material / planning suggestions ──
+        // Material / planning suggestions 
 
         let estimates = MeasurementService.estimateMaterials(
             from: measurements,

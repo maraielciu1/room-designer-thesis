@@ -1,7 +1,7 @@
 // AppTheme.swift
 // RoomScanTest
 //
-// App-wide design system — deep blue-gray palette with warm clay accents.
+// App-wide design system - deep blue-gray palette with warm clay accents.
 
 import SwiftUI
 
@@ -9,7 +9,7 @@ import SwiftUI
 
 enum AppTheme {
 
-    // ── Core brand (canonical) ─────────────────────────────────────────────────
+    // Core brand (canonical)
     /// #1B3C53
     static let primaryDark   = Color(hex: 0x1B3C53)
     /// #456882
@@ -19,13 +19,13 @@ enum AppTheme {
     /// #F9F3EF
     static let lightNeutral  = Color(hex: 0xF9F3EF)
 
-    // ── Backgrounds & surfaces ─────────────────────────────────────────────────
+    // Backgrounds and surfaces
     static let background       = primaryDark
     static let surfacePrimary   = Color(hex: 0x152E42)
     static let surfaceSecondary = secondaryTint
     static let surfaceTertiary  = secondaryTint.opacity(0.72)
 
-    // ── Accent ────────────────────────────────────────────────────────────────
+    // Accent
     static let accent      = warmAccent
     static let accentLight = lightNeutral
     static let accentMuted = warmAccent.opacity(0.18)
@@ -40,31 +40,31 @@ enum AppTheme {
     static let glowCyan   = secondaryTint
     static let glowViolet = warmAccent
 
-    // ── Status (semantic, palette-adjacent) ───────────────────────────────────
+    // Status (semantic, palette-adjacent)
     static let glowGreen  = Color(hex: 0x6B9B7A)
     static let glowOrange = warmAccent
     static let glowRed    = Color(hex: 0xC47A6E)
 
-    // ── Text ──────────────────────────────────────────────────────────────────
+    // Text
     static let primaryText   = lightNeutral
     static let secondaryText = lightNeutral.opacity(0.72)
     static let tertiaryText  = warmAccent.opacity(0.85)
 
-    // ── Glow / chrome ─────────────────────────────────────────────────────────
+    // Glow / chrome
     static let glowAccent = warmAccent.opacity(0.28)
 
-    // ── Tab bar ───────────────────────────────────────────────────────────────
+    // Tab bar
     static let tabBarBackground   = primaryDark
     static let tabBarItemInactive = lightNeutral.opacity(0.45)
     static let tabBarItemActive   = lightNeutral
     static let tabBarPill         = warmAccent.opacity(0.16)
 
-    // ── Sizes ─────────────────────────────────────────────────────────────────
+    // Sizes
     static let cornerRadius:       CGFloat = 18
     static let cardCornerRadius:   CGFloat = 16
     static let buttonCornerRadius: CGFloat = 14
 
-    // ── Page background ─────────────────────────────────────────────────────────
+    // Page background 
     static let pageBackground = LinearGradient(
         colors: [primaryDark, Color(hex: 0x142A3C)],
         startPoint: .top,
@@ -203,7 +203,7 @@ struct SecondaryChipButtonStyle: ButtonStyle {
     }
 }
 
-/// Secondary ghost pill — for less important actions.
+/// Secondary ghost pill - for less important actions.
 struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -330,7 +330,7 @@ extension EnvironmentValues {
     }
 }
 
-/// Custom top bar for main tabs — avoids UIKit toolbar button chrome (identical on every tab).
+/// Custom top bar for main tabs - avoids UIKit toolbar button chrome (identical on every tab).
 struct AppScreenHeaderMenuItem: Identifiable {
     let id = UUID()
     let title: String
@@ -474,7 +474,7 @@ struct AppToolbarLeadingIcon: View {
     }
 }
 
-/// Flat trailing “add” icon — outline circle, matches tab header.
+/// Flat trailing “add” icon - outline circle, matches tab header.
 struct AppToolbarAddIcon: View {
     var body: some View {
         Image(systemName: "plus.circle")

@@ -22,17 +22,17 @@ struct FurnitureReplacement: Identifiable, Codable {
     var yRotation: Double?         // Rotation around Y axis in radians
     var customScale: Double?       // Additional scale multiplier (1.0 = fit to original size)
 
-    // ── Wall Art metadata (only when originalCategory == "wallArt") ──
+    // Wall Art metadata (only when originalCategory == "wallArt")
     var wallArtImageFile: String?   // JPEG file saved in DecorManager.wallArtDirectory
     var wallArtFrameSize: String?   // FrameSize rawValue
     var wallArtFrameStyle: String?  // FrameStyle rawValue
 
-    // ── Lighting metadata (only when originalCategory == "lighting") ──
+    // Lighting metadata (only when originalCategory == "lighting")
     var lightFixtureType: String?   // LightFixtureType rawValue
     var lightColorRGB: [Double]?    // [r, g, b] 0…1
     var lightIntensity: Double?     // lumens
 
-    // ── Carpet metadata (only when originalCategory == "carpet") ──
+    // Carpet metadata (only when originalCategory == "carpet")
     var carpetSize: String?          // CarpetSize rawValue
     var carpetPattern: String?       // CarpetPattern rawValue
     var carpetColorRGB: [Double]?    // [r, g, b] 0…1
@@ -82,7 +82,7 @@ struct FurnitureReplacement: Identifiable, Codable {
         self.carpetCustomDepthCm = carpetCustomDepthCm
     }
 
-    // ── Convenience helpers ──
+    // Convenience helpers
 
     var isWallArt: Bool { originalCategory == "wallArt" }
     var isLighting: Bool { originalCategory == "lighting" }

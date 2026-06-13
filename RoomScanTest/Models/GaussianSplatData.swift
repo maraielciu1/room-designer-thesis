@@ -86,7 +86,7 @@ nonisolated enum PLYParser {
 
     /// Parse PLY data from memory.
     static func parse(data: Data) throws -> GaussianSplatScene {
-        // ── Locate header boundary ──
+        // Locate header boundary
         guard let headerEndRange = data.range(of: Data("end_header\n".utf8)) else {
             throw PLYError.invalidHeader
         }
@@ -99,7 +99,7 @@ nonisolated enum PLYParser {
         let lines = headerString.components(separatedBy: "\n")
         guard lines.first == "ply" else { throw PLYError.invalidHeader }
 
-        // ── Parse header ──
+        // Parse header
         var isBinaryLE = false
         var isAscii = false
         var vertexCount = 0
@@ -183,13 +183,13 @@ nonisolated enum PLYParser {
         for i in 0..<vertexCount {
             let base = bodyStart + i * stride
 
-            // ── Position (COLMAP Y-down Z-forward → Y-up Z-back) ──
+            // Position (COLMAP Y-down Z-forward -> Y-up Z-back)
             let x = readFloat(data: data, offset: base + offsets[propIndex["x"]!])
             let y = readFloat(data: data, offset: base + offsets[propIndex["y"]!])
             let z = readFloat(data: data, offset: base + offsets[propIndex["z"]!])
             let pos = colmapToYUp(position: SIMD3<Float>(x, y, z))
 
-            // ── Color (SH DC or direct RGB) ──
+            //  Color (SH DC or direct RGB)
             var color = SIMD3<Float>(0.5, 0.5, 0.5)
             if let i0 = propIndex["f_dc_0"],
                let i1 = propIndex["f_dc_1"],
@@ -211,14 +211,14 @@ nonisolated enum PLYParser {
                 color = SIMD3<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255)
             }
 
-            // ── Opacity (logit → sigmoid) ──
+            // Opacity (logit -> sigmoid)
             var opacity: Float = 1.0
             if let iO = propIndex["opacity"] {
                 let logit = readFloat(data: data, offset: base + offsets[iO])
                 opacity = sigmoid(logit)
             }
 
-            // ── Scale (log → exp) ──
+            // Scale (log -> exp)
             var scale = SIMD3<Float>(0.01, 0.01, 0.01)
             if let i0 = propIndex["scale_0"],
                let i1 = propIndex["scale_1"],
@@ -230,7 +230,7 @@ nonisolated enum PLYParser {
                 )
             }
 
-            // ── Rotation quaternion (then COLMAP → Y-up) ──
+            // Rotation quaternion (then COLMAP -> Y-up)
             var rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
             if let i0 = propIndex["rot_0"],
                let i1 = propIndex["rot_1"],
@@ -337,7 +337,7 @@ nonisolated enum PLYParser {
         return GaussianSplatScene(gaussians: gaussians, boundingBox: (bbMin, bbMax))
     }
 
-    // MARK: - COLMAP → Y-up transform
+    // MARK: - COLMAP -> Y-up transform
 
     /// COLMAP/msplat use Y-down, Z-forward. Convert to Y-up, Z-back for rendering.
     private static func colmapToYUp(position: SIMD3<Float>) -> SIMD3<Float> {

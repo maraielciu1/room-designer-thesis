@@ -37,7 +37,7 @@ struct RoomScanView: View {
             AppTheme.background.ignoresSafeArea()
 
             if createdRoom != nil {
-                // ── Scan complete — brief success state ──
+                //  Scan complete — brief success state 
                 VStack(spacing: 22) {
                     ZStack {
                         Circle()
@@ -74,7 +74,7 @@ struct RoomScanView: View {
                 }
 
             } else if isScanning {
-                // ── Scanning: Live Camera Feed ──
+                //  Scanning: Live Camera Feed 
                 if let captureView = roomCaptureView {
                     RoomCaptureViewWrapper(
                         captureView: captureView,
@@ -159,7 +159,7 @@ struct RoomScanView: View {
                 }
 
             } else {
-                // ── Instructions (expandable) ──
+                //  Instructions (expandable) 
                 VStack(spacing: 28) {
                     Spacer()
 
@@ -183,7 +183,7 @@ struct RoomScanView: View {
 
                     // Collapsible instructions card
                     VStack(spacing: 0) {
-                        // ── Header / drag handle ──
+                        //  Header / drag handle 
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                 instructionsExpanded.toggle()
@@ -213,7 +213,7 @@ struct RoomScanView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // ── Expandable content ──
+                        //  Expandable content 
                         if instructionsExpanded {
                             VStack(alignment: .leading, spacing: 14) {
                                 InstructionRow(icon: "1.circle.fill", text: "Move slowly around the room")

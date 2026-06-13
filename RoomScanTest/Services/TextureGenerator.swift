@@ -54,7 +54,7 @@ enum TextureGenerator {
 
     // MARK: - Patterns
 
-    /// Wood planks — horizontal boards with grain and stagger joints.
+    /// Wood planks - horizontal boards with grain and stagger joints.
     private static func wood(
         _ w: Int, _ h: Int, _ color: UIColor,
         _ mW: Float, _ mH: Float
@@ -115,7 +115,7 @@ enum TextureGenerator {
         return img?.cgImage
     }
 
-    /// Ceramic tiles — regular grid with grout.
+    /// Ceramic tiles - regular grid with grout.
     private static func tiles(
         _ w: Int, _ h: Int, _ color: UIColor,
         _ mW: Float, _ mH: Float
@@ -201,7 +201,7 @@ enum TextureGenerator {
         return img?.cgImage
     }
 
-    /// Parquet / herringbone — alternating horizontal & vertical blocks.
+    /// Parquet / herringbone - alternating horizontal & vertical blocks.
     private static func parquet(
         _ w: Int, _ h: Int, _ color: UIColor,
         _ mW: Float, _ mH: Float
@@ -229,14 +229,14 @@ enum TextureGenerator {
                 let bx = CGFloat(col) * unitW
                 let by = CGFloat(row) * unitH * 2
 
-                // Block A — horizontal
+                // Block A - horizontal
                 let v1 = CGFloat.random(in: -0.04...0.04)
                 ctx.setFillColor(UIColor(red: clamp01(r + v1), green: clamp01(g + v1),
                                          blue: clamp01(b + v1 * 0.6), alpha: 1).cgColor)
                 ctx.fill(CGRect(x: bx + gap, y: by + gap,
                                 width: unitW - gap * 2, height: unitH - gap * 2))
 
-                // Block B — offset half-unit
+                // Block B - offset half-unit
                 let v2 = CGFloat.random(in: -0.04...0.04)
                 ctx.setFillColor(UIColor(red: clamp01(r + v2), green: clamp01(g + v2),
                                          blue: clamp01(b + v2 * 0.6), alpha: 1).cgColor)
@@ -250,7 +250,7 @@ enum TextureGenerator {
         return img?.cgImage
     }
 
-    /// Concrete — subtle speckle noise.
+    /// Concrete - subtle speckle noise.
     private static func concrete(_ w: Int, _ h: Int, _ color: UIColor) -> CGImage? {
         let size = CGSize(width: w, height: h)
         UIGraphicsBeginImageContextWithOptions(size, true, 1)
@@ -277,7 +277,7 @@ enum TextureGenerator {
         return img?.cgImage
     }
 
-    /// Marble — base colour with curved veins.
+    /// Marble - base colour with curved veins.
     private static func marble(_ w: Int, _ h: Int, _ color: UIColor) -> CGImage? {
         let size = CGSize(width: w, height: h)
         UIGraphicsBeginImageContextWithOptions(size, true, 1)

@@ -35,7 +35,7 @@
 % can substantially improve indoor scene understanding for AR applications, a
 % direction complementary to the real-scan pipeline used here.
 
-% The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware.
+% The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware. This positions the application as a practical tool for the extended, iterative redesign process that conventional AR-only solutions cannot support—closing the gap identified in Section~\ref{sec:intro:motivation}.
 \chapter{Conclusions}
 \label{ch:conclusions}
 
@@ -49,7 +49,7 @@ The software artefact demonstrates a coherent pipeline: RoomPlan $\rightarrow$ s
 
 Quantitative evaluation was conducted across two capture modalities. For \textbf{room scanning}, 28 room captures across five room types were measured against ground-truth tape-measure dimensions: mean absolute error was 1.64\,cm on length, 1.23\,cm on width, and 0.87\,cm on height, for a combined mean of 1.25\,cm (max observed: 3.10\,cm). Height error is consistently smaller than planar dimensions, consistent with strong floor/ceiling plane constraints in the depth fusion stage. Window detection under clear-view conditions achieved 100\,\%; partial drape coverage gave 83\,\% success (6 trials); fully closed curtains dropped to 60\,\% (5 trials), indicating the model uses structural geometry cues even when the window surface is visually occluded.
 
-For \textbf{object scanning}, 20 captures with ruler-measured ground-truth dimensions yielded a mean absolute dimension error of 3.44\,mm and mean bounding-box IoU of 0.796. Performance degrades predictably under cluttered backgrounds (MAE 4.94\,mm vs.\ 1.97\,mm on plain backgrounds) and transparent materials (MAE 5.54\,mm vs.\ 2.23\,mm for opaque objects), consistent with contour ambiguity at object boundaries.
+For \textbf{object scanning}, 20 captures with ruler-measured ground-truth dimensions yielded a mean absolute dimension error of 3.44\,mm and mean bounding-box IoU of 0.796. Performance degrades predictably under cluttered backgrounds (MAE 4.92\,mm vs.\ 1.97\,mm on plain backgrounds) and transparent materials (MAE 5.51\,mm vs.\ 2.23\,mm for opaque objects), consistent with contour ambiguity at object boundaries.
 
 For the \textbf{Metal Gaussian splat renderer}, the CPU-side back-to-front sort for budgets up to 300\,k Gaussians completes in approximately 10--30\,ms on A-series hardware, remaining within a 60\,Hz frame budget. \textbf{3DGS training time} scales super-linearly at low frame counts and flattens above 40 frames: 20-frame room-traversal training takes 20\,min\,17\,s, while 40 frames require 42\,min\,44\,s on the same workstation hardware. Object-orbit captures require approximately 5--6\,minutes more than room-traversal runs at every frame count due to denser initial point clouds increasing the Gaussian densification cost.
 
@@ -73,4 +73,4 @@ layout systems such as K\'an et al.~\cite{kan2021ar}. Pugh et al.\
 can support indoor scene understanding evaluation, a direction complementary
 to the real-scan pipeline used here.
 
-The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware.
+The project shows that \textbf{merging API-level room semantics with an editable mesh workflow} yields a practical middle ground between live AR stickers and professional BIM tools, suitable for iterative interior exploration on mobile hardware. This positions the application as a practical tool for the extended, iterative redesign process that conventional AR-only solutions cannot support, closing the gap identified in Section~\ref{sec:intro:motivation}.

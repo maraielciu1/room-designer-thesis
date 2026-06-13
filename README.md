@@ -111,9 +111,6 @@ RoomScanTest/
 5. Use the **gizmo arrows** to position furniture precisely, pinch to scale, two-finger rotate
 6. Tap **My Furniture** → **Scan New Object** to capture your own furniture with photogrammetry
 
-## Thesis Document
-
-The theoretical foundation (technologies, algorithms, architecture comparison) is available in [`TheoreticalFoundation.tex`](TheoreticalFoundation.tex).
 
 ## License
 

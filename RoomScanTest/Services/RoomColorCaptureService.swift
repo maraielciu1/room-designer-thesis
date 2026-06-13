@@ -24,15 +24,15 @@ import CoreImage
 
 class RoomColorCaptureService {
 
-    // ── Configuration ────────────────────────────────────────────
+    // Configuration
     /// Seconds between frame samples (lower = more samples but more CPU)
     private let samplingInterval: TimeInterval = 1.5
 
     /// Pitch threshold (radians). Values below this classify as "floor".
-    /// −0.45 rad ≈ −26°  (device tilted ~26° below horizontal)
+    /// −0.45 rad approx −26°  (device tilted ~26° below horizontal)
     private let floorPitchThreshold: Float = -0.45
 
-    // ── Internal state ───────────────────────────────────────────
+    // Internal state
     private var timer: Timer?
     private var wallSamples:  [(r: Double, g: Double, b: Double)] = []
     private var floorSamples: [(r: Double, g: Double, b: Double)] = []
@@ -41,7 +41,7 @@ class RoomColorCaptureService {
     /// Weak capture session reference so we don't retain the view
     private weak var captureSession: RoomCaptureSession?
 
-    // ── Public API ───────────────────────────────────────────────
+    // Public API
 
     /// Begin sampling frames from the given RoomCaptureSession.
     /// Call this shortly after the session starts running.
@@ -71,7 +71,7 @@ class RoomColorCaptureService {
         return materials
     }
 
-    // ── Frame Sampling ───────────────────────────────────────────
+    // Frame Sampling
 
     private func sampleCurrentFrame() {
         guard let session = captureSession else { return }
@@ -109,7 +109,7 @@ class RoomColorCaptureService {
         }
     }
 
-    // ── Colour Computation ───────────────────────────────────────
+    // Colour Computation 
 
     /// Uses CIAreaAverage to compute the mean colour of a region.
     private func averageColor(of image: CIImage, in rect: CGRect) -> (r: Double, g: Double, b: Double)? {
