@@ -29,6 +29,17 @@ struct RoomListView: View {
     @State private var isBlenderExporting = false
     @State private var roomPendingDeletion: Room?
     @State private var showDeleteConfirmation = false
+    @State private var showDemoSplat = false
+
+    private var demoSplatURL: URL? {
+        // First try app bundle, then Documents folder
+        if let bundleURL = Bundle.main.url(forResource: "demo_splat", withExtension: "ply") {
+            return bundleURL
+        }
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let docsURL = docs.appendingPathComponent("demo_splat.ply")
+        return FileManager.default.fileExists(atPath: docsURL.path) ? docsURL : nil
+    }
 
     private var roomScanMenuItems: [AppScreenHeaderMenuItem] {
         [
@@ -89,7 +100,14 @@ struct RoomListView: View {
             AppTheme.background.ignoresSafeArea()
 
             if userRooms.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    demoSplatCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                    Spacer()
+                    emptyStateView
+                    Spacer()
+                }
             } else {
                 roomsList
             }
@@ -126,12 +144,100 @@ struct RoomListView: View {
 
     private var roomsList: some View {
         List {
+            Section {
+                demoSplatCard
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
             ForEach(userRooms) { room in
                 roomRow(for: room)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+    }
+
+    private var demoSplatCard: some View {
+        Button {
+            if demoSplatURL != nil {
+                showDemoSplat = true
+            }
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppTheme.glowViolet.opacity(0.18))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 22))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppTheme.glowViolet, AppTheme.glowCyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("Demo 3D Gaussian Splat")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(AppTheme.primaryText)
+                        Text("DEMO")
+                            .font(.caption2.weight(.bold))
+                            .foregroundColor(AppTheme.glowViolet)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.glowViolet.opacity(0.18))
+                            .clipShape(Capsule())
+                    }
+                    Text(demoSplatURL != nil ? "Tap to view best result" : "Add demo_splat.ply to bundle or Documents")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.secondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: demoSplatURL != nil ? "chevron.right" : "exclamationmark.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(demoSplatURL != nil ? AppTheme.tertiaryText : AppTheme.glowOrange)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius)
+                    .fill(AppTheme.glowViolet.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [AppTheme.glowViolet.opacity(0.5), AppTheme.glowCyan.opacity(0.3)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(demoSplatURL == nil)
+        .fullScreenCover(isPresented: $showDemoSplat) {
+            NavigationStack {
+                if let url = demoSplatURL {
+                    GaussianSplatView(plyURL: url)
+                        .navigationTitle("Demo 3DGS")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Close") { showDemoSplat = false }
+                            }
+                        }
+                }
+            }
+            .appSheetBackground()
+        }
     }
 
     @ViewBuilder

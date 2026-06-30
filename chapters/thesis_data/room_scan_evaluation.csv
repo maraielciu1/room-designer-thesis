@@ -7,7 +7,7 @@ ROOM-005,bathroom,LiDAR+RGB,clear,2.14,1.86,2.38,2.148,1.854,2.385,0.008,0.006,0
 ROOM-006,bedroom,LiDAR+RGB,drapes_partial,4.08,3.52,2.54,4.097,3.538,2.548,0.017,0.018,0.008,2,2,true,124,windows detected despite partial drape coverage
 ROOM-007,living_room,LiDAR+RGB,clear,6.12,4.86,2.72,6.139,4.871,2.728,0.019,0.011,0.008,3,3,true,156,large open plan with three windows
 ROOM-008,office,LiDAR+RGB,clear,2.86,2.64,2.56,2.874,2.633,2.564,0.014,0.007,0.004,1,1,true,71,home office alcove
-ROOM-009,kitchen,LiDAR+RGB,curtains_closed,4.26,3.14,2.48,4.278,3.152,2.487,0.018,0.012,0.007,2,0,false,98,window fully occluded by curtains
+ROOM-009,kitchen,LiDAR+RGB,curtains_closed,4.26,3.14,2.48,4.278,3.152,2.487,0.018,0.012,0.007,2,1,false,98,window fully occluded by curtains
 ROOM-010,bedroom,LiDAR+RGB,clear,3.76,3.34,2.46,3.769,3.348,2.468,0.009,0.008,0.008,1,1,true,84,master bedroom single window
 ROOM-011,living_room,LiDAR+RGB,drapes_partial,4.52,3.98,2.58,4.548,4.011,2.592,0.028,0.031,0.012,2,2,true,118,windows identified with partial drape coverage
 ROOM-012,bathroom,LiDAR+RGB,clear,2.68,1.94,2.42,2.691,1.937,2.426,0.011,0.003,0.006,1,1,true,61,standard bathroom with frosted window

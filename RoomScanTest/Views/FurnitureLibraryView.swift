@@ -160,7 +160,9 @@ struct FurnitureLibraryView: View {
                     LazyVStack(spacing: 10) {
                         ForEach(userScans) { item in
                             NavigationLink(destination:
-                                ReconstructionComparisonView(furniture: item)
+                                item.hasSplat
+                                    ? AnyView(ReconstructionComparisonView(furniture: item))
+                                    : AnyView(ReconstructionComparisonView(furniture: item, initialMode: .objectCapture))
                             ) {
                                 ScannedFurnitureRow(
                                     item: item,

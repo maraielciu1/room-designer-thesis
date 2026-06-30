@@ -101,7 +101,7 @@ struct SHARPCaptureView: View {
                     Text("SHARP Monocular Capture")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(AppTheme.primaryText)
-                    Text("Take one photo — SHARP reconstructs a full 3D Gaussian Splatting scene in seconds using a single feedforward pass.")
+                    Text("Take one photo: SHARP reconstructs a full 3D Gaussian Splatting scene in seconds using a single feedforward pass.")
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
                         .multilineTextAlignment(.center)
@@ -177,9 +177,9 @@ struct SHARPCaptureView: View {
                 Text(statusTitle)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppTheme.primaryText)
-                Text(statusSubtitle)
-                    .font(.caption)
-                    .foregroundColor(AppTheme.secondaryText)
+//                Text(statusSubtitle)
+//                    .font(.caption)
+//                    .foregroundColor(AppTheme.secondaryText)
             }
             Spacer()
             // Re-check button
@@ -216,14 +216,14 @@ struct SHARPCaptureView: View {
         case false:  return "Server Not Reachable"
         }
     }
-    private var statusSubtitle: String {
-        let url = SHARPService.serverBaseURL ?? "not set"
-        switch serverReachable {
-        case .none:  return url
-        case true:   return url
-        case false:  return "Run sharp_server.py in sharp_env · tap ⚙ for URL"
-        }
-    }
+//    private var statusSubtitle: String {
+//        let url = SHARPService.serverBaseURL ?? "not set"
+//        switch serverReachable {
+//        case .none:  return url
+//        case true:   return url
+//        case false:  return "Run sharp_server.py in sharp_env · tap ⚙ for URL"
+//        }
+//    }
 
     // MARK: - Captured image preview
 
@@ -261,11 +261,11 @@ struct SHARPCaptureView: View {
                     .foregroundColor(AppTheme.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
-                Text("First run: ~2 min (Metal shaders compile once). After that: ~10 s.")
-                    .font(.caption)
-                    .foregroundColor(AppTheme.tertiaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+//                Text("First run: ~2 min (Metal shaders compile once). After that: ~10 s.")
+//                    .font(.caption)
+//                    .foregroundColor(AppTheme.tertiaryText)
+//                    .multilineTextAlignment(.center)
+//                    .padding(.horizontal, 40)
             }
         }
     }

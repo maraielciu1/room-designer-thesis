@@ -17,16 +17,22 @@ enum SHARPService {
 
     // MARK: - Configuration
 
-    /// UserDefaults key where the server base URL is persisted.
+    static let modalURL: String? = "https://maraielciu26--sharp-server-web.modal.run"
+
+    /// UserDefaults key where a manually-entered server URL is persisted (fallback).
     static let serverURLKey = "sharp_server_base_url"
 
     static var serverBaseURL: String? {
         get {
-            UserDefaults.standard
+            if let modal = modalURL { return modal }
+            return UserDefaults.standard
                 .string(forKey: serverURLKey)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        set { UserDefaults.standard.set(newValue, forKey: serverURLKey) }
+        set {
+            guard modalURL == nil else { return }  // ignore saves when Modal URL is active
+            UserDefaults.standard.set(newValue, forKey: serverURLKey)
+        }
     }
 
     static var serverURL: URL? {

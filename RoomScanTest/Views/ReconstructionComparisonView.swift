@@ -14,6 +14,7 @@ import RealityKit
 
 struct ReconstructionComparisonView: View {
     let furniture: ScannedFurniture
+    var initialMode: ViewMode = .sideBySide
     @EnvironmentObject var scannedFurnitureManager: ScannedFurnitureManager
 
     enum ViewMode: String, CaseIterable {
@@ -36,10 +37,12 @@ struct ReconstructionComparisonView: View {
             AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                //  Mode Picker 
-                modePicker
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                //  Mode Picker — hidden when no splat is available
+                if furniture.hasSplat {
+                    modePicker
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                }
 
                 //  Content 
                 switch viewMode {
@@ -60,7 +63,8 @@ struct ReconstructionComparisonView: View {
                     .padding(.bottom, 8)
             }
         }
-        .navigationTitle("Compare Methods")
+        .onAppear { viewMode = initialMode }
+        .navigationTitle(furniture.hasSplat ? "Compare Methods" : "Object Capture")
         .navigationBarTitleDisplayMode(.inline)
             .appNavigationChrome()
         .toolbar {

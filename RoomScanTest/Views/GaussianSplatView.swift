@@ -22,6 +22,28 @@ struct GaussianSplatView: View {
     @State private var fps: Int = 0
     @State private var fpsTimer: Timer?
 
+    // UserDefaults keys scoped to the PLY file path so each splat has its own saved camera
+    private var cameraKey: String { "gsplat_camera_\(plyURL.lastPathComponent)" }
+
+    private func saveCamera() {
+        guard let r = renderer else { return }
+        UserDefaults.standard.set(r.orbitTheta, forKey: cameraKey + "_theta")
+        UserDefaults.standard.set(r.orbitPhi,   forKey: cameraKey + "_phi")
+        UserDefaults.standard.set(r.orbitDistance, forKey: cameraKey + "_dist")
+    }
+
+    private func restoreCamera() {
+        guard let r = renderer else { return }
+        let theta = UserDefaults.standard.float(forKey: cameraKey + "_theta")
+        let phi   = UserDefaults.standard.float(forKey: cameraKey + "_phi")
+        let dist  = UserDefaults.standard.float(forKey: cameraKey + "_dist")
+        // Only restore if a value was actually saved (dist == 0 means never saved)
+        guard dist > 0 else { return }
+        r.orbitTheta    = theta
+        r.orbitPhi      = phi
+        r.orbitDistance = dist
+    }
+
     var body: some View {
         ZStack {
             AppTheme.background.ignoresSafeArea()
@@ -95,7 +117,6 @@ struct GaussianSplatView: View {
             await loadPLY()
         }
         .onAppear {
-            // FPS counter
             fpsTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 if let r = renderer, r.lastFrameTime > 0 {
                     fps = Int(1.0 / r.lastFrameTime)
@@ -103,6 +124,7 @@ struct GaussianSplatView: View {
             }
         }
         .onDisappear {
+            saveCamera()
             fpsTimer?.invalidate()
             fpsTimer = nil
         }
@@ -127,6 +149,7 @@ struct GaussianSplatView: View {
             r.loadScene(scene)
             renderer = r
             gaussianCount = scene.gaussians.count
+            restoreCamera()
             isLoading = false
 
         } catch {

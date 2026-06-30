@@ -184,6 +184,9 @@ struct ObjectScanView: View {
             .task {
                 await monitorFeedback(session)
             }
+            .task {
+                await monitorShotCount(session)
+            }
             .alert("Scan Issue", isPresented: $showError) {
                 Button("Try Again") { cleanupAndReset(); startCapture() }
                 Button("OK", role: .cancel) { cleanupAndReset() }
@@ -496,91 +499,91 @@ struct ObjectScanView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
-            //  Gaussian Splatting export option 
-            VStack(spacing: 12) {
-                Divider()
-                    .background(AppTheme.warmAccent.opacity(0.25))
-                    .padding(.horizontal, 40)
-
-                Text("Gaussian Splatting")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.primaryText)
-
-                Text("Export the captured images to train a Gaussian Splat model for comparison with Object Capture.")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-
-                if isExporting {
-                    ProgressView("Packaging images…")
-                        .font(.caption)
-                        .tint(AppTheme.warmAccent)
-                } else {
-                    Button(action: exportImagesForGS) {
-                        Label("Export Images for 3DGS Training", systemImage: "photo.stack")
-                    }
-                    .buttonStyle(SecondaryChipButtonStyle())
-                    .padding(.horizontal, 24)
-                }
-
-                //  Train in Cloud (server runs 3DGS, then app downloads .ply) 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Server URL (your backend that runs 3DGS)")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.secondaryText)
-                    TextField("https://your-server.com/gs", text: $cloudServerBaseURL)
-                        .textFieldStyle(.plain)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.primaryText)
-                        .padding(12)
-                        .background(AppTheme.secondaryTint.opacity(0.35))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
-                        )
-                }
-                .padding(.horizontal, 24)
-
-                if isCloudTraining {
-                    VStack(spacing: 4) {
-                        ProgressView()
-                            .tint(AppTheme.warmAccent)
-                        Text(cloudStatusMessage ?? "Training…")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.secondaryText)
-                    }
-                } else {
-                    if let err = cloudError {
-                        Text(err)
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.glowRed)
-                            .multilineTextAlignment(.center)
-                        Text("Tap below to try again.")
-                            .font(.caption2)
-                            .foregroundStyle(AppTheme.tertiaryText)
-                    }
-                    Button(action: startCloudTraining) {
-                        Label("Train in Cloud", systemImage: "cloud.fill")
-                    }
-                    .buttonStyle(SecondaryChipButtonStyle())
-                    .padding(.horizontal, 24)
-                    .disabled(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || lastAddedFurniture == nil)
-                    .opacity(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
-                }
-
-                Button(action: { showGSGuide = true }) {
-                    Label("How to Train a Gaussian Splat", systemImage: "questionmark.circle")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(AppTheme.tertiaryText)
-                }
-            }
-            .padding(.top, 8)
-            .appPanel(cornerRadius: AppTheme.cardCornerRadius)
-            .padding(.horizontal, 16)
+//            //  Gaussian Splatting export option 
+//            VStack(spacing: 12) {
+//                Divider()
+//                    .background(AppTheme.warmAccent.opacity(0.25))
+//                    .padding(.horizontal, 40)
+//
+//                Text("Gaussian Splatting")
+//                    .font(.subheadline.weight(.semibold))
+//                    .foregroundStyle(AppTheme.primaryText)
+//
+//                Text("Export the captured images to train a Gaussian Splat model for comparison with Object Capture.")
+//                    .font(.caption)
+//                    .foregroundStyle(AppTheme.secondaryText)
+//                    .multilineTextAlignment(.center)
+//                    .padding(.horizontal, 40)
+//
+//                if isExporting {
+//                    ProgressView("Packaging images…")
+//                        .font(.caption)
+//                        .tint(AppTheme.warmAccent)
+//                } else {
+//                    Button(action: exportImagesForGS) {
+//                        Label("Export Images for 3DGS Training", systemImage: "photo.stack")
+//                    }
+//                    .buttonStyle(SecondaryChipButtonStyle())
+//                    .padding(.horizontal, 24)
+//                }
+//
+//                //  Train in Cloud (server runs 3DGS, then app downloads .ply) 
+////                VStack(alignment: .leading, spacing: 6) {
+////                    Text("Server URL (your backend that runs 3DGS)")
+////                        .font(.caption2)
+////                        .foregroundStyle(AppTheme.secondaryText)
+////                    TextField("https://your-server.com/gs", text: $cloudServerBaseURL)
+////                        .textFieldStyle(.plain)
+////                        .textInputAutocapitalization(.never)
+////                        .autocorrectionDisabled()
+////                        .font(.caption)
+////                        .foregroundStyle(AppTheme.primaryText)
+////                        .padding(12)
+////                        .background(AppTheme.secondaryTint.opacity(0.35))
+////                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+////                        .overlay(
+////                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+////                                .strokeBorder(AppTheme.warmAccent.opacity(0.25), lineWidth: 1)
+////                        )
+////                }
+////                .padding(.horizontal, 24)
+//
+//                if isCloudTraining {
+//                    VStack(spacing: 4) {
+//                        ProgressView()
+//                            .tint(AppTheme.warmAccent)
+//                        Text(cloudStatusMessage ?? "Training…")
+//                            .font(.caption)
+//                            .foregroundStyle(AppTheme.secondaryText)
+//                    }
+//                } else {
+//                    if let err = cloudError {
+//                        Text(err)
+//                            .font(.caption)
+//                            .foregroundStyle(AppTheme.glowRed)
+//                            .multilineTextAlignment(.center)
+//                        Text("Tap below to try again.")
+//                            .font(.caption2)
+//                            .foregroundStyle(AppTheme.tertiaryText)
+//                    }
+//                    Button(action: startCloudTraining) {
+//                        Label("Train in Cloud", systemImage: "cloud.fill")
+//                    }
+//                    .buttonStyle(SecondaryChipButtonStyle())
+//                    .padding(.horizontal, 24)
+//                    .disabled(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || lastAddedFurniture == nil)
+//                    .opacity(cloudServerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+//                }
+//
+//                Button(action: { showGSGuide = true }) {
+//                    Label("How to Train a Gaussian Splat", systemImage: "questionmark.circle")
+//                        .font(.caption.weight(.medium))
+//                        .foregroundStyle(AppTheme.tertiaryText)
+//                }
+//            }
+//            .padding(.top, 8)
+//            .appPanel(cornerRadius: AppTheme.cardCornerRadius)
+//            .padding(.horizontal, 16)
 
             Spacer()
 
@@ -652,31 +655,31 @@ struct ObjectScanView: View {
     private func monitorCaptureState(_ session: ObjectCaptureSession) async {
         print("[ObjectScan] Monitoring session state updates…")
         for await state in session.stateUpdates {
-            print("[ObjectScan] State → \(state)")
+            print("[ObjectScan] State -> \(state)")
             await MainActor.run {
                 switch state {
                 case .initializing:
                     sessionState = "Initializing…"
                 case .ready:
                     sessionState = "Ready"
-                    print("[ObjectScan] ✅ Ready - point camera at object, tap Continue")
+                    print("[ObjectScan] Ready - point camera at object, tap Continue")
                 case .detecting:
                     sessionState = "Detecting"
-                    print("[ObjectScan] ✅ Detecting - position the bounding box")
+                    print("[ObjectScan] Detecting - position the bounding box")
                 case .capturing:
                     sessionState = "Capturing"
                     numberOfShotsTaken = 0
-                    print("[ObjectScan] ✅ Capturing - walk around the object")
+                    print("[ObjectScan] Capturing - walk around the object")
                 case .finishing:
                     sessionState = "Finishing…"
                 case .completed:
                     sessionState = "Completed"
-                    print("[ObjectScan] ✅ Completed - starting reconstruction")
+                    print("[ObjectScan] Completed - starting reconstruction")
                     phase = .reconstructing
                     // Start reconstruction outside MainActor.run (it's async)
                     Task { await startReconstruction() }
                 case .failed(let error):
-                    print("[ObjectScan] ❌ FAILED: \(error)")
+                    print("[ObjectScan] FAILED: \(error)")
                     errorMessage = "Scan failed: \(error.localizedDescription)"
                     showError = true
                 @unknown default:
@@ -690,15 +693,18 @@ struct ObjectScanView: View {
     private func monitorFeedback(_ session: ObjectCaptureSession) async {
         for await feedback in session.feedbackUpdates {
             print("[ObjectScan] Feedback: \(feedback)")
-            // Track shots by counting images on disk periodically
-            if let imagesDir = imagesDirectory {
-                let count = countCapturedImages(in: imagesDir)
+        }
+    }
+
+    private func monitorShotCount(_ session: ObjectCaptureSession) async {
+        while !Task.isCancelled {
+            let count = session.numberOfShotsTaken
+            await MainActor.run {
                 if count != numberOfShotsTaken {
-                    await MainActor.run {
-                        numberOfShotsTaken = count
-                    }
+                    numberOfShotsTaken = count
                 }
             }
+            try? await Task.sleep(for: .milliseconds(250))
         }
     }
 
@@ -730,7 +736,7 @@ struct ObjectScanView: View {
                 errorMessage = """
                 Not enough scan data (\(imageCount) images captured).
 
-                For a successful 3D reconstruction you need at least 20–30 overlapping photos. Tips:
+                For a successful 3D reconstruction you need at least 20-30 overlapping photos. Tips:
                 • Walk slowly around the entire object
                 • Cover all sides (front, back, top)
                 • Keep the object centered in the frame
@@ -807,7 +813,7 @@ struct ObjectScanView: View {
             • Walk a full circle (or two) around the object
             • Make sure the object has visible texture/pattern
             • Avoid shiny, reflective, or transparent surfaces
-            • Use good, even lighting - avoid harsh shadows
+            • Use good, even lighting, avoid harsh shadows
             """
         }
 
@@ -973,7 +979,7 @@ struct ObjectScanView: View {
                     isCloudTraining = false
                     let msg = error.localizedDescription
                     if msg.lowercased().contains("offline") || msg.lowercased().contains("internet") {
-                        cloudError = "Can’t reach the server. Check: (1) iPhone and Mac on same Wi‑Fi, (2) Server URL is correct (e.g. http://192.168.1.206:5001), (3) Allow \"Local Network\" when the app prompts, or enable it in Settings → Privacy & Security → Local Network."
+                        cloudError = "Can’t reach the server. Check: (1) iPhone and Mac on same Wi‑Fi, (2) Server URL is correct (e.g. http://192.168.1.206:5001), (3) Allow \"Local Network\" when the app prompts, or enable it in Settings -> Privacy & Security -> Local Network."
                     } else {
                         cloudError = msg
                     }

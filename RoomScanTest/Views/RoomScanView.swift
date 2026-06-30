@@ -37,7 +37,7 @@ struct RoomScanView: View {
             AppTheme.background.ignoresSafeArea()
 
             if createdRoom != nil {
-                //  Scan complete — brief success state 
+                //  Scan complete => brief success state
                 VStack(spacing: 22) {
                     ZStack {
                         Circle()
