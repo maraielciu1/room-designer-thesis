@@ -19,7 +19,14 @@ struct RoomScanTestApp: App {
     init() {
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: AppUserEntity.self)
+            container = try ModelContainer(for:
+                AppUserEntity.self,
+                RoomEntity.self,
+                FurnitureReplacementEntity.self,
+                ProjectEntity.self,
+                ScannedFurnitureEntity.self,
+                ReplacementHistoryEntity.self
+            )
         } catch {
             fatalError("Failed to create SwiftData container: \(error)")
         }
@@ -83,6 +90,8 @@ struct AppRootView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var catalogManager = FurnitureCatalogManager()
 
+    @Environment(\.modelContext) private var modelContext
+
     @State private var roomManager: RoomManager?
     @State private var historyManager: HistoryManager?
     @State private var scannedFurnitureManager: ScannedFurnitureManager?
@@ -129,6 +138,10 @@ struct AppRootView: View {
 
     private func syncManagersAfterAuthChange() {
         if authManager.isAuthenticated {
+            // Migration MUST run before managers are created. RoomManager.init calls
+            // cleanOrphanedScanFiles — if SwiftData is empty (first launch after migration)
+            // it would treat every scan file as orphaned and delete them all.
+            SwiftDataMigration.runIfNeeded(modelContext: modelContext, userManager: userManager)
             ensureManagers()
             roomManager?.reloadForCurrentUser()
             historyManager?.reloadForCurrentUser()
@@ -143,13 +156,13 @@ struct AppRootView: View {
     }
 
     private func ensureManagers() {
-        if roomManager == nil { roomManager = RoomManager(userManager: userManager) }
-        if historyManager == nil { historyManager = HistoryManager(userManager: userManager) }
+        if roomManager == nil { roomManager = RoomManager(userManager: userManager, modelContext: modelContext) }
+        if historyManager == nil { historyManager = HistoryManager(userManager: userManager, modelContext: modelContext) }
         if scannedFurnitureManager == nil {
-            scannedFurnitureManager = ScannedFurnitureManager(userManager: userManager)
+            scannedFurnitureManager = ScannedFurnitureManager(userManager: userManager, modelContext: modelContext)
         }
         if projectManager == nil, let rm = roomManager {
-            projectManager = ProjectManager(userManager: userManager, roomManager: rm)
+            projectManager = ProjectManager(userManager: userManager, roomManager: rm, modelContext: modelContext)
         }
     }
 }

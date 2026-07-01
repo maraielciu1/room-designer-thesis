@@ -669,9 +669,19 @@ struct RoomDesignerView: View {
                 }
             }
 
-            //  Object dimensions 
+            //  Object dimensions — use replacement model's real-world size if available
+            let replacementDimensions: SIMD3<Float>? = {
+                guard let rep = selectedReplacement,
+                      rep.replacedWithUSDZ.hasPrefix("scanned_") else { return nil }
+                let uuidString = String(rep.replacedWithUSDZ.dropFirst("scanned_".count))
+                guard let uuid = UUID(uuidString: uuidString),
+                      let item = scannedFurnitureManager.items.first(where: { $0.id == uuid }),
+                      let dims = item.realWorldSize else { return nil }
+                return dims
+            }()
             let objDims = MeasurementService.measureScannedObject(
-                dimensions: object.dimensions, category: object.categoryDescription)
+                dimensions: replacementDimensions ?? object.dimensions,
+                category: object.categoryDescription)
             HStack(spacing: 12) {
                 Image(systemName: "ruler")
                     .font(.caption2)

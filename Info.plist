@@ -8,6 +8,8 @@
 	<string>RoomScanTest</string>
 	<key>CFBundleName</key>
 	<string>RoomScanTest</string>
+	<key>CFBundleDisplayName</key>
+	<string>Room Designer</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

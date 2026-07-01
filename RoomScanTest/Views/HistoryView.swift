@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct HistoryView: View {
     @EnvironmentObject var historyManager: HistoryManager
@@ -191,10 +192,19 @@ struct HistoryRowView: View {
 }
 
 #Preview {
-    NavigationView {
+    let container = try! ModelContainer(for:
+        RoomEntity.self, FurnitureReplacementEntity.self,
+        ProjectEntity.self, ScannedFurnitureEntity.self,
+        ReplacementHistoryEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let ctx = container.mainContext
+    let userManager = UserManager()
+    return NavigationView {
         HistoryView()
-            .environmentObject(HistoryManager(userManager: UserManager()))
-            .environmentObject(RoomManager(userManager: UserManager()))
+            .environmentObject(HistoryManager(userManager: userManager, modelContext: ctx))
+            .environmentObject(RoomManager(userManager: userManager, modelContext: ctx))
     }
+    .modelContainer(container)
     .preferredColorScheme(.dark)
 }

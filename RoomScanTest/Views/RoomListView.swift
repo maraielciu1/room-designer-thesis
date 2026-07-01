@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import UIKit
 
 struct RoomListView: View {
@@ -479,12 +480,22 @@ struct RoomRowView: View {
 }
 
 #Preview {
-    NavigationView {
+    let container = try! ModelContainer(for:
+        RoomEntity.self, FurnitureReplacementEntity.self,
+        ProjectEntity.self, ScannedFurnitureEntity.self,
+        ReplacementHistoryEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let ctx = container.mainContext
+    let userManager = UserManager()
+    let roomManager = RoomManager(userManager: userManager, modelContext: ctx)
+    return NavigationView {
         RoomListView()
-            .environmentObject(UserManager())
-            .environmentObject(RoomManager(userManager: UserManager()))
+            .environmentObject(userManager)
+            .environmentObject(roomManager)
             .environmentObject(FurnitureCatalogManager())
-            .environmentObject(ProjectManager(userManager: UserManager(), roomManager: RoomManager(userManager: UserManager())))
+            .environmentObject(ProjectManager(userManager: userManager, roomManager: roomManager, modelContext: ctx))
     }
+    .modelContainer(container)
     .preferredColorScheme(.dark)
 }

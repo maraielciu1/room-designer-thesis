@@ -117,8 +117,8 @@ enum SmartSuggestionsService {
             ? Float(totalFurniture) / measurements.floorArea
             : 0
 
-        // Lighting adequacy (rule of thumb: ~1 fixture per 4 m^2)
-        let recommendedLights = max(1, Int(measurements.floorArea / 4))
+        // Lighting adequacy (rule of thumb: ~1 fixture per 8 m^2)
+        let recommendedLights = max(1, Int(measurements.floorArea / 8))
         let adequacy: RoomStatistics.LightingAdequacy
         if lightingCount == 0 {
             adequacy = .insufficient

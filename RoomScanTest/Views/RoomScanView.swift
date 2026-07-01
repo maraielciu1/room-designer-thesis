@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RoomPlan
+import SwiftData
 
 struct RoomScanView: View {
     @EnvironmentObject var roomManager: RoomManager
@@ -319,8 +320,17 @@ struct InstructionRow: View {
 }
 
 #Preview {
-    RoomScanView(roomName: "Living Room")
-        .environmentObject(RoomManager(userManager: UserManager()))
-        .environmentObject(UserManager())
+    let container = try! ModelContainer(for:
+        RoomEntity.self, FurnitureReplacementEntity.self,
+        ProjectEntity.self, ScannedFurnitureEntity.self,
+        ReplacementHistoryEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let userManager = UserManager()
+    let roomManager = RoomManager(userManager: userManager, modelContext: container.mainContext)
+    return RoomScanView(roomName: "Living Room")
+        .environmentObject(roomManager)
+        .environmentObject(userManager)
+        .modelContainer(container)
         .preferredColorScheme(.dark)
 }

@@ -240,14 +240,31 @@ enum RoomBlenderExportService {
                 frameStyle: fStyle,
                 replacement: rep
             ) {
-                let rgba = rgbaFloats(.white)
+                let uid = rep.id.uuidString.prefix(8)
+                // Frame box (behind the canvas) — same color as the app frame
+                if fStyle != .noFrame {
+                    let border = fStyle.borderWidthM
+                    let depth  = fStyle.frameDepthM
+                    let fw = fSize.widthM + border * 2
+                    let fh = fSize.heightM + border * 2
+                    // The canvas sits on the wall face; push the frame box back by half its depth
+                    var frameWorld = world
+                    frameWorld.columns.3 -= frameWorld.columns.2 * (depth * 0.5)
+                    try builder.addBox(
+                        name: "wall_art_frame_\(uid)",
+                        transform: frameWorld,
+                        halfExtents: SIMD3<Float>(fw * 0.5, fh * 0.5, depth * 0.5),
+                        baseColor: rgbaFloats(fStyle.frameColor),
+                        textureRelativePath: nil
+                    )
+                }
                 try builder.addTexturedVerticalPlane(
-                    name: "wall_art_\(rep.id.uuidString.prefix(8))",
+                    name: "wall_art_\(uid)",
                     worldMatrix: world,
                     width: fSize.widthM,
                     height: fSize.heightM,
                     textureRelativePath: texRel,
-                    tint: rgba
+                    tint: rgbaFloats(.white)
                 )
             }
         }
@@ -417,6 +434,14 @@ enum RoomBlenderExportService {
             alphaMode: "BLEND",
             unlit: true
         )
+        // Extract pure rotation quaternion from the world matrix (strip scale first).
+        let c0 = normalize(SIMD3<Float>(world.columns.0.x, world.columns.0.y, world.columns.0.z))
+        let c1 = normalize(SIMD3<Float>(world.columns.1.x, world.columns.1.y, world.columns.1.z))
+        let c2 = normalize(SIMD3<Float>(world.columns.2.x, world.columns.2.y, world.columns.2.z))
+        let rotMat = simd_float4x4(
+            SIMD4<Float>(c0, 0), SIMD4<Float>(c1, 0), SIMD4<Float>(c2, 0), SIMD4<Float>(0, 0, 0, 1)
+        )
+        let q = simd_quatf(rotMat)
         manifestItems.append(
             FurnitureManifestItem(
                 id: id,
@@ -428,7 +453,8 @@ enum RoomBlenderExportService {
                     Double(targetDimensions.z)
                 ],
                 useRealWorldScale: useRealWorldScale,
-                customScale: customScale.map { Double($0) }
+                customScale: customScale.map { Double($0) },
+                rotationQuaternion: [Double(q.vector.x), Double(q.vector.y), Double(q.vector.z), Double(q.vector.w)]
             )
         )
     }
@@ -506,10 +532,28 @@ enum RoomBlenderExportService {
         child.parent = parent
         child.matrix_world = mw
 
-    def align_to_marker(imported_roots, marker_obj, use_real_scale, custom_scale, align_mode):
+    def arkit_rot_to_blender(qxyzw):
+        import math
+        qx, qy, qz, qw = qxyzw
+        from mathutils import Quaternion as MQuat
+        q = MQuat((qw, qx, qy, qz))
+        R = q.to_matrix().to_4x4()
+        # ARKit is Y-up; Blender is Z-up.
+        # Prefix with Rx(+90°) so ARKit +Y maps to Blender +Z.
+        # This gives Rz(yaw) @ Rx(90°): the model stands upright AND faces
+        # the correct horizontal direction.  A similarity transform C@R@C⁻¹
+        # would drop the Rx(90°) "stand-up" component, causing the model to
+        # lie on its side.
+        C = Matrix.Rotation(math.pi / 2, 4, "X")
+        return C @ R
+
+    def align_to_marker(imported_roots, marker_obj, use_real_scale, custom_scale, align_mode, rotation_quaternion=None):
         group = bpy.data.objects.new("FURN_" + marker_obj.name, None)
         bpy.context.scene.collection.objects.link(group)
         group.matrix_world = Matrix.Identity(4)
+
+        # Record the USDZ model's world rotation BEFORE parenting so we can cancel it out.
+        model_rot_world = imported_roots[0].matrix_world.to_3x3().normalized().to_4x4() if imported_roots else Matrix.Identity(4)
 
         for r in imported_roots:
             parent_preserve_world(r, group)
@@ -517,7 +561,7 @@ enum RoomBlenderExportService {
         bpy.context.view_layer.update()
         meshes = [o for o in group.children_recursive if o.type == "MESH"]
         _, g_size, _, _ = mesh_world_bounds(meshes)
-        _, m_size, _, m_max = mesh_world_bounds([marker_obj])
+        _, m_size, _, _ = mesh_world_bounds([marker_obj])
 
         if not use_real_scale:
             sx = m_size.x / g_size.x if g_size.x > 1e-5 else 1.0
@@ -527,6 +571,22 @@ enum RoomBlenderExportService {
             if custom_scale:
                 uniform *= float(custom_scale)
             group.scale = (group.scale.x * uniform, group.scale.y * uniform, group.scale.z * uniform)
+
+        # Orient the group using the ARKit quaternion stored in the manifest.
+        # The marker box bakes its transform into vertex positions (no node matrix),
+        # so marker_obj.matrix_world carries only the glTF root's Y->Z conversion,
+        # NOT the furniture orientation. We use the explicit quaternion instead.
+        # group_rot = R_target * R_model_world^-1 ensures the child's world rotation
+        # equals R_target after parenting.
+        if rotation_quaternion and len(rotation_quaternion) == 4:
+            R_target = arkit_rot_to_blender(rotation_quaternion)
+            group_rot = R_target @ model_rot_world.inverted()
+        else:
+            group_rot = Matrix.Identity(4)
+
+        saved_scale = group.scale.copy()
+        group.matrix_world = group_rot
+        group.scale = saved_scale
 
         bpy.context.view_layer.update()
         meshes = [o for o in group.children_recursive if o.type == "MESH"]
@@ -625,8 +685,9 @@ enum RoomBlenderExportService {
 
         if ft == "Floor Lamp":
             # Match DecorManager floorLamp: base at floor, pole 1.5m, shade on top
-            add_cylinder(pfx + "base", 0.14, 0.02, (cx, cy, cz_floor + 0.01), metal)
-            add_cylinder(pfx + "pole", 0.012, 1.50, (cx, cy, cz_floor + 0.77), metal)
+            black = make_mat(pfx + "black", (0.02, 0.02, 0.02, 1.0))
+            add_cylinder(pfx + "base", 0.14, 0.02, (cx, cy, cz_floor + 0.01), black)
+            add_cylinder(pfx + "pole", 0.012, 1.50, (cx, cy, cz_floor + 0.77), black)
             add_cylinder(pfx + "shade", 0.16, 0.22, (cx, cy, cz_floor + 1.56), bulb)
             return
         elif ft == "Wall Sconce":
@@ -743,6 +804,7 @@ enum RoomBlenderExportService {
                 bool(item.get("useRealWorldScale", False)),
                 item.get("customScale"),
                 item.get("alignMode", "bottom"),
+                item.get("rotationQuaternion"),
             )
             print("Aligned", os.path.basename(usdz_path), "->", marker_name)
 
@@ -896,6 +958,9 @@ private struct FurnitureManifestItem: Encodable {
     let useRealWorldScale: Bool
     let customScale: Double?
     let alignMode: String
+    /// Rotation quaternion [x, y, z, w] in ARKit Y-up world space.
+    /// Used by the Blender script to orient the USDZ correctly.
+    let rotationQuaternion: [Double]
 
     init(
         id: String,
@@ -903,7 +968,8 @@ private struct FurnitureManifestItem: Encodable {
         markerName: String,
         targetDimensions: [Double],
         useRealWorldScale: Bool,
-        customScale: Double?
+        customScale: Double?,
+        rotationQuaternion: [Double] = [0, 0, 0, 1]
     ) {
         self.id = id
         self.usdz = usdz
@@ -911,6 +977,7 @@ private struct FurnitureManifestItem: Encodable {
         self.targetDimensions = targetDimensions
         self.useRealWorldScale = useRealWorldScale
         self.customScale = customScale
+        self.rotationQuaternion = rotationQuaternion
         alignMode = "bottom"
     }
 }

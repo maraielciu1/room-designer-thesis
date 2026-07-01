@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 
 struct FurnitureLibraryView: View {
@@ -318,10 +319,15 @@ struct BuiltInModelCard: View {
 }
 
 #Preview {
-    NavigationView {
+    let container = try! ModelContainer(for:
+        ScannedFurnitureEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    return NavigationView {
         FurnitureLibraryView()
             .environmentObject(FurnitureCatalogManager())
-            .environmentObject(ScannedFurnitureManager(userManager: UserManager()))
+            .environmentObject(ScannedFurnitureManager(userManager: UserManager(), modelContext: container.mainContext))
     }
+    .modelContainer(container)
     .preferredColorScheme(.dark)
 }

@@ -8,134 +8,157 @@
 import Foundation
 import Combine
 import RoomPlan
+import SwiftData
 
 class RoomManager: ObservableObject {
     @Published var rooms: [Room] = []
-    
-    private let roomsKey = "saved_rooms"
+
     private let userManager: UserManager
-    
-    init(userManager: UserManager) {
+    private let modelContext: ModelContext
+
+    init(userManager: UserManager, modelContext: ModelContext) {
         self.userManager = userManager
+        self.modelContext = modelContext
         reloadForCurrentUser()
     }
 
     func reloadForCurrentUser() {
         loadRooms()
-        if let userId = userManager.currentUser?.id {
+        // Only clean orphaned scan files when we actually loaded rooms.
+        // An empty result on first launch (before migration) must not be
+        // treated as "all files are orphaned" — that would delete valid scans.
+        if let userId = userManager.currentUser?.id, !rooms.isEmpty {
             Room.cleanOrphanedScanFiles(userId: userId, existingRoomIds: Set(rooms.map(\.id)))
         }
     }
-    
+
     func createRoom(name: String, capturedRoom: CapturedRoom? = nil, roomMaterials: RoomMaterials? = nil) -> Room {
         guard let userId = userManager.currentUser?.id else {
             fatalError("No current user")
         }
-        
+
         var room = Room(name: name, userId: userId, roomMaterials: roomMaterials)
         if let capturedRoom = capturedRoom {
-            room.setCapturedRoom(capturedRoom) // saves to memory + disk
+            room.setCapturedRoom(capturedRoom)
         }
-        
-        // Check for duplicates before adding (same name and user, created within last second)
+
         let recentDuplicate = rooms.first { existingRoom in
             existingRoom.userId == userId &&
             existingRoom.name == name &&
             abs(existingRoom.createdAt.timeIntervalSinceNow) < 1.0
         }
-        
-        // Only add if no recent duplicate exists
+
         if recentDuplicate == nil {
             rooms.append(room)
-            saveRooms()
+            persist(room)
         } else {
-            // Return the existing room instead of creating duplicate
             return recentDuplicate!
         }
-        
+
         return room
     }
-    
+
     func removeDuplicateRooms() {
-        // Remove duplicate rooms (same name, same user, created within 1 second of each other)
         var seenRooms: [String: Room] = [:]
         var roomsToKeep: [Room] = []
-        
+
         for room in rooms {
             let similarKey = "\(room.userId.uuidString)_\(room.name)"
             if let existing = seenRooms[similarKey],
                abs(existing.createdAt.timeIntervalSince(room.createdAt)) < 1.0 {
-                // This is a duplicate — clean up its scan file
                 room.deleteScanData()
+                deleteEntity(for: room)
                 continue
             }
-            
             seenRooms[similarKey] = room
             roomsToKeep.append(room)
         }
-        
+
         if roomsToKeep.count < rooms.count {
             rooms = roomsToKeep
-            saveRooms()
         }
     }
-    
+
     func updateRoom(_ room: Room) {
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
             var updatedRoom = room
             updatedRoom.updatedAt = Date()
             rooms[index] = updatedRoom
-            saveRooms()
+            persist(updatedRoom)
         }
     }
-    
+
     func deleteRoom(_ room: Room) {
-        // Delete the scan data file from disk first
         room.deleteScanData()
         rooms.removeAll { $0.id == room.id }
-        saveRooms()
+        deleteEntity(for: room)
     }
-    
+
     func getRoomsForCurrentUser() -> [Room] {
         guard let userId = userManager.currentUser?.id else { return [] }
         return rooms.filter { $0.userId == userId }
     }
-    
+
     func addReplacement(to room: Room, replacement: FurnitureReplacement) {
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
             rooms[index].furnitureReplacements.append(replacement)
             rooms[index].updatedAt = Date()
-            saveRooms()
+            persist(rooms[index])
         }
     }
-    
+
     func updateReplacement(in room: Room, replacement: FurnitureReplacement) {
         if let index = rooms.firstIndex(where: { $0.id == room.id }),
            let replacementIndex = rooms[index].furnitureReplacements.firstIndex(where: { $0.id == replacement.id }) {
             rooms[index].furnitureReplacements[replacementIndex] = replacement
             rooms[index].updatedAt = Date()
-            saveRooms()
+            persist(rooms[index])
         }
     }
-    
+
     func removeReplacement(from room: Room, replacementId: UUID) {
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
             rooms[index].furnitureReplacements.removeAll { $0.id == replacementId }
             rooms[index].updatedAt = Date()
-            saveRooms()
+            persist(rooms[index])
         }
-    }
-    
-    private func loadRooms() {
-        guard let userId = userManager.currentUser?.id else {
-            rooms = []
-            return
-        }
-        rooms = UserScopedStorage.load([Room].self, baseKey: roomsKey, userId: userId) ?? []
     }
 
-    private func saveRooms() {
-        guard let userId = userManager.currentUser?.id else { return }
-        UserScopedStorage.save(rooms, baseKey: roomsKey, userId: userId)
+    // MARK: - SwiftData persistence
+
+    private func loadRooms() {
+        guard let userId = userManager.currentUser?.id else { rooms = []; return }
+        var descriptor = FetchDescriptor<RoomEntity>(
+            predicate: #Predicate { $0.userId == userId },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        descriptor.relationshipKeyPathsForPrefetching = [\.furnitureReplacements]
+        rooms = (try? modelContext.fetch(descriptor))?.map { $0.toRoom() } ?? []
+    }
+
+    private func persist(_ room: Room) {
+        let roomId = room.id
+        let descriptor = FetchDescriptor<RoomEntity>(predicate: #Predicate { $0.id == roomId })
+        if let entity = try? modelContext.fetch(descriptor).first {
+            entity.update(from: room, context: modelContext)
+        } else {
+            let entity = RoomEntity(from: room)
+            modelContext.insert(entity)
+            for replacement in room.furnitureReplacements {
+                let repEntity = FurnitureReplacementEntity(from: replacement)
+                repEntity.room = entity
+                entity.furnitureReplacements.append(repEntity)
+            }
+        }
+        try? modelContext.save()
+    }
+
+    private func deleteEntity(for room: Room) {
+        let roomId = room.id
+        let descriptor = FetchDescriptor<RoomEntity>(predicate: #Predicate { $0.id == roomId })
+        if let entity = try? modelContext.fetch(descriptor).first {
+            modelContext.delete(entity)
+            try? modelContext.save()
+        }
     }
 }

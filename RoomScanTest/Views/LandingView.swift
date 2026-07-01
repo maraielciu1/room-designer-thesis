@@ -4,6 +4,7 @@
 // Local mode root: floating pill tab bar, static background.
 
 import SwiftUI
+import SwiftData
 
 // MARK: - Local Landing View
 
@@ -193,16 +194,24 @@ struct LandingView: View {
 }
 
 #Preview("Tab bar") {
+    let container = try! ModelContainer(for:
+        RoomEntity.self, FurnitureReplacementEntity.self,
+        ProjectEntity.self, ScannedFurnitureEntity.self,
+        ReplacementHistoryEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let ctx = container.mainContext
     let userManager = UserManager()
     userManager.setCurrentUser(User(name: "Preview", email: "preview@test.com"))
-    let roomManager = RoomManager(userManager: userManager)
+    let roomManager = RoomManager(userManager: userManager, modelContext: ctx)
     return LocalLandingView()
         .environmentObject(userManager)
         .environmentObject(FurnitureCatalogManager())
-        .environmentObject(ScannedFurnitureManager(userManager: userManager))
+        .environmentObject(ScannedFurnitureManager(userManager: userManager, modelContext: ctx))
         .environmentObject(roomManager)
-        .environmentObject(HistoryManager(userManager: userManager))
-        .environmentObject(ProjectManager(userManager: userManager, roomManager: roomManager))
+        .environmentObject(HistoryManager(userManager: userManager, modelContext: ctx))
+        .environmentObject(ProjectManager(userManager: userManager, roomManager: roomManager, modelContext: ctx))
+        .modelContainer(container)
 }
 
 #Preview("Legacy landing") {

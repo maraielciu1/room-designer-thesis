@@ -8,18 +8,18 @@
 import Foundation
 import Combine
 import RealityKit
+import SwiftData
 
 /// Manages the user's personal library of scanned furniture USDZ files.
-/// Metadata is persisted in UserDefaults; USDZ files live in Documents/ScannedFurniture/.
+/// Metadata is persisted in SwiftData; USDZ files live in Documents/ScannedFurniture/.
 class ScannedFurnitureManager: ObservableObject {
     @Published var items: [ScannedFurniture] = []
 
-    private let storageKey = "scanned_furniture_items"
     private let userManager: UserManager
+    private let modelContext: ModelContext
 
     // MARK: - Shared directory paths
 
-    /// Per-user directory for finished USDZ models.
     func modelDirectory() -> URL {
         guard let userId = userManager.currentUser?.id else {
             return UserStoragePaths.legacyScannedFurniture
@@ -27,10 +27,8 @@ class ScannedFurnitureManager: ObservableObject {
         return UserStoragePaths.scannedFurniture(userId: userId)
     }
 
-    /// Legacy shared path (pre–account isolation). Prefer `modelDirectory()`.
     static var legacyModelDirectory: URL { UserStoragePaths.legacyScannedFurniture }
 
-    /// Temporary directory used during an Object Capture session.
     static var captureSessionDirectory: URL {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ObjectCaptureTemp", isDirectory: true)
@@ -42,8 +40,9 @@ class ScannedFurnitureManager: ObservableObject {
 
     // MARK: - Init
 
-    init(userManager: UserManager) {
+    init(userManager: UserManager, modelContext: ModelContext) {
         self.userManager = userManager
+        self.modelContext = modelContext
         reloadForCurrentUser()
     }
 
@@ -58,10 +57,6 @@ class ScannedFurnitureManager: ObservableObject {
         return items.filter { $0.userId == userId }
     }
 
-    /// Register a finished USDZ model in the library.
-    ///
-    /// If `realWorldDimensions` is nil the method will load the USDZ once
-    /// to measure its visual bounds (Object Capture models use 1 unit = 1 m).
     @discardableResult
     func addFurniture(name: String, category: String, usdzURL: URL,
                       realWorldDimensions: [Double]? = nil) -> ScannedFurniture {
@@ -69,7 +64,6 @@ class ScannedFurnitureManager: ObservableObject {
             fatalError("No current user")
         }
 
-        // Move/copy USDZ to permanent directory with a stable name
         let id = UUID()
         let permanentFileName = "\(id.uuidString).usdz"
         let permanentURL = modelDirectory().appendingPathComponent(permanentFileName)
@@ -84,8 +78,6 @@ class ScannedFurnitureManager: ObservableObject {
         }
 
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: permanentURL.path))?[.size] as? Int64
-
-        // Measure real-world dimensions if not provided
         let dimensions = realWorldDimensions ?? Self.measureModelDimensions(at: permanentURL)
         if let dims = dimensions {
             print("[ScannedFurnitureManager] Stored real-world dimensions: "
@@ -103,17 +95,12 @@ class ScannedFurnitureManager: ObservableObject {
         )
 
         items.append(item)
-        saveItems()
+        persist(item)
         return item
     }
 
     // MARK: - Dimension measurement
 
-    /// Load a USDZ model from disk and return its visual extents in metres.
-    /// Object Capture outputs use 1 unit = 1 m, so the extents correspond
-    /// directly to the physical object's width × height × depth.
-    ///
-    /// Returns `[width, height, depth]` or `nil` if the model can't be loaded.
     static func measureModelDimensions(at url: URL) -> [Double]? {
         guard let model = try? Entity.load(contentsOf: url) else {
             print("[ScannedFurnitureManager] Could not load model for measurement: \(url.lastPathComponent)")
@@ -129,25 +116,22 @@ class ScannedFurnitureManager: ObservableObject {
     }
 
     func deleteFurniture(_ item: ScannedFurniture) {
-        // Remove USDZ file from disk
         let fileURL = item.usdzURL
         try? FileManager.default.removeItem(at: fileURL)
-
         items.removeAll { $0.id == item.id }
-        saveItems()
+        deleteEntity(for: item)
         print("[ScannedFurnitureManager] Deleted: \(item.name)")
     }
 
     func renameFurniture(_ item: ScannedFurniture, newName: String) {
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].name = newName
-            saveItems()
+            persist(items[idx])
         }
     }
 
     // MARK: - Gaussian Splatting
 
-    /// Associate a trained Gaussian Splat .ply file with an existing scanned object.
     func attachSplat(to item: ScannedFurniture,
                      splatFileName: String,
                      gaussianCount: Int?,
@@ -157,14 +141,12 @@ class ScannedFurnitureManager: ObservableObject {
         items[idx].splatGaussianCount = gaussianCount
         items[idx].splatFileSizeBytes = fileSizeBytes
         items[idx].reconstructionMethod = "both"
-        saveItems()
+        persist(items[idx])
         print("[ScannedFurnitureManager] Attached splat (\(gaussianCount ?? 0) Gaussians) to '\(item.name)'")
     }
 
-    /// Remove the Gaussian Splat from a scanned object (keeps the USDZ).
     func removeSplat(from item: ScannedFurniture) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
-        // Remove .ply file from disk
         if let splatName = items[idx].splatFileName {
             let splatURL = item.splatURL ?? modelDirectory().appendingPathComponent(splatName)
             try? FileManager.default.removeItem(at: splatURL)
@@ -173,13 +155,12 @@ class ScannedFurnitureManager: ObservableObject {
         items[idx].splatGaussianCount = nil
         items[idx].splatFileSizeBytes = nil
         items[idx].reconstructionMethod = "objectCapture"
-        saveItems()
+        persist(items[idx])
         print("[ScannedFurnitureManager] Removed splat from '\(item.name)'")
     }
 
-    // MARK: - Lookup (used by FurnitureCatalogManager)
+    // MARK: - Lookup
 
-    /// Resolve a `catalogKey` like `"scanned_<uuid>"` to a file URL.
     func resolveURL(forCatalogKey key: String) -> URL? {
         guard key.hasPrefix("scanned_") else { return nil }
         let uuidString = String(key.dropFirst("scanned_".count))
@@ -191,7 +172,6 @@ class ScannedFurnitureManager: ObservableObject {
 
     // MARK: - Capture session helpers
 
-    /// Create a fresh temporary directory for an Object Capture session.
     func createSessionDirectories() throws -> (images: URL, checkpoint: URL) {
         let sessionId = UUID().uuidString
         let base = Self.captureSessionDirectory.appendingPathComponent(sessionId)
@@ -202,26 +182,40 @@ class ScannedFurnitureManager: ObservableObject {
         return (imagesDir, checkpointDir)
     }
 
-    /// Remove all temporary capture session files.
     func cleanupSessionFiles() {
         try? FileManager.default.removeItem(at: Self.captureSessionDirectory)
-        // Recreate the empty directory for next time
         try? FileManager.default.createDirectory(at: Self.captureSessionDirectory, withIntermediateDirectories: true)
         print("[ScannedFurnitureManager] Cleaned up capture session files")
     }
 
-    // MARK: - Persistence
+    // MARK: - SwiftData persistence
 
     private func loadItems() {
-        guard let userId = userManager.currentUser?.id else {
-            items = []
-            return
-        }
-        items = UserScopedStorage.load([ScannedFurniture].self, baseKey: storageKey, userId: userId) ?? []
+        guard let userId = userManager.currentUser?.id else { items = []; return }
+        let descriptor = FetchDescriptor<ScannedFurnitureEntity>(
+            predicate: #Predicate { $0.userId == userId },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        items = (try? modelContext.fetch(descriptor))?.map { $0.toScannedFurniture() } ?? []
     }
 
-    private func saveItems() {
-        guard let userId = userManager.currentUser?.id else { return }
-        UserScopedStorage.save(items, baseKey: storageKey, userId: userId)
+    private func persist(_ item: ScannedFurniture) {
+        let itemId = item.id
+        let descriptor = FetchDescriptor<ScannedFurnitureEntity>(predicate: #Predicate { $0.id == itemId })
+        if let entity = try? modelContext.fetch(descriptor).first {
+            entity.update(from: item)
+        } else {
+            modelContext.insert(ScannedFurnitureEntity(from: item))
+        }
+        try? modelContext.save()
+    }
+
+    private func deleteEntity(for item: ScannedFurniture) {
+        let itemId = item.id
+        let descriptor = FetchDescriptor<ScannedFurnitureEntity>(predicate: #Predicate { $0.id == itemId })
+        if let entity = try? modelContext.fetch(descriptor).first {
+            modelContext.delete(entity)
+            try? modelContext.save()
+        }
     }
 }

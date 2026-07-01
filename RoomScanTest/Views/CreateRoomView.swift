@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct CreateRoomView: View {
     @EnvironmentObject var roomManager: RoomManager
@@ -133,7 +134,15 @@ struct CreateRoomView: View {
 }
 
 #Preview {
-    CreateRoomView()
-        .environmentObject(RoomManager(userManager: UserManager()))
+    let container = try! ModelContainer(for:
+        RoomEntity.self, FurnitureReplacementEntity.self,
+        ProjectEntity.self, ScannedFurnitureEntity.self,
+        ReplacementHistoryEntity.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    let userManager = UserManager()
+    return CreateRoomView()
+        .environmentObject(RoomManager(userManager: userManager, modelContext: container.mainContext))
+        .modelContainer(container)
         .preferredColorScheme(.dark)
 }
