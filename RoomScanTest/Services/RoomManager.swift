@@ -26,7 +26,7 @@ class RoomManager: ObservableObject {
         loadRooms()
         // Only clean orphaned scan files when we actually loaded rooms.
         // An empty result on first launch (before migration) must not be
-        // treated as "all files are orphaned" — that would delete valid scans.
+        // treated as "all files are orphaned" that would delete valid scans.
         if let userId = userManager.currentUser?.id, !rooms.isEmpty {
             Room.cleanOrphanedScanFiles(userId: userId, existingRoomIds: Set(rooms.map(\.id)))
         }
