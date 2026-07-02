@@ -59,7 +59,7 @@ struct ObjectScanView: View {
     @State private var isExporting = false
     @State private var showGSGuide = false
 
-    // Cloud training (upload zip → server runs 3DGS → download .ply)
+    // Cloud training (upload zip -> server runs 3DGS -> download .ply)
     @State private var lastAddedFurniture: ScannedFurniture?
     @State private var isCloudTraining = false
     @State private var cloudStatusMessage: String?
@@ -75,9 +75,7 @@ struct ObjectScanView: View {
     @ViewBuilder
     var body: some View {
         if phase == .capturing, let session = captureSession {
-            // ═══════════════════════════════════════════════════════
             //  CAPTURING - camera feed + our custom controls
-            // ═══════════════════════════════════════════════════════
             ZStack {
                 // Layer 1 - Apple's camera + visual guides
                 ObjectCaptureView(session: session)
@@ -85,7 +83,7 @@ struct ObjectScanView: View {
 
                 // Layer 2 - Our buttons (transparent background lets camera show)
                 VStack(spacing: 0) {
-                    //  Top bar: Cancel + State badge 
+                    //  Top bar: Cancel + State badge
                     HStack(alignment: .top) {
                         Button(action: { cleanupAndReset() }) {
                             HStack(spacing: 5) {
@@ -195,9 +193,7 @@ struct ObjectScanView: View {
             }
 
         } else {
-            // ═══════════════════════════════════════════════════════
             //  ALL OTHER PHASES
-            // ═══════════════════════════════════════════════════════
             nonCaptureContent
                 .alert("Scan Issue", isPresented: $showError) {
                     Button("Try Again") {
@@ -756,7 +752,7 @@ struct ObjectScanView: View {
         print("[ObjectScan] Starting reconstruction (\(imageCount) images) → \(outputURL.lastPathComponent)")
 
         do {
-            //  Configure session with checkpoint + sequential ordering 
+            //  Configure session with checkpoint + sequential ordering
             var configuration = PhotogrammetrySession.Configuration()
             configuration.sampleOrdering = .sequential
             configuration.featureSensitivity = .normal

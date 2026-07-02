@@ -10,6 +10,7 @@ import SwiftData
 import UIKit
 
 struct RoomListView: View {
+    @ObservedObject private var recents = RecentItemsStore.shared
     @EnvironmentObject var userManager: UserManager
     @EnvironmentObject var roomManager: RoomManager
     @EnvironmentObject var catalogManager: FurnitureCatalogManager
@@ -143,6 +144,11 @@ struct RoomListView: View {
         }
     }
 
+    private var recentRoomsToShow: [RecentRoom] {
+        let ids = Set(userRooms.map(\.id))
+        return recents.recentRooms.filter { ids.contains($0.id) }
+    }
+
     private var roomsList: some View {
         List {
             Section {
@@ -151,8 +157,33 @@ struct RoomListView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             }
-            ForEach(userRooms) { room in
-                roomRow(for: room)
+
+            if !recentRoomsToShow.isEmpty {
+                Section {
+                    ForEach(recentRoomsToShow) { recent in
+                        if let room = userRooms.first(where: { $0.id == recent.id }) {
+                            roomRow(for: room)
+                        }
+                    }
+                } header: {
+                    Text("Recently Viewed")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(AppTheme.secondaryText)
+                        .textCase(nil)
+                }
+            }
+
+            Section {
+                ForEach(userRooms) { room in
+                    roomRow(for: room)
+                }
+            } header: {
+                if !recentRoomsToShow.isEmpty {
+                    Text("All Rooms")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(AppTheme.secondaryText)
+                        .textCase(nil)
+                }
             }
         }
         .listStyle(.plain)
@@ -186,17 +217,17 @@ struct RoomListView: View {
                         Text("Demo 3D Gaussian Splat")
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(AppTheme.primaryText)
-                        Text("DEMO")
-                            .font(.caption2.weight(.bold))
-                            .foregroundColor(AppTheme.glowViolet)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(AppTheme.glowViolet.opacity(0.18))
-                            .clipShape(Capsule())
+                        // Text("DEMO")
+                        //     .font(.caption2.weight(.bold))
+                        //     .foregroundColor(AppTheme.glowViolet)
+                        //     .padding(.horizontal, 6)
+                        //     .padding(.vertical, 2)
+                        //     .background(AppTheme.glowViolet.opacity(0.18))
+                        //     .clipShape(Capsule())
                     }
-                    Text(demoSplatURL != nil ? "Tap to view best result" : "Add demo_splat.ply to bundle or Documents")
-                        .font(.caption)
-                        .foregroundColor(AppTheme.secondaryText)
+                    // Text(demoSplatURL != nil ? "Tap to view best result" : "Add demo_splat.ply to bundle or Documents")
+                    //     .font(.caption)
+                    //     .foregroundColor(AppTheme.secondaryText)
                 }
 
                 Spacer()

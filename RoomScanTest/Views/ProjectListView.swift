@@ -11,6 +11,7 @@
 import SwiftUI
 
 struct ProjectListView: View {
+    @ObservedObject private var recents = RecentItemsStore.shared
     @EnvironmentObject var projectManager: ProjectManager
     @EnvironmentObject var roomManager: RoomManager
     @EnvironmentObject var userManager: UserManager
@@ -52,9 +53,36 @@ struct ProjectListView: View {
 
     // MARK: - Project List
 
+    private var recentProjectsToShow: [RecentProject] {
+        let ids = Set(projects.map(\.id))
+        return recents.recentProjects.filter { ids.contains($0.id) }
+    }
+
     private var projectList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                if !recentProjectsToShow.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recently Created")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(AppTheme.secondaryText)
+                            .padding(.horizontal, 16)
+                        ForEach(recentProjectsToShow) { recent in
+                            if let project = projects.first(where: { $0.id == recent.id }) {
+                                NavigationLink(destination: ProjectDetailView(project: project)) {
+                                    projectCard(project)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        Divider()
+                            .padding(.horizontal, 16)
+                        Text("All Projects")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(AppTheme.secondaryText)
+                            .padding(.horizontal, 16)
+                    }
+                }
                 ForEach(projects) { project in
                     NavigationLink(destination: ProjectDetailView(project: project)) {
                         projectCard(project)
@@ -199,10 +227,11 @@ struct ProjectListView: View {
                     Button {
                         let name = newProjectName.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !name.isEmpty else { return }
-                        projectManager.createProject(
+                        let created = projectManager.createProject(
                             name: name,
                             description: newProjectDescription.trimmingCharacters(in: .whitespacesAndNewlines)
                         )
+                        RecentItemsStore.shared.recordProject(RecentProject(id: created.id, name: created.name))
                         newProjectName = ""
                         newProjectDescription = ""
                         showCreateSheet = false

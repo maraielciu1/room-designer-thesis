@@ -78,12 +78,10 @@ struct ScannedObject: Identifiable {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // MARK: - Helpers
-// ═══════════════════════════════════════════════════════════════════
 
 /// Extracts the `FurnitureReplacement.id` UUID embedded in a scene key.
-/// Decor / added keys use the format "prefix_<UUID>", e.g. "wallArt_XXXXXXXX-…".
+/// Decor / added keys use the format "prefix_<UUID>", e.g. "wallArt_...".
 /// Returns `nil` for position-keyed objects like "obj_0_1.20_0.00_-0.50".
 private func extractReplacementId(from key: String) -> UUID? {
     for prefix in ["wallArt_", "lighting_", "carpet_", "added_"] {
@@ -94,9 +92,7 @@ private func extractReplacementId(from key: String) -> UUID? {
     return nil
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // MARK: - RoomDesignerView
-// ═══════════════════════════════════════════════════════════════════
 
 struct RoomDesignerView: View {
     @EnvironmentObject var roomManager: RoomManager
@@ -326,6 +322,9 @@ struct RoomDesignerView: View {
         .sheet(isPresented: $showStatistics) {
             RoomStatisticsView(room: room)
                 .appSheetBackground()
+        }
+        .onAppear {
+            RecentItemsStore.shared.recordRoom(RecentRoom(id: room.id, name: room.name))
         }
         .onChange(of: room.id) { _, _ in roomManager.updateRoom(room) }
         .onChange(of: room.furnitureReplacements.count) { _, _ in roomManager.updateRoom(room) }
@@ -1158,9 +1157,7 @@ struct RoomDesignerView: View {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
 // MARK: - RoomModelSceneView (Non-AR 3D Room Scene)
-// ═══════════════════════════════════════════════════════════════════
 
 struct RoomModelSceneView: UIViewRepresentable {
     let capturedRoom: CapturedRoom
@@ -2962,6 +2959,7 @@ struct FurniturePickerView: View {
     @EnvironmentObject var roomManager: RoomManager
     @EnvironmentObject var historyManager: HistoryManager
     @EnvironmentObject var scannedFurnitureManager: ScannedFurnitureManager
+    @ObservedObject private var recents = RecentItemsStore.shared
     @Environment(\.dismiss) var dismiss
 
     let selectedObject: ScannedObject
@@ -2987,6 +2985,21 @@ struct FurniturePickerView: View {
                 AppTheme.background.ignoresSafeArea()
 
                 ScrollView {
+                    // Recently used
+                    if !recents.recentFurniture.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ThemeSectionHeader(title: "Recently Used", icon: "clock.arrow.circlepath")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(recents.recentFurniture) { item in
+                                    FurnitureCard(modelName: item.modelKey) { replaceObject(with: item.modelKey) }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+
                     // Built-in models
                     if !availableModels.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
@@ -3067,11 +3080,16 @@ struct FurniturePickerView: View {
         room.furnitureReplacements.append(replacement)
         roomManager.updateRoom(room)
 
+        let displayName = friendlyModelName(usdzFileName)
+        RecentItemsStore.shared.recordFurniture(
+            RecentFurniture(id: UUID(), modelKey: usdzFileName, displayName: displayName)
+        )
+
         historyManager.addHistoryEntry(
             roomId: room.id,
             replacementId: replacement.id,
             action: .replaced,
-            details: "Replaced \(catDesc) with \(friendlyModelName(usdzFileName))"
+            details: "Replaced \(catDesc) with \(displayName)"
         )
         dismiss()
     }

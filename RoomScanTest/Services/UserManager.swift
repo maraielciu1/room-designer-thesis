@@ -14,6 +14,7 @@ class UserManager: ObservableObject {
 
     func setCurrentUser(_ user: User) {
         currentUser = user
+        RecentItemsStore.shared.configure(for: user.id)
     }
 
     func clearSession() {
